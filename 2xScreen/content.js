@@ -5,6 +5,11 @@ let shadow = null;
 let currentZoomPercent = 100;
 let isUrlCheckingInterval = null;
 
+// Función para verificar si el contexto de la extensión sigue siendo válido
+function isContextValid() {
+  return typeof chrome !== 'undefined' && chrome.runtime && !!chrome.runtime.id;
+}
+
 // Inicialización de la extensión al cargar la página
 async function init() {
   try {
@@ -12,7 +17,7 @@ async function init() {
     if (response && response.enabled) {
       const storage = await chrome.storage.local.get("isBarCollapsed");
       const isCollapsed = storage.isBarCollapsed !== undefined ? storage.isBarCollapsed : false;
-      initUI(!!response.alignRightScreen, isCollapsed);
+      await initUI(!!response.alignRightScreen, isCollapsed);
     }
   } catch (err) {
     // Si falla la comunicación inicial, reintentamos después
@@ -22,18 +27,32 @@ async function init() {
 
 // Escuchar mensajes provenientes del background service worker
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message.action === "set2xMode") {
-    if (message.enabled) {
-      (async () => {
-        const storage = await chrome.storage.local.get("isBarCollapsed");
-        const isCollapsed = storage.isBarCollapsed !== undefined ? storage.isBarCollapsed : false;
-        initUI(!!message.alignRightScreen, isCollapsed);
-      })();
-    } else {
-      destroyUI();
-    }
+  if (!isContextValid()) {
+    destroyUI();
+    return;
   }
-  sendResponse({ success: true });
+  try {
+    if (message.action === "set2xMode") {
+      if (message.enabled) {
+        (async () => {
+          try {
+            const storage = await chrome.storage.local.get("isBarCollapsed");
+            const isCollapsed = storage.isBarCollapsed !== undefined ? storage.isBarCollapsed : false;
+            await initUI(!!message.alignRightScreen, isCollapsed);
+          } catch (err) {
+            console.debug("Error leyendo almacenamiento en set2xMode:", err);
+            destroyUI();
+          }
+        })();
+      } else {
+        destroyUI();
+      }
+    }
+    sendResponse({ success: true });
+  } catch (err) {
+    console.debug("Error procesando mensaje en content script:", err);
+    destroyUI();
+  }
 });
 
 function startLoadingState() {
@@ -53,11 +72,21 @@ function stopLoadingState() {
 }
 
 // Función para construir e inyectar la UI flotante
-function initUI(alignRightScreen, isCollapsed) {
+async function initUI(alignRightScreen, isCollapsed) {
   // Evitar duplicados
   if (document.getElementById("minichrome-2x-extension-root")) {
     updateURLInput();
     return;
+  }
+
+  // Obtener estado de extensiones auxiliares
+  let extensionsStatus = null;
+  if (isContextValid()) {
+    try {
+      extensionsStatus = await chrome.runtime.sendMessage({ action: "checkInstalledExtensions" });
+    } catch (err) {
+      console.debug("Error obteniendo estado de extensiones auxiliares:", err);
+    }
   }
 
   // 1. Crear el Shadow Host
@@ -207,6 +236,13 @@ function initUI(alignRightScreen, isCollapsed) {
   const btnRestore = shadow.querySelector("#mc-2x");
   const btnCloseWindow = shadow.querySelector("#mc-close-window");
 
+  // Ocultar botones si las extensiones correspondientes no están instaladas/activas
+  if (extensionsStatus) {
+    if (!extensionsStatus.agenda && btnAgenda) btnAgenda.style.display = "none";
+    if (!extensionsStatus.videoplayer && btnVideoPlayer) btnVideoPlayer.style.display = "none";
+    if (!extensionsStatus.imageplayer && btnImagePlayer) btnImagePlayer.style.display = "none";
+  }
+
   // Mostrar la URL y estado inicial
   updateURLInput();
   checkFavoriteState();
@@ -232,14 +268,17 @@ function initUI(alignRightScreen, isCollapsed) {
 
   // Acciones de navegación
   btnBack.addEventListener("click", () => {
+    if (!isContextValid()) return destroyUI();
     startLoadingState();
     chrome.runtime.sendMessage({ action: "goBack" });
   });
   btnFwd.addEventListener("click", () => {
+    if (!isContextValid()) return destroyUI();
     startLoadingState();
     chrome.runtime.sendMessage({ action: "goForward" });
   });
   btnReload.addEventListener("click", () => {
+    if (!isContextValid()) return destroyUI();
     startLoadingState();
     chrome.runtime.sendMessage({ action: "reload" });
   });
@@ -252,6 +291,7 @@ function initUI(alignRightScreen, isCollapsed) {
 
   // Evento Ir
   const handleNavigation = () => {
+    if (!isContextValid()) return destroyUI();
     const url = inputUrl.value.trim();
     if (url) {
       startLoadingState();
@@ -268,46 +308,70 @@ function initUI(alignRightScreen, isCollapsed) {
 
   // Acciones de Zoom
   btnZoomOut.addEventListener("click", async () => {
-    const resp = await chrome.runtime.sendMessage({ action: "changeZoom", direction: "out" });
-    if (resp && resp.zoom) {
-      currentZoomPercent = resp.zoom;
-      btnZoomLbl.innerText = `${currentZoomPercent}%`;
+    if (!isContextValid()) return destroyUI();
+    try {
+      const resp = await chrome.runtime.sendMessage({ action: "changeZoom", direction: "out" });
+      if (resp && resp.zoom) {
+        currentZoomPercent = resp.zoom;
+        btnZoomLbl.innerText = `${currentZoomPercent}%`;
+      }
+    } catch (err) {
+      console.debug("Error al cambiar zoom out:", err);
+      destroyUI();
     }
   });
 
   btnZoomIn.addEventListener("click", async () => {
-    const resp = await chrome.runtime.sendMessage({ action: "changeZoom", direction: "in" });
-    if (resp && resp.zoom) {
-      currentZoomPercent = resp.zoom;
-      btnZoomLbl.innerText = `${currentZoomPercent}%`;
+    if (!isContextValid()) return destroyUI();
+    try {
+      const resp = await chrome.runtime.sendMessage({ action: "changeZoom", direction: "in" });
+      if (resp && resp.zoom) {
+        currentZoomPercent = resp.zoom;
+        btnZoomLbl.innerText = `${currentZoomPercent}%`;
+      }
+    } catch (err) {
+      console.debug("Error al cambiar zoom in:", err);
+      destroyUI();
     }
   });
 
   btnZoomLbl.addEventListener("click", async () => {
-    const resp = await chrome.runtime.sendMessage({ action: "changeZoom", direction: "reset" });
-    if (resp && resp.zoom) {
-      currentZoomPercent = resp.zoom;
-      btnZoomLbl.innerText = `${currentZoomPercent}%`;
+    if (!isContextValid()) return destroyUI();
+    try {
+      const resp = await chrome.runtime.sendMessage({ action: "changeZoom", direction: "reset" });
+      if (resp && resp.zoom) {
+        currentZoomPercent = resp.zoom;
+        btnZoomLbl.innerText = `${currentZoomPercent}%`;
+      }
+    } catch (err) {
+      console.debug("Error al resetear zoom:", err);
+      destroyUI();
     }
   });
 
   // Acciones de Favoritos (☆)
   btnFav.addEventListener("click", async () => {
+    if (!isContextValid()) return destroyUI();
     const isFav = btnFav.classList.contains("active");
     const currentUrl = window.location.href;
     const currentTitle = document.title || currentUrl;
 
     if (!isFav) {
       // Agregar favorito
-      const response = await chrome.runtime.sendMessage({
-        action: "addFavorite",
-        url: currentUrl,
-        title: currentTitle
-      });
-      if (response && response.success) {
-        btnFav.classList.add("active");
-        btnFav.innerText = "★";
-        showToast("Favorito Guardado", `Se ha agregado "${currentTitle}" a tus marcadores de Chrome.`);
+      try {
+        const response = await chrome.runtime.sendMessage({
+          action: "addFavorite",
+          url: currentUrl,
+          title: currentTitle
+        });
+        if (response && response.success) {
+          btnFav.classList.add("active");
+          btnFav.innerText = "★";
+          showToast("Favorito Guardado", `Se ha agregado "${currentTitle}" a tus marcadores de Chrome.`);
+        }
+      } catch (err) {
+        console.debug("Error agregando favorito:", err);
+        destroyUI();
       }
     } else {
       // Pedir confirmación con modal personalizado para eliminar
@@ -315,14 +379,20 @@ function initUI(alignRightScreen, isCollapsed) {
         "Eliminar favorito",
         `¿Está seguro de que desea eliminar la página "${currentTitle}" de favoritos?`,
         async () => {
-          const response = await chrome.runtime.sendMessage({
-            action: "removeFavorite",
-            url: currentUrl
-          });
-          if (response && response.success) {
-            btnFav.classList.remove("active");
-            btnFav.innerText = "☆";
-            showToast("Favorito Eliminado", `Se ha quitado la página de tus marcadores.`);
+          if (!isContextValid()) return destroyUI();
+          try {
+            const response = await chrome.runtime.sendMessage({
+              action: "removeFavorite",
+              url: currentUrl
+            });
+            if (response && response.success) {
+              btnFav.classList.remove("active");
+              btnFav.innerText = "☆";
+              showToast("Favorito Eliminado", `Se ha quitado la página de tus marcadores.`);
+            }
+          } catch (err) {
+            console.debug("Error eliminando favorito:", err);
+            destroyUI();
           }
         }
       );
@@ -331,12 +401,14 @@ function initUI(alignRightScreen, isCollapsed) {
 
   // Botón salir de modo 2x
   btnRestore.addEventListener("click", () => {
+    if (!isContextValid()) return destroyUI();
     chrome.runtime.sendMessage({ action: "restoreWindow" });
   });
 
   // Acción de captura de pantalla
   if (btnScreenshot) {
     btnScreenshot.addEventListener("click", () => {
+      if (!isContextValid()) return destroyUI();
       chrome.runtime.sendMessage({ action: "take_screenshot" });
     });
   }
@@ -344,6 +416,7 @@ function initUI(alignRightScreen, isCollapsed) {
   // Abrir Agenda / Notes
   if (btnAgenda) {
     btnAgenda.addEventListener("click", () => {
+      if (!isContextValid()) return destroyUI();
       chrome.runtime.sendMessage({
         action: "open_url",
         url: "chrome-extension://bgiopnnblbijgffgdohgmnkhopbonefd/notes.html"
@@ -360,6 +433,7 @@ function initUI(alignRightScreen, isCollapsed) {
   // Abrir Video Player
   if (btnVideoPlayer) {
     btnVideoPlayer.addEventListener("click", () => {
+      if (!isContextValid()) return destroyUI();
       chrome.runtime.sendMessage({
         action: "open_url",
         url: "chrome-extension://akmbookdeplgfocoehhjajjakckkdfke/videoplayer.html"
@@ -376,6 +450,7 @@ function initUI(alignRightScreen, isCollapsed) {
   // Abrir Image Player
   if (btnImagePlayer) {
     btnImagePlayer.addEventListener("click", () => {
+      if (!isContextValid()) return destroyUI();
       chrome.runtime.sendMessage({
         action: "open_url",
         url: "chrome-extension://dkpgjcdnjhempmphhmgnbabiimlccgne/imageplayer.html"
@@ -392,6 +467,7 @@ function initUI(alignRightScreen, isCollapsed) {
   // Cerrar Ventana actual
   if (btnCloseWindow) {
     btnCloseWindow.addEventListener("click", () => {
+      if (!isContextValid()) return destroyUI();
       chrome.runtime.sendMessage({ action: "close_current_window" }, (response) => {
         if (chrome.runtime.lastError) {
           showToast("Error de Comunicación", `Asegúrate de recargar la extensión 2xScreen en chrome://extensions. Detalle: ${chrome.runtime.lastError.message}`);
@@ -404,6 +480,10 @@ function initUI(alignRightScreen, isCollapsed) {
 
   // Intervalo ligero para sincronizar URL y favoritos en aplicaciones SPA
   isUrlCheckingInterval = setInterval(() => {
+    if (!isContextValid()) {
+      destroyUI();
+      return;
+    }
     const currentUrl = window.location.href;
     if (inputUrl.value !== currentUrl && !inputUrl.matches(":focus")) {
       inputUrl.value = currentUrl;
@@ -445,6 +525,11 @@ async function checkFavoriteState() {
   const btnFav = shadow.querySelector("#mc-fav");
   if (!btnFav) return;
 
+  if (!isContextValid()) {
+    destroyUI();
+    return;
+  }
+
   try {
     const response = await chrome.runtime.sendMessage({
       action: "checkFavorite",
@@ -459,6 +544,9 @@ async function checkFavoriteState() {
     }
   } catch (e) {
     console.debug("Error verificando favoritos:", e);
+    if (e.message && e.message.includes("Extension context invalidated")) {
+      destroyUI();
+    }
   }
 }
 
@@ -468,6 +556,11 @@ async function updateZoomValue() {
   const btnZoomLbl = shadow.querySelector("#mc-zoom-lbl");
   if (!btnZoomLbl) return;
 
+  if (!isContextValid()) {
+    destroyUI();
+    return;
+  }
+
   try {
     const response = await chrome.runtime.sendMessage({ action: "getZoom" });
     if (response && response.zoom) {
@@ -476,6 +569,9 @@ async function updateZoomValue() {
     }
   } catch (e) {
     console.debug("Error obteniendo zoom:", e);
+    if (e.message && e.message.includes("Extension context invalidated")) {
+      destroyUI();
+    }
   }
 }
 
@@ -485,6 +581,7 @@ function destroyUI() {
     clearInterval(isUrlCheckingInterval);
     isUrlCheckingInterval = null;
   }
+  document.removeEventListener("keydown", handleKeyDown);
   if (container) {
     container.remove();
     container = null;
@@ -678,9 +775,14 @@ function showSecurityInfoModal() {
 }
 
 // --- Accesos directos de teclado (Shortcuts) ---
-document.addEventListener("keydown", (e) => {
+function handleKeyDown(e) {
   // Solo escuchar atajos si la interfaz de la extensión está activa en la página
   if (!container) return;
+
+  if (!isContextValid()) {
+    destroyUI();
+    return;
+  }
 
   // 1. Escape: salir del modo 2x
   if (e.key === "Escape") {
@@ -691,7 +793,12 @@ document.addEventListener("keydown", (e) => {
       activeEl.blur();
       return;
     }
-    chrome.runtime.sendMessage({ action: "restoreWindow" });
+    try {
+      chrome.runtime.sendMessage({ action: "restoreWindow" });
+    } catch (err) {
+      console.debug("Error de comunicación 2xScreen:", err);
+      destroyUI();
+    }
   }
 
   // 2. Ctrl + Space: Alternar visibilidad de la barra
@@ -713,10 +820,17 @@ document.addEventListener("keydown", (e) => {
         if (inputUrl) setTimeout(() => inputUrl.focus(), 150);
       }
       // Guardar el estado en el storage local
-      chrome.storage.local.set({ isBarCollapsed: isCollapsed });
+      try {
+        chrome.storage.local.set({ isBarCollapsed: isCollapsed });
+      } catch (err) {
+        console.debug("Error guardando configuración 2xScreen:", err);
+        destroyUI();
+      }
     }
   }
-});
+}
+
+document.addEventListener("keydown", handleKeyDown);
 
 // Arrancar script
 init();

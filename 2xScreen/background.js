@@ -237,6 +237,24 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   (async () => {
     try {
       switch (message.action) {
+        case "checkInstalledExtensions":
+          const results = {};
+          const extIds = {
+            agenda: "bgiopnnblbijgffgdohgmnkhopbonefd",
+            videoplayer: "akmbookdeplgfocoehhjajjakckkdfke",
+            imageplayer: "dkpgjcdnjhempmphhmgnbabiimlccgne"
+          };
+          for (const [key, id] of Object.entries(extIds)) {
+            try {
+              const ext = await chrome.management.get(id);
+              results[key] = !!(ext && ext.enabled);
+            } catch (e) {
+              results[key] = false;
+            }
+          }
+          sendResponse(results);
+          break;
+
         case "restoreWindow":
           const data = await chrome.storage.local.get("active2xTabs");
           await restoreWindow(tabId, data.active2xTabs || {});
