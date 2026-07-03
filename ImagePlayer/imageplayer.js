@@ -181,7 +181,10 @@
                     showNotification('Por favor, configura la ruta absoluta en Minichrome.', 'info', true);
                     return;
                 }
-                const absPath = `${rootPath.replace(/\/+$/, '')}/${img.path}`;
+                let absPath = `${rootPath.replace(/[\\/]+$/, '')}/${img.path}`;
+                if (rootPath.includes('\\')) {
+                    absPath = absPath.replace(/\//g, '\\');
+                }
                 const ok = await py.set_image_wallpaper(absPath);
                 showNotification(ok ? 'Fondo de pantalla aplicado exitosamente' : 'No se pudo aplicar el fondo', ok ? 'success' : 'error');
             } catch (e) {
@@ -373,6 +376,12 @@
 
         const sortEl = q('ip-sort');
         if (sortEl) sortEl.value = state.settings.sortBy;
+
+        if (typeof window.showDirectoryPicker !== 'function') {
+            q('ip-permission-banner').style.display = 'none';
+            q('ip-folder-tree').innerHTML = '<div style="padding:20px 14px; font-size:0.8rem; color:#ff7675; text-align:center; line-height:1.6;">La exploración de archivos locales no es compatible en este navegador/dispositivo (no disponible en iOS).</div>';
+            return;
+        }
 
         state.rootHandle = await loadHandle('root_directory');
         if (state.rootHandle) {
@@ -1210,11 +1219,30 @@
 
     function openConfigModal() {
         q('ip-cfg-modal').classList.add('active');
+        const selectBtn = q('ip-cfg-select-btn');
+        const nameLabel = q('ip-cfg-selected-name');
+
+        if (typeof window.showDirectoryPicker !== 'function') {
+            if (selectBtn) {
+                selectBtn.disabled = true;
+                selectBtn.style.opacity = '0.5';
+                selectBtn.style.cursor = 'not-allowed';
+                selectBtn.title = 'No compatible con este navegador/dispositivo (ej. iOS)';
+            }
+            if (nameLabel) {
+                nameLabel.textContent = 'La exploración de archivos locales no es compatible en este navegador o sistema (requiere File System Access API, no disponible en iOS).';
+                nameLabel.style.display = 'block';
+                nameLabel.style.color = '#ff7675';
+            }
+            return;
+        }
+
         if (state.rootHandle) {
-            q('ip-cfg-selected-name').textContent = `Carpeta actual: ${state.rootHandle.name}`;
-            q('ip-cfg-selected-name').style.display = 'block';
+            nameLabel.textContent = `Carpeta actual: ${state.rootHandle.name}`;
+            nameLabel.style.display = 'block';
+            nameLabel.style.color = '';
         } else {
-            q('ip-cfg-selected-name').style.display = 'none';
+            nameLabel.style.display = 'none';
         }
     }
 

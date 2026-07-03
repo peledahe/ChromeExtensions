@@ -1088,7 +1088,12 @@ function renderCfgFolderBrowser(data) {
         row.className = 'cfg-folder-item';
         row.innerHTML = `<span>📁</span><span>${escapeHtml(name)}</span>`;
         row.onclick = async () => {
-            const nextPath = `${state.cfgBrowsingPath.replace(/\/+$/, '')}/${name}`;
+            const isWindows = state.cfgBrowsingPath.includes('\\');
+            const sep = isWindows ? '\\' : '/';
+            const cleanPath = isWindows 
+                ? state.cfgBrowsingPath.replace(/[\\/]+$/, '')
+                : state.cfgBrowsingPath.replace(/\/+$/, '');
+            const nextPath = `${cleanPath}${sep}${name}`;
             const raw = state.cfgBrowseMode === 'image'
                 ? await py.browse_local_path(nextPath)
                 : await py.browse_folders(nextPath);

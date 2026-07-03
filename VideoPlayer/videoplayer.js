@@ -2201,13 +2201,34 @@
             setStartupVideo();
             await DbManager.init();
 
-            // Cargar Handle de Carpeta persistido en IndexedDB
-            localState.rootHandle = await loadHandle('root_directory');
-            if (localState.rootHandle) {
-                await checkDirectoryPermissions();
-            } else {
+            if (typeof window.showDirectoryPicker !== 'function') {
+                const banner = document.getElementById('vp-permission-banner');
+                if (banner) banner.style.display = 'none';
                 if (folderList) {
-                    folderList.innerHTML = '<li class="info-text" style="padding:20px 14px; font-size:0.8rem; opacity:0.4; text-align:center; line-height:1.6;">Configura la carpeta raíz de videos desde el botón ⚙️ superior.</li>';
+                    folderList.innerHTML = '<li class="info-text" style="padding:20px 14px; font-size:0.8rem; color:#ff7675; text-align:center; line-height:1.6;">La exploración de archivos locales no es compatible en este navegador/dispositivo (no disponible en iOS).</li>';
+                }
+                const configBtn = document.getElementById('config-select-dir-btn');
+                if (configBtn) {
+                    configBtn.disabled = true;
+                    configBtn.style.opacity = '0.5';
+                    configBtn.style.cursor = 'not-allowed';
+                    configBtn.title = 'No compatible con este navegador/dispositivo (ej. iOS)';
+                }
+                const configLabel = document.getElementById('config-selected-name');
+                if (configLabel) {
+                    configLabel.textContent = 'Exploración local no compatible (iOS)';
+                    configLabel.style.display = 'block';
+                    configLabel.style.color = '#ff7675';
+                }
+            } else {
+                // Cargar Handle de Carpeta persistido en IndexedDB
+                localState.rootHandle = await loadHandle('root_directory');
+                if (localState.rootHandle) {
+                    await checkDirectoryPermissions();
+                } else {
+                    if (folderList) {
+                        folderList.innerHTML = '<li class="info-text" style="padding:20px 14px; font-size:0.8rem; opacity:0.4; text-align:center; line-height:1.6;">Configura la carpeta raíz de videos desde el botón ⚙️ superior.</li>';
+                    }
                 }
             }
 
