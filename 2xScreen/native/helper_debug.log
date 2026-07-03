@@ -1,0 +1,72 @@
+=== Helper de 2xScreen Iniciado ===
+Acción recibida: 'undecorate', Título: 'Mk2xScreen_1783096474353'
+Iniciando undecorate_linux para título: 'Mk2xScreen_1783096474353'
+IDs de ventana encontrados en _NET_CLIENT_LIST: ['0x1600008', '0x160000c', '0x1600010', '0x3e00021', '0x2a00004', '0x2c00004', '0x2c00027']
+¡Coincidencia encontrada! ID: 0x2c00027, Prop: WM_NAME, Contenido: 'WM_NAME(UTF8_STRING) = "Mk2xScreen_1783096474353"'
+Ejecutando xprop para quitar decoraciones en 0x2c00027. Retorno: 0. Stderr: 
+Respuesta enviada a Chrome: success=True
+Conexión cerrada o mensaje nulo recibido. Saliendo.
+=== Helper de 2xScreen Iniciado ===
+Acción recibida: 'undecorate', Título: 'Mk2xScreen_1783096611944'
+Iniciando undecorate_linux para título: 'Mk2xScreen_1783096611944'
+IDs de ventana encontrados en _NET_CLIENT_LIST: ['0x1600008', '0x160000c', '0x1600010', '0x3e00021', '0x2a00004', '0x2c00004', '0x2c00035']
+¡Coincidencia encontrada! ID: 0x2c00035, Prop: WM_NAME, Contenido: 'WM_NAME(UTF8_STRING) = "Mk2xScreen_1783096611944"'
+Ejecutando xprop para quitar decoraciones en 0x2c00035. Retorno: 0. Stderr: 
+Respuesta enviada a Chrome: success=True
+Conexión cerrada o mensaje nulo recibido. Saliendo.
+=== Helper de 2xScreen Iniciado ===
+Acción recibida: 'undecorate', Título: 'Mk2xScreen_1783097028149'
+Iniciando undecorate_linux para título: 'Mk2xScreen_1783097028149'
+IDs de ventana encontrados en _NET_CLIENT_LIST: ['0x1600008', '0x160000c', '0x1600010', '0x3e00021', '0x2a00004', '0x2c00004', '0x2c0004b']
+¡Coincidencia encontrada! ID: 0x2c0004b, Prop: WM_NAME, Contenido: 'WM_NAME(UTF8_STRING) = "Mk2xScreen_1783097028149"'
+Ejecutando xprop para quitar decoraciones en 0x2c0004b. Retorno: 0. Stderr: 
+Respuesta enviada a Chrome: success=True
+Conexión cerrada o mensaje nulo recibido. Saliendo.
+=== Helper de 2xScreen Iniciado ===
+Acción recibida: 'undecorate', Título: 'Mk2xScreen_1783097791959'
+Iniciando undecorate_linux para título: 'Mk2xScreen_1783097791959'
+IDs de ventana encontrados en _NET_CLIENT_LIST: ['0x1600008', '0x160000c', '0x1600010', '0x2a00004', '0x2c00004', '0x2c00023']
+¡Coincidencia encontrada! ID: 0x2c00023, Prop: WM_NAME, Contenido: 'WM_NAME(UTF8_STRING) = "Mk2xScreen_1783097791959"'
+Ejecutando xprop para quitar decoraciones en 0x2c00023. Retorno: 0. Stderr: 
+Respuesta enviada a Chrome: success=True
+Conexión cerrada o mensaje nulo recibido. Saliendo.
+=== Helper de 2xScreen Iniciado ===
+Acción recibida: 'undecorate', Título: 'Mk2xScreen_1783097805713'
+Iniciando undecorate_linux para título: 'Mk2xScreen_1783097805713'
+IDs de ventana encontrados en _NET_CLIENT_LIST: ['0x1600008', '0x160000c', '0x1600010', '0x2a00004', '0x2c00004', '0x2c00027']
+¡Coincidencia encontrada! ID: 0x2c00027, Prop: WM_NAME, Contenido: 'WM_NAME(UTF8_STRING) = "Mk2xScreen_1783097805713"'
+Ejecutando xprop para quitar decoraciones en 0x2c00027. Retorno: 0. Stderr: 
+Respuesta enviada a Chrome: success=True
+Conexión cerrada o mensaje nulo recibido. Saliendo.
+=== Helper de 2xScreen Iniciado ===
+Acción recibida: 'undecorate', Título: 'Mk2xScreen_1783097812775'
+Iniciando undecorate_linux para título: 'Mk2xScreen_1783097812775'
+IDs de ventana encontrados en _NET_CLIENT_LIST: ['0x1600008', '0x160000c', '0x1600010', '0x2a00004', '0x2c00004', '0x2c00032']
+¡Coincidencia encontrada! ID: 0x2c00032, Prop: WM_NAME, Contenido: 'WM_NAME(UTF8_STRING) = "Mk2xScreen_1783097812775"'
+Ejecutando xprop para quitar decoraciones en 0x2c00032. Retorno: 0. Stderr: 
+Respuesta enviada a Chrome: success=True
+Conexión cerrada o mensaje nulo recibido. Saliendo.
+=== Helper de 2xScreen Iniciado ===
+Acción recibida: 'undecorate', Título: 'Mk2xScreen_1783098442747'
+Iniciando undecorate_linux para título: 'Mk2xScreen_1783098442747'
+IDs de ventana encontrados en _NET_CLIENT_LIST: ['0x1600008', '0x160000c', '0x1600010', '0x2a00004', '0x2c00004', '0x2c0006c']
+¡Coincidencia encontrada! ID: 0x2c0006c, Prop: WM_NAME, Contenido: 'WM_NAME(UTF8_STRING) = "Mk2xScreen_1783098442747"'
+Ejecutando xprop para quitar decoraciones en 0x2c0006c. Retorno: 0. Stderr: 
+Respuesta enviada a Chrome: success=True
+Conexión cerrada o mensaje nulo recibido. Saliendo.
+=== Helper de 2xScreen Iniciado ===
+Acción recibida: 'undecorate', Título: 'Mk2xScreen_1783098626098'
+Iniciando undecorate_linux para título: 'Mk2xScreen_1783098626098'
+IDs de ventana encontrados en _NET_CLIENT_LIST: ['0x1600008', '0x160000c', '0x1600010', '0x2a00004', '0x2c00004', '0x2c00070']
+¡Coincidencia encontrada! ID: 0x2c00070, Prop: WM_NAME, Contenido: 'WM_NAME(UTF8_STRING) = "Mk2xScreen_1783098626098"'
+Ejecutando xprop para quitar decoraciones en 0x2c00070. Retorno: 0. Stderr: 
+Respuesta enviada a Chrome: success=True
+Conexión cerrada o mensaje nulo recibido. Saliendo.
+=== Helper de 2xScreen Iniciado ===
+Acción recibida: 'undecorate', Título: 'Mk2xScreen_1783098836133'
+Iniciando undecorate_linux para título: 'Mk2xScreen_1783098836133'
+IDs de ventana encontrados en _NET_CLIENT_LIST: ['0x1600008', '0x160000c', '0x1600010', '0x2a00004', '0x2c00004', '0x2c0009e']
+¡Coincidencia encontrada! ID: 0x2c0009e, Prop: WM_NAME, Contenido: 'WM_NAME(UTF8_STRING) = "Mk2xScreen_1783098836133"'
+Ejecutando xprop para quitar decoraciones en 0x2c0009e. Retorno: 0. Stderr: 
+Respuesta enviada a Chrome: success=True
+Conexión cerrada o mensaje nulo recibido. Saliendo.

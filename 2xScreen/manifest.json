@@ -9,7 +9,8 @@
     "windows",
     "tabs",
     "bookmarks",
-    "scripting"
+    "scripting",
+    "nativeMessaging"
   ],
   "host_permissions": [
     "<all_urls>"
@@ -31,8 +32,12 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["content.css"],
-      "matches": ["<all_urls>"]
+      "resources": [
+        "content.css"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
     }
   ],
   "content_scripts": [
@@ -54,8 +59,11 @@
     "gecko": {
       "id": "twoscreen@merke.net",
       "data_collection_permissions": {
-        "required": ["none"]
+        "required": [
+          "none"
+        ]
       }
     }
-  }
+  },
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEApgrqmK5fRxc5LUIaiVBdDtoNTZ/eg1JVcngEzLJfR1uO4BiV6dVdnuvpZXZPr0nfNOkhmf2dbAW2tliURgQVO4zfjf60Kb/CcVbWuDvgL6h7fJx6rDQpQilApK9iHiEJbJH7pzq2mr1hBxRNnUq/6Vm0ctgNgVmtqvmxBvN8RkK14xLe4RLgAZRnv9c7lH7BnN0e1feLJe+dYLjUn7bKhNSVYo+86xCzqRIgVh06SMw4Gy3yLIzGM0zjyCvaJMHNXrK3PhdZ3Y7drm4fi/+ZC18LykzI46yAKx3+ee4OMA1yNirKL9pwtf+tipX7IugFYT+TlWHtwWdsN934FVl6qQIDAQAB"
 }

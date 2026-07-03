@@ -145,13 +145,43 @@ function initUI(alignRightScreen, isCollapsed) {
       </div>
 
       <button class="mc-btn mc-btn-fav" id="mc-fav" title="Guardar favorito">☆</button>
+      
       <button class="mc-btn" id="mc-screenshot" title="Tomar captura (ScreenShot Merke)" style="display: flex; align-items: center; justify-content: center;">
         <svg viewBox="0 0 24 24" style="width:14px; height:14px; fill:none; stroke:currentColor; stroke-width:2.5; stroke-linecap:round; stroke-linejoin:round;">
           <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
           <circle cx="12" cy="13" r="4"/>
         </svg>
       </button>
+
+      <button class="mc-btn" id="mc-agenda" title="Abrir Agenda (Notes)" style="display: flex; align-items: center; justify-content: center;">
+        <svg viewBox="0 0 24 24" style="width:14px; height:14px; fill:none; stroke:currentColor; stroke-width:2.2; stroke-linecap:round; stroke-linejoin:round;">
+          <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+          <line x1="16" y1="2" x2="16" y2="6"/>
+          <line x1="8" y1="2" x2="8" y2="6"/>
+          <line x1="3" y1="10" x2="21" y2="10"/>
+        </svg>
+      </button>
+
+      <button class="mc-btn" id="mc-videoplayer" title="Abrir Video Player" style="display: flex; align-items: center; justify-content: center;">
+        <svg viewBox="0 0 24 24" style="width:14px; height:14px; fill:none; stroke:currentColor; stroke-width:2.2; stroke-linecap:round; stroke-linejoin:round;">
+          <polygon points="23 7 16 12 23 17 23 7"/>
+          <rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
+        </svg>
+      </button>
+
+      <button class="mc-btn" id="mc-imageplayer" title="Abrir Image Player" style="display: flex; align-items: center; justify-content: center;">
+        <svg viewBox="0 0 24 24" style="width:14px; height:14px; fill:none; stroke:currentColor; stroke-width:2.2; stroke-linecap:round; stroke-linejoin:round;">
+          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+          <circle cx="8.5" cy="8.5" r="1.5"/>
+          <polyline points="21 15 16 10 5 21"/>
+        </svg>
+      </button>
+
       <button class="mc-btn-2x" id="mc-2x" title="Salir de pantalla doble (Esc)">2x</button>
+
+      <button class="mc-btn" id="mc-close-window" title="Cerrar ventana" style="display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 16px; margin-left: 2px; color: rgba(255, 107, 107, 0.9);">
+        &times;
+      </button>
     </div>
   `;
 
@@ -165,12 +195,17 @@ function initUI(alignRightScreen, isCollapsed) {
   const btnReload = shadow.querySelector("#mc-reload");
   const btnGo = shadow.querySelector("#mc-go");
   const inputUrl = shadow.querySelector("#mc-url");
+  const shield = shadow.querySelector("#mc-shield");
   const btnZoomOut = shadow.querySelector("#mc-zoom-out");
   const btnZoomIn = shadow.querySelector("#mc-zoom-in");
   const btnZoomLbl = shadow.querySelector("#mc-zoom-lbl");
   const btnFav = shadow.querySelector("#mc-fav");
   const btnScreenshot = shadow.querySelector("#mc-screenshot");
+  const btnAgenda = shadow.querySelector("#mc-agenda");
+  const btnVideoPlayer = shadow.querySelector("#mc-videoplayer");
+  const btnImagePlayer = shadow.querySelector("#mc-imageplayer");
   const btnRestore = shadow.querySelector("#mc-2x");
+  const btnCloseWindow = shadow.querySelector("#mc-close-window");
 
   // Mostrar la URL y estado inicial
   updateURLInput();
@@ -208,6 +243,12 @@ function initUI(alignRightScreen, isCollapsed) {
     startLoadingState();
     chrome.runtime.sendMessage({ action: "reload" });
   });
+
+  if (shield) {
+    shield.addEventListener("click", () => {
+      showSecurityInfoModal();
+    });
+  }
 
   // Evento Ir
   const handleNavigation = () => {
@@ -297,6 +338,67 @@ function initUI(alignRightScreen, isCollapsed) {
   if (btnScreenshot) {
     btnScreenshot.addEventListener("click", () => {
       chrome.runtime.sendMessage({ action: "take_screenshot" });
+    });
+  }
+
+  // Abrir Agenda / Notes
+  if (btnAgenda) {
+    btnAgenda.addEventListener("click", () => {
+      chrome.runtime.sendMessage({
+        action: "open_url",
+        url: "chrome-extension://bgiopnnblbijgffgdohgmnkhopbonefd/notes.html"
+      }, (response) => {
+        if (chrome.runtime.lastError) {
+          showToast("Error de Comunicación", `Asegúrate de recargar la extensión 2xScreen en chrome://extensions. Detalle: ${chrome.runtime.lastError.message}`);
+        } else if (response && response.error) {
+          showToast("Error al abrir Agenda", response.error);
+        }
+      });
+    });
+  }
+
+  // Abrir Video Player
+  if (btnVideoPlayer) {
+    btnVideoPlayer.addEventListener("click", () => {
+      chrome.runtime.sendMessage({
+        action: "open_url",
+        url: "chrome-extension://akmbookdeplgfocoehhjajjakckkdfke/videoplayer.html"
+      }, (response) => {
+        if (chrome.runtime.lastError) {
+          showToast("Error de Comunicación", `Asegúrate de recargar la extensión 2xScreen en chrome://extensions. Detalle: ${chrome.runtime.lastError.message}`);
+        } else if (response && response.error) {
+          showToast("Error al abrir Video Player", response.error);
+        }
+      });
+    });
+  }
+
+  // Abrir Image Player
+  if (btnImagePlayer) {
+    btnImagePlayer.addEventListener("click", () => {
+      chrome.runtime.sendMessage({
+        action: "open_url",
+        url: "chrome-extension://dkpgjcdnjhempmphhmgnbabiimlccgne/imageplayer.html"
+      }, (response) => {
+        if (chrome.runtime.lastError) {
+          showToast("Error de Comunicación", `Asegúrate de recargar la extensión 2xScreen en chrome://extensions. Detalle: ${chrome.runtime.lastError.message}`);
+        } else if (response && response.error) {
+          showToast("Error al abrir Image Player", response.error);
+        }
+      });
+    });
+  }
+
+  // Cerrar Ventana actual
+  if (btnCloseWindow) {
+    btnCloseWindow.addEventListener("click", () => {
+      chrome.runtime.sendMessage({ action: "close_current_window" }, (response) => {
+        if (chrome.runtime.lastError) {
+          showToast("Error de Comunicación", `Asegúrate de recargar la extensión 2xScreen en chrome://extensions. Detalle: ${chrome.runtime.lastError.message}`);
+        } else if (response && response.error) {
+          showToast("Error al cerrar ventana", response.error);
+        }
+      });
     });
   }
 
@@ -476,6 +578,102 @@ function showConfirmationModal(title, text, onConfirm) {
   btnConfirm.addEventListener("click", () => {
     onConfirm();
     closeModal();
+  });
+}
+
+// --- Modal de Detalles de Seguridad de URL (SSL) ---
+function showSecurityInfoModal() {
+  if (!shadow) return;
+
+  const protocol = window.location.protocol;
+  const hostname = window.location.hostname || "Archivo Local/Extensión";
+  
+  let modalTitle = "";
+  let modalIcon = "";
+  let modalText = "";
+
+  if (protocol === "https:") {
+    modalTitle = "Conexión Segura (SSL/TLS)";
+    modalIcon = `
+      <svg viewBox="0 0 24 24" style="width: 50px; height: 50px; fill: #2ecc71; margin-bottom: 12px;">
+        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+      </svg>
+    `;
+    modalText = `
+      La conexión a <strong>${hostname}</strong> es segura.<br><br>
+      Toda la información que transmitas (como contraseñas, datos personales o tarjetas de crédito) se cifra de extremo a extremo antes de enviarse a la red, evitando que terceros o atacantes puedan interceptarla o alterarla.<br><br>
+      <span style="opacity: 0.7; font-size: 0.82rem;">Detalles del cifrado: Protocolo seguro HTTPS configurado activamente.</span>
+    `;
+  } else if (protocol === "http:") {
+    modalTitle = "Conexión No Segura (Sin Cifrar)";
+    modalIcon = `
+      <svg viewBox="0 0 24 24" style="width: 50px; height: 50px; fill: #e74c3c; margin-bottom: 12px;">
+        <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/>
+      </svg>
+    `;
+    modalText = `
+      ⚠️ <strong>Advertencia de Privacidad</strong><br><br>
+      La conexión con <strong>${hostname}</strong> no está cifrada.<br><br>
+      Cualquier dato confidencial que ingreses en este sitio (como contraseñas, cookies de sesión o formularios) se transmitirá en texto plano y puede ser leído o modificado por intermediarios, redes de terceros o proveedores en tu red local.<br><br>
+      <span style="color: #ff7675; font-weight: bold;">Se recomienda NO introducir contraseñas ni datos bancarios en este sitio.</span>
+    `;
+  } else if (protocol === "file:") {
+    modalTitle = "Archivo Local";
+    modalIcon = `
+      <svg viewBox="0 0 24 24" style="width: 50px; height: 50px; fill: #3498db; margin-bottom: 12px;">
+        <path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/>
+      </svg>
+    `;
+    modalText = `
+      Estás visualizando un archivo almacenado localmente en tu sistema de archivos.<br><br>
+      Al no requerir acceso a internet, no existe tráfico de red expuesto. Es seguro interactuar con este archivo siempre y cuando confíes en su origen y procedencia local.
+    `;
+  } else {
+    modalTitle = "Recurso del Navegador";
+    modalIcon = `
+      <svg viewBox="0 0 24 24" style="width: 50px; height: 50px; fill: #95a5a6; margin-bottom: 12px;">
+        <path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM19 18H6c-2.21 0-4-1.79-4-4 0-2.05 1.53-3.76 3.56-3.97l1.07-.11.5-.95C8.08 7.14 9.94 6 12 6c2.62 0 4.88 1.86 5.39 4.43l.3 1.5 1.53.11c1.56.1 2.78 1.41 2.78 2.96 0 1.65-1.35 3-3 3z"/>
+      </svg>
+    `;
+    modalText = `
+      Estás accediendo a un recurso interno del navegador o de una extensión de Chrome (esquema <strong>${protocol}</strong>).<br><br>
+      Es un entorno local aislado y seguro gestionado internamente por el propio Chrome.
+    `;
+  }
+
+  const overlay = document.createElement("div");
+  overlay.className = "mc-modal-overlay";
+
+  overlay.innerHTML = `
+    <div class="mc-modal-box" style="text-align: center; max-width: 450px;">
+      ${modalIcon}
+      <h3 class="mc-modal-title" style="margin-top: 0;">${modalTitle}</h3>
+      <p class="mc-modal-text" style="text-align: left; line-height: 1.5; font-size: 0.92rem;">${modalText}</p>
+      <div class="mc-modal-buttons" style="justify-content: center; margin-top: 20px;">
+        <button class="mc-modal-btn mc-modal-btn-confirm" id="mc-modal-ok" style="padding: 6px 24px;">Entendido</button>
+      </div>
+    </div>
+  `;
+
+  shadow.appendChild(overlay);
+
+  // Forzar reflow
+  overlay.offsetHeight;
+  overlay.classList.add("show");
+
+  const btnOk = overlay.querySelector("#mc-modal-ok");
+
+  const closeModal = () => {
+    overlay.classList.remove("show");
+    setTimeout(() => overlay.remove(), 250);
+  };
+
+  btnOk.addEventListener("click", closeModal);
+
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) {
+      closeModal();
+    }
   });
 }
 

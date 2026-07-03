@@ -180,6 +180,13 @@
   width: 20px;
   height: 20px;
   margin-left: 2px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background 0.2s;
+}
+
+.mc-shield:hover {
+  background: rgba(255, 255, 255, 0.15);
 }
 
 .mc-shield svg {

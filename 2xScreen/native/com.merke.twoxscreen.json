@@ -1,0 +1,9 @@
+{
+  "name": "com.merke.twoxscreen",
+  "description": "Helper nativo de 2xScreen para quitar bordes de ventana",
+  "path": "/home/perry/Desarrollo/ChromeExtensions/2xScreen/native/twoxscreen_helper.py",
+  "type": "stdio",
+  "allowed_origins": [
+    "chrome-extension://jajhejmballgopikkdkbmnmjniljlihk/"
+  ]
+}

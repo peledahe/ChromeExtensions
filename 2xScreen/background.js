@@ -109,10 +109,43 @@ async function toggle2xMode(tab) {
       };
       await chrome.storage.local.set({ active2xTabs });
 
-      // 5. Aplicar un segundo redimensionamiento diferido a los 300ms.
+      // 5. Aplicar un segundo redimensionamiento diferido y desdecoración a los 300ms.
       // En Linux, esto fuerza a GNOME Mutter a consolidar la geometría de doble pantalla de la ventana una vez mapeada.
       setTimeout(async () => {
         try {
+          // Cambiar el título a una firma única
+          const tempTitle = `Mk2xScreen_${Date.now()}`;
+          try {
+            await chrome.scripting.executeScript({
+              target: { tabId: tab.id },
+              func: (title) => { document.title = title; },
+              args: [tempTitle]
+            });
+          } catch (e) {
+            console.debug("No se pudo cambiar el titulo con executeScript:", e);
+          }
+
+          // Esperar un instante para que Chrome procese el cambio de título en el OS
+          await new Promise(r => setTimeout(r, 60));
+
+          // Enviar señal al helper nativo para quitar la decoración de la ventana
+          try {
+            const port = chrome.runtime.connectNative("com.merke.twoxscreen");
+            port.postMessage({ action: "undecorate", title: tempTitle });
+            port.onMessage.addListener((res) => {
+              console.debug("Native helper response:", res);
+              port.disconnect();
+            });
+            port.onDisconnect.addListener(() => {
+              if (chrome.runtime.lastError) {
+                console.debug("Native messaging not available:", chrome.runtime.lastError.message);
+              }
+            });
+          } catch (e) {
+            console.debug("Native messaging connect error:", e);
+          }
+
+          // Aplicar redimensionamiento final
           await chrome.windows.update(popupWindow.id, {
             left: targetLeft,
             top: targetTop,
@@ -120,17 +153,20 @@ async function toggle2xMode(tab) {
             height: targetHeight,
             focused: true
           });
+
+          // Finalmente, recargar la pestaña (restaurará el título original e inicializará el viewport)
+          setTimeout(async () => {
+            try {
+              await chrome.tabs.reload(tab.id);
+            } catch (e) {
+              console.error("Error al recargar la pestaña:", e);
+            }
+          }, 150);
+
         } catch (e) {
-          console.debug("Error aplicando redimensionamiento diferido 2xScreen:", e);
+          console.debug("Error aplicando redimensionamiento y desdecoracion:", e);
         }
       }, 300);
-
-      // 6. Recargar la pestaña para forzar una inicialización limpia en el nuevo viewport
-      try {
-        await chrome.tabs.reload(tab.id);
-      } catch (e) {
-        console.error("Error al recargar la pestaña en modo 2x:", e);
-      }
 
     } catch (err) {
       console.error("Error al activar modo 2x:", err);
@@ -314,6 +350,24 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
               });
             });
           });
+          break;
+
+        case "open_url":
+          chrome.tabs.create({
+            url: message.url
+          }, () => {
+            sendResponse({ success: true });
+          });
+          break;
+
+        case "close_current_window":
+          if (sender.tab && sender.tab.windowId) {
+            chrome.windows.remove(sender.tab.windowId, () => {
+              sendResponse({ success: true });
+            });
+          } else {
+            sendResponse({ error: "No se identificó la ventana emisora" });
+          }
           break;
 
         default:
