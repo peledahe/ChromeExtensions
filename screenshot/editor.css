@@ -1,0 +1,585 @@
+:root {
+  color-scheme: dark;
+  --bg: #05070f;
+  --panel: rgba(13, 18, 36, 0.75);
+  --panel-border: rgba(255, 255, 255, 0.06);
+  --text: #f8fafc;
+  --muted: #94a3b8;
+  --accent: #3b82f6;
+  --accent-light: #60a5fa;
+  --accent-glow: rgba(59, 130, 246, 0.35);
+  --danger: #f43f5e;
+  --danger-glow: rgba(244, 63, 94, 0.25);
+  --success: #10b981;
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --radius-lg: 16px;
+  --radius-md: 10px;
+  --transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  background: radial-gradient(circle at 50% 0%, #121829 0%, var(--bg) 90%);
+  color: var(--text);
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Barra Superior */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 16px;
+  background: var(--panel);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--panel-border);
+  z-index: 10;
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.4);
+}
+
+.logo-area {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.logo-icon {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: var(--accent-light);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.logo-text {
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.5px;
+  background: linear-gradient(135deg, #fff 0%, var(--muted) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding-right: 8px;
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.group:last-child {
+  border-right: none;
+  padding-right: 0;
+}
+
+/* Botones con estilo Premium */
+.icon-btn, .btn {
+  font-family: var(--font-sans);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: var(--transition);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  outline: none;
+}
+
+.icon-btn {
+  width: 32px;
+  height: 32px;
+  position: relative;
+}
+
+.icon-btn svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: var(--transition);
+}
+
+.icon-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: #fff;
+  transform: translateY(-1.5px);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+}
+
+.icon-btn:active {
+  transform: translateY(0);
+}
+
+.icon-btn.active {
+  background: var(--accent);
+  border-color: var(--accent-light);
+  color: #fff;
+  box-shadow: 0 0 10px var(--accent-glow);
+}
+
+.icon-btn.danger-hover:hover {
+  border-color: rgba(244, 63, 94, 0.4);
+  background: var(--danger-glow);
+  color: #fca5a5;
+}
+
+/* Botones de Texto */
+.btn {
+  height: 32px;
+  padding: 0 12px;
+  font-size: 12px;
+  font-weight: 600;
+  gap: 6px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+}
+
+.btn-icon {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+}
+
+.icon-btn.primary-btn {
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-light) 100%);
+  border: none;
+  color: #fff;
+  box-shadow: 0 4px 10px var(--accent-glow);
+}
+
+.icon-btn.primary-btn:hover {
+  background: linear-gradient(135deg, var(--accent-light) 0%, var(--accent) 100%);
+  box-shadow: 0 6px 14px var(--accent-glow);
+  transform: translateY(-1.5px);
+}
+
+.icon-btn.danger-btn {
+  background: rgba(244, 63, 94, 0.15);
+  border-color: rgba(244, 63, 94, 0.25);
+  color: #fca5a5;
+}
+
+.icon-btn.danger-btn:hover {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+  box-shadow: 0 6px 12px var(--danger-glow);
+  transform: translateY(-1.5px);
+}
+
+/* Badge de pasos numerados */
+.num-badge {
+  position: absolute;
+  right: -3px;
+  top: -3px;
+  min-width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 1.5px solid #fff;
+  color: #fff;
+  font-size: 8px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+/* Color y Grosor */
+.color-picker-wrapper {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  padding: 3px;
+  cursor: pointer;
+  transition: var(--transition);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.color-picker-wrapper:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+#color {
+  width: 100%;
+  height: 100%;
+  border: none;
+  border-radius: 5px;
+  background: none;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+#color::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+#color::-webkit-color-swatch {
+  border: none;
+  border-radius: 5px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+}
+
+.slider-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px;
+}
+
+.slider-icon {
+  width: 14px;
+  height: 14px;
+  fill: currentColor;
+  color: var(--muted);
+}
+
+input[type="range"] {
+  width: 80px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.1);
+  appearance: none;
+  outline: none;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--text);
+  border: 2px solid var(--accent-light);
+  transition: var(--transition);
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.5);
+}
+
+input[type="range"]::-webkit-slider-thumb:hover {
+  background: #fff;
+  transform: scale(1.3);
+  box-shadow: 0 0 8px var(--accent-glow);
+}
+
+/* Área del Lienzo */
+.canvas-wrap {
+  flex: 1;
+  overflow: auto;
+  padding: 32px;
+  display: grid;
+  place-items: safe center;
+  background: 
+    radial-gradient(circle, rgba(255, 255, 255, 0.015) 1px, transparent 1px) 0 0/20px 20px,
+    radial-gradient(circle, rgba(255, 255, 255, 0.01) 1.5px, transparent 1.5px) 10px 10px/20px 20px;
+}
+
+#canvas {
+  display: block;
+  background: #1e1e1e;
+  border-radius: var(--radius-lg);
+  box-shadow: 0 25px 70px -10px rgba(0, 0, 0, 0.7);
+  cursor: crosshair;
+  transition: width 0.2s cubic-bezier(0.16, 1, 0.3, 1), height 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Barra de Estado */
+.status {
+  padding: 10px 20px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+  border-top: 1px solid var(--panel-border);
+  background: var(--panel);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+/* Modales Personalizados */
+.custom-dialog {
+  border: 1px solid var(--panel-border);
+  background: rgba(10, 15, 30, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  color: var(--text);
+  border-radius: var(--radius-lg);
+  margin: auto;
+  max-width: 420px;
+  width: 90%;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.6);
+  outline: none;
+  overflow: hidden;
+  transition: opacity 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  opacity: 0;
+  transform: scale(0.9);
+}
+
+.custom-dialog[open] {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.custom-dialog::backdrop {
+  background: rgba(2, 6, 23, 0.55);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+.dialog-content {
+  padding: 24px;
+}
+
+.dialog-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.dialog-icon {
+  width: 24px;
+  height: 24px;
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.dialog-icon.warning {
+  stroke: var(--danger);
+}
+
+.dialog-icon.text-tool {
+  stroke: var(--accent-light);
+}
+
+.dialog-header h3 {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.dialog-content p {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.6;
+  margin-bottom: 20px;
+}
+
+.dialog-content input[type="text"] {
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--panel-border);
+  background: rgba(255, 255, 255, 0.03);
+  color: #fff;
+  font-size: 14px;
+  outline: none;
+  margin-bottom: 20px;
+  transition: var(--transition);
+}
+
+.dialog-content input[type="text"]:focus {
+  border-color: var(--accent-light);
+  box-shadow: 0 0 0 2px var(--accent-glow);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.dialog-btn {
+  height: 36px;
+  padding: 0 16px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: var(--transition);
+}
+
+.dialog-btn.primary {
+  background: var(--accent);
+  color: #fff;
+}
+
+.dialog-btn.primary:hover {
+  background: var(--accent-light);
+}
+
+.dialog-btn.secondary {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: var(--panel-border);
+  color: var(--text);
+}
+
+.dialog-btn.secondary:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.dialog-btn.danger {
+  background: var(--danger);
+  color: #fff;
+}
+
+.dialog-btn.danger:hover {
+  background: #f43f5e;
+}
+
+/* Contenedor de Toasts (Notificaciones Sticky) */
+.toast-container {
+  position: fixed;
+  top: 72px;
+  right: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 100;
+  pointer-events: none;
+}
+
+.toast {
+  pointer-events: auto;
+  min-width: 250px;
+  background: rgba(15, 23, 42, 0.9);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid var(--panel-border);
+  border-left: 4px solid var(--accent);
+  color: var(--text);
+  padding: 12px 16px;
+  border-radius: var(--radius-md);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+  font-size: 13px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  animation: toastSlideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  transition: var(--transition);
+}
+
+.toast.success {
+  border-left-color: var(--success);
+}
+
+.toast.danger {
+  border-left-color: var(--danger);
+}
+
+.toast-close {
+  cursor: pointer;
+  color: var(--muted);
+  border: none;
+  background: none;
+  font-size: 16px;
+  line-height: 1;
+  transition: var(--transition);
+}
+
+.toast-close:hover {
+  color: #fff;
+}
+
+@keyframes toastSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.toast.fade-out {
+  opacity: 0;
+  transform: translateY(-10px) scale(0.95);
+}
+
+/* --- Reglas Responsivas --- */
+
+/* Pantallas medianas (Laptops y tabletas horizontales) */
+@media (max-width: 1024px) {
+  .logo-text {
+    display: none; /* Oculta el texto del logo, dejando sólo el icono */
+  }
+  
+  input[type="range"] {
+    width: 60px; /* Reduce ligeramente el tamaño de los deslizadores */
+  }
+}
+
+/* Pantallas estrechas (Tabletas verticales y ventanas compactas) */
+@media (max-width: 900px) {
+  .topbar {
+    gap: 8px; /* Compacta el espaciado global de la barra */
+    padding: 6px 12px;
+  }
+  
+  .group {
+    padding-right: 6px;
+    gap: 2px;
+  }
+}
+
+/* Pantallas ultra-estrechas (Móviles) */
+@media (max-width: 680px) {
+  .topbar {
+    overflow-x: auto; /* Permite deslizar horizontalmente la barra de herramientas sin deformar el editor */
+    justify-content: flex-start;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  .logo-area {
+    margin-right: 8px;
+  }
+  
+  .group {
+    border-right: 1px solid rgba(255, 255, 255, 0.05);
+    flex-shrink: 0; /* Evita que los grupos se encojan y se deformen */
+  }
+  
+  /* Ocultar iconos de slider para ganar espacio */
+  .slider-wrap .slider-icon {
+    display: none;
+  }
+  
+  .slider-wrap {
+    padding: 0 4px;
+  }
+}

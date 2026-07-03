@@ -1,0 +1,476 @@
+/* content.css - Estilos aislados para la barra flotante de 2xScreen */
+
+/* Estilos aplicados al Shadow Host (Light DOM) */
+#minichrome-2x-extension-root {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  height: 0 !important;
+  z-index: 2147483647 !important;
+  pointer-events: none !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+  overflow: visible !important;
+}
+
+/* --- Elementos internos del Shadow DOM --- */
+
+.mc-wrapper-dual {
+  display: flex;
+  width: 100vw;
+  height: 0;
+  pointer-events: none;
+}
+
+.mc-column-left {
+  flex: 1;
+  pointer-events: none;
+}
+
+.mc-column-right {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  position: relative;
+  pointer-events: none;
+}
+
+.mc-wrapper-single {
+  display: flex;
+  justify-content: center;
+  position: relative;
+  width: 100vw;
+  height: 0;
+  pointer-events: none;
+}
+
+.mc-container {
+  pointer-events: auto;
+  position: absolute;
+  top: 0;
+  transform: translateY(0);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 850px;
+  max-width: 90%;
+  transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+  z-index: 99999;
+}
+
+/* Estado de la barra oculta: subimos la barra fuera del viewport */
+.mc-container.collapsed {
+  transform: translateY(-38px); /* 36px de barra + 2px de bordes */
+}
+
+/* Notch / Pestaña Superior */
+.mc-notch {
+  width: 80px;
+  height: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: bold;
+  color: rgba(255, 255, 255, 0.8);
+  user-select: none;
+  background: linear-gradient(180deg, rgba(81, 162, 255, 0.85) 0%, rgba(41, 122, 215, 0.85) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  transition: background 0.2s, color 0.2s;
+}
+
+/* Notch cuando la barra está desplegada (apunta hacia arriba) */
+.mc-notch.notch-up {
+  order: 1; /* Poner el notch arriba de la barra */
+  border-bottom: none;
+  border-top-left-radius: 7px;
+  border-top-right-radius: 7px;
+  margin-top: 10px;
+}
+
+/* Notch cuando la barra está oculta (apunta hacia abajo y se pega al tope) */
+.mc-notch.notch-down {
+  order: 2; /* Poner el notch debajo de la barra oculta */
+  border-top: none;
+  border-bottom-left-radius: 7px;
+  border-bottom-right-radius: 7px;
+}
+
+.mc-notch:hover {
+  color: #white;
+  background: rgba(81, 162, 255, 0.98);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+/* Barra de Navegación Principal */
+.mc-bar {
+  order: 2;
+  width: 100%;
+  height: 36px;
+  background: linear-gradient(180deg, rgba(81, 162, 255, 0.96) 0%, rgba(41, 122, 215, 0.96) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  box-sizing: border-box;
+  gap: 6px;
+}
+
+.collapsed .mc-bar {
+  order: 1;
+}
+
+/* Botones */
+.mc-btn {
+  background: transparent;
+  border: none;
+  outline: none;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  color: rgba(255, 255, 255, 0.85);
+  cursor: pointer;
+  border-radius: 6px;
+  transition: background 0.2s, color 0.2s;
+  padding: 0;
+}
+
+.mc-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+}
+
+.mc-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+/* Botón especial para salir de 2x (pantalla completa) */
+.mc-btn-2x {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 5px;
+  color: #fff;
+  padding: 2px 6px;
+  font-size: 11px;
+  font-weight: bold;
+  border: none;
+  cursor: pointer;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+
+.mc-btn-2x:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* Escudo de seguridad */
+.mc-shield {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin-left: 2px;
+}
+
+.mc-shield svg {
+  width: 15px;
+  height: 15px;
+  fill: rgba(255, 255, 255, 0.8);
+}
+
+.mc-shield.secure svg {
+  fill: #2ecc71; /* Escudo verde para HTTPS */
+}
+
+/* Contenedor de URL e Input */
+.mc-url-wrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  height: 100%;
+}
+
+.mc-input {
+  width: 100%;
+  height: 24px;
+  background: transparent;
+  border: none;
+  outline: none;
+  padding: 0 6px;
+  color: rgba(255, 255, 255, 0.95);
+  font-size: 13px;
+  box-sizing: border-box;
+  transition: background 0.2s, border-radius 0.2s;
+}
+
+.mc-input::placeholder {
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.mc-input:focus {
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 6px;
+}
+
+/* Botón redondo para "Ir" */
+.mc-btn-go {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+  font-size: 14px;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.2s;
+  padding: 0;
+  outline: none;
+}
+
+.mc-btn-go:hover {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.mc-btn-go.loading {
+  color: transparent !important;
+  position: relative;
+  pointer-events: none;
+}
+
+.mc-btn-go.loading::after {
+  content: "";
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: mc-spin 0.8s linear infinite;
+  top: 50%;
+  left: 50%;
+  margin-top: -7px;
+  margin-left: -7px;
+  box-sizing: border-box;
+}
+
+@keyframes mc-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Controles de Zoom */
+.mc-zoom-wrap {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.mc-zoom-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  border-radius: 5px;
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 13px;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+  padding: 0;
+  outline: none;
+}
+
+.mc-zoom-btn:hover {
+  background: rgba(255, 255, 255, 0.22);
+  color: #fff;
+}
+
+.mc-zoom-lbl {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 10px;
+  width: 34px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: color 0.2s;
+  padding: 0;
+  outline: none;
+}
+
+.mc-zoom-lbl:hover {
+  color: #fff;
+}
+
+/* Estrella favoritos */
+.mc-btn-fav {
+  font-size: 17px;
+}
+
+.mc-btn-fav.active {
+  color: #f1c40f;
+  text-shadow: 0 0 3px rgba(241, 196, 15, 0.4);
+}
+
+/* --- Notificación Sticky --- */
+.mc-toast {
+  pointer-events: auto;
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  width: 300px;
+  background: linear-gradient(135deg, #1e2732 0%, #11171f 100%);
+  border: 1px solid rgba(81, 162, 255, 0.4);
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  color: #fff;
+  padding: 12px 16px;
+  box-sizing: border-box;
+  z-index: 1000000;
+  transform: translateX(150%);
+  transition: transform 0.35s cubic-bezier(0.25, 0.8, 0.25, 1);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.mc-toast.show {
+  transform: translateX(0);
+}
+
+.mc-toast-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  font-weight: bold;
+  color: #51a2ff;
+}
+
+.mc-toast-close {
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 16px;
+  line-height: 1;
+  transition: color 0.2s;
+}
+
+.mc-toast-close:hover {
+  color: #fff;
+}
+
+.mc-toast-body {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.85);
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+/* --- Modal de Confirmación --- */
+.mc-modal-overlay {
+  pointer-events: auto;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000001;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+
+.mc-modal-overlay.show {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.mc-modal-box {
+  background: #19222d;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  width: 320px;
+  max-width: 90vw;
+  padding: 20px;
+  box-sizing: border-box;
+  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.6);
+  transform: translateY(-20px);
+  transition: transform 0.25s ease;
+  text-align: center;
+}
+
+.mc-modal-overlay.show .mc-modal-box {
+  transform: translateY(0);
+}
+
+.mc-modal-title {
+  font-size: 15px;
+  font-weight: bold;
+  color: #51a2ff;
+  margin: 0 0 10px 0;
+}
+
+.mc-modal-text {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.8);
+  line-height: 1.4;
+  margin: 0 0 20px 0;
+}
+
+.mc-modal-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+}
+
+.mc-modal-btn {
+  border: none;
+  outline: none;
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-size: 12px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.mc-modal-btn-cancel {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.mc-modal-btn-cancel:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.mc-modal-btn-confirm {
+  background: #e74c3c;
+  color: #fff;
+}
+
+.mc-modal-btn-confirm:hover {
+  background: #c0392b;
+}

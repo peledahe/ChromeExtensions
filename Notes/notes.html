@@ -1,0 +1,2946 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agenda y Compras</title>
+    <link rel="stylesheet" href="theme.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; scrollbar-width: thin; scrollbar-color: rgba(108, 92, 231, 0.35) transparent; }
+
+        /* ── Tokens de tema (usados por obs-modal, checkboxes y nuevos componentes) ── */
+        :root {
+            --ag-check-border:        rgba(255,255,255,0.25);
+            --ag-check-bg:            rgba(255,255,255,0.06);
+            --ag-check-active-border: #2ed573;
+            --ag-check-active-bg:     rgba(46,213,115,0.10);
+            --ag-card-bg:             #1e1f26;
+            --ag-border:              rgba(255,255,255,0.09);
+            --ag-text:                #e8e8f0;
+            --ag-text-muted:          #a0a0a8;
+            --ag-accent:              #6c5ce7;
+            --ag-input-bg:            #1a1a1e;
+            --ag-input-border:        rgba(255,255,255,0.10);
+            --ag-surface:             #1a1a1e;
+            --ag-placeholder:         rgba(255,255,255,0.30);
+        }
+        [data-theme='light'] {
+            --ag-check-border:        rgba(0,0,0,0.22);
+            --ag-check-bg:            rgba(0,0,0,0.04);
+            --ag-check-active-border: #16a34a;
+            --ag-check-active-bg:     rgba(22,163,74,0.08);
+            --ag-card-bg:             #ffffff;
+            --ag-border:              rgba(31,41,55,0.14);
+            --ag-text:                #111827;
+            --ag-text-muted:          #4b5563;
+            --ag-accent:              #4f46e5;
+            --ag-input-bg:            #f8fafc;
+            --ag-input-border:        rgba(31,41,55,0.16);
+            --ag-surface:             #ffffff;
+            --ag-placeholder:         #94a3b8;
+        }
+
+
+        ::-webkit-scrollbar { width: 2px; height: 2px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(108, 92, 231, 0.45); border-radius: 999px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(108, 92, 231, 0.8); }
+        ::-webkit-scrollbar-corner { background: transparent; }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: #0e0e10;
+            color: #fff;
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        /* ===== HEADER ===== */
+        .ag-header {
+            position: relative;
+            z-index: 10;
+            -webkit-app-region: drag;
+            background: #1a1a1e;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+            padding: 0 16px;
+            height: 52px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .ag-header > * { -webkit-app-region: no-drag; }
+        .ag-nav-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            color: rgba(255, 255, 255, 0.55);
+            cursor: pointer;
+            width: 34px;
+            height: 34px;
+            border-radius: 9px;
+            transition: background 0.2s, color 0.2s, border-color 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        .ag-nav-btn:hover {
+            background: rgba(255, 255, 255, 0.12);
+            color: #fff;
+            border-color: rgba(255,255,255,0.15);
+        }
+        .ag-nav-btn.viewer:hover { background: rgba(108, 92, 231, 0.25); border-color: #6c5ce7; color: #a29bfe; }
+        .ag-nav-btn.browser:hover { background: rgba(9, 132, 227, 0.2); border-color: #0984e3; color: #74b9ff; }
+        .ag-nav-btn.images:hover  { background: rgba(0, 184, 148, 0.18); border-color: #00b894; color: #55efc4; }
+        .ag-nav-group { display: flex; gap: 6px; align-items: center; }
+
+        .ag-tabs {
+            position: relative;
+            display: flex;
+            gap: 4px;
+            align-self: flex-end;
+            margin-bottom: -1px;
+            padding: 4px 6px 0;
+            border-radius: 12px 12px 0 0;
+            background: linear-gradient(180deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.03) 100%);
+            border: 1px solid rgba(255,255,255,0.14);
+            border-bottom: none;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.1);
+            isolation: isolate;
+        }
+        .ag-tabs::after {
+            content: '';
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            height: 1px;
+            background: rgba(226,232,240,0.24);
+            pointer-events: none;
+        }
+        .ag-tab {
+            position: relative;
+            padding: 5px 18px 6px;
+            border-radius: 10px 10px 0 0;
+            font-size: 0.86rem;
+            color: rgba(226,232,240,0.82);
+            cursor: pointer;
+            transition: background 0.2s, color 0.2s, transform 0.16s, box-shadow 0.2s, border-color 0.2s;
+            font-family: inherit;
+            border: 1px solid transparent;
+            border-bottom: none;
+            background: linear-gradient(180deg, rgba(42,49,60,0.58) 0%, rgba(25,31,41,0.58) 100%);
+            margin-bottom: -1px;
+        }
+        .ag-tab:hover {
+            color: #f8fafc;
+            background: linear-gradient(180deg, rgba(72,82,96,0.74) 0%, rgba(37,46,58,0.74) 100%);
+            border-color: rgba(203,213,225,0.26);
+            transform: translateY(-1px);
+            z-index: 1;
+        }
+        .ag-tab.active {
+            background: linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(236,243,251,0.98) 100%);
+            border-color: rgba(226,232,240,0.62);
+            color: #0f172a;
+            font-weight: 700;
+            box-shadow: 0 6px 12px rgba(2,6,23,0.24);
+            transform: translateY(-1px);
+            z-index: 2;
+        }
+        .ag-tab.active::after {
+            content: '';
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: -1px;
+            height: 2px;
+            background: linear-gradient(90deg, #f8fbff 0%, #edf4ff 100%);
+            pointer-events: none;
+        }
+
+        :root[data-theme='light'] .ag-tabs {
+            background: linear-gradient(180deg, #eef3fb 0%, #e6edf7 100%);
+            border: 1px solid #cad5e6;
+            border-bottom: none;
+            box-shadow: inset 0 1px 0 #ffffff;
+        }
+        :root[data-theme='light'] .ag-tabs::after {
+            background: #cad5e6;
+        }
+        :root[data-theme='light'] .ag-tab {
+            color: #475569;
+            background: linear-gradient(180deg, #dbe5f3 0%, #d1ddec 100%);
+        }
+        :root[data-theme='light'] .ag-tab:hover {
+            color: #1e293b;
+            background: linear-gradient(180deg, #e8eef8 0%, #dde8f6 100%);
+            border-color: #c3d1e6;
+        }
+        :root[data-theme='light'] .ag-tab.active {
+            background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+            border-color: #cad5e6;
+            color: #0f172a;
+            box-shadow: 0 4px 10px rgba(15,23,42,0.12);
+        }
+        :root[data-theme='light'] .ag-tab.active::after {
+            background: #ffffff;
+        }
+
+        @media (prefers-color-scheme: light) {
+            :root:not([data-theme='dark']) .ag-tabs {
+                background: linear-gradient(180deg, #eef3fb 0%, #e6edf7 100%);
+                border: 1px solid #cad5e6;
+                border-bottom: none;
+                box-shadow: inset 0 1px 0 #ffffff;
+            }
+            :root:not([data-theme='dark']) .ag-tabs::after {
+                background: #cad5e6;
+            }
+            :root:not([data-theme='dark']) .ag-tab {
+                color: #475569;
+                background: linear-gradient(180deg, #dbe5f3 0%, #d1ddec 100%);
+            }
+            :root:not([data-theme='dark']) .ag-tab:hover {
+                color: #1e293b;
+                background: linear-gradient(180deg, #e8eef8 0%, #dde8f6 100%);
+                border-color: #c3d1e6;
+            }
+            :root:not([data-theme='dark']) .ag-tab.active {
+                background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+                border-color: #cad5e6;
+                color: #0f172a;
+                box-shadow: 0 4px 10px rgba(15,23,42,0.12);
+            }
+            :root:not([data-theme='dark']) .ag-tab.active::after {
+                background: #ffffff;
+            }
+        }
+
+        /* Controles de ventana dentro del header */
+        .ag-win-controls {
+            margin-left: auto;
+            display: flex;
+            gap: 8px;
+        }
+        .ag-win-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            color: rgba(255, 255, 255, 0.6);
+            border-radius: 50%;
+            width: 28px;
+            height: 28px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+            backdrop-filter: blur(10px);
+        }
+        .ag-win-btn:hover {
+            background: rgba(255, 255, 255, 0.15);
+            color: white;
+        }
+        .ag-win-btn.close-btn:hover {
+            background: rgba(255, 71, 87, 0.9);
+            color: white;
+        }
+        .ag-win-btn.minimize:hover {
+            background: rgba(253, 203, 110, 0.9);
+            color: #111;
+        }
+        .ag-win-btn.maximize:hover {
+            background: rgba(0, 184, 148, 0.9);
+            color: white;
+        }
+
+        /* ===== CONTENT ===== */
+        .ag-content {
+            height: calc(100vh - 52px);
+            overflow-y: auto;
+            padding: 30px 40px;
+        }
+        /* El kanban y notas necesitan altura exacta sin scroll exterior */
+        .ag-content:has(#view-kanban.active),
+        .ag-content:has(#view-notes.active) {
+            overflow-y: hidden;
+            padding: 20px 24px 16px;
+        }
+
+        /* ===== VIEWS ===== */
+        .ag-view { display: none; }
+        .ag-view.active { display: block; animation: fadeIn 0.25s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* ===== AGENDA STYLES ===== */
+        .section-header { margin-bottom: 24px; }
+        .section-header h1 { font-size: 1.6rem; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+        .section-header p { color: #a0a0a8; font-size: 0.9rem; margin-top: 4px; }
+
+        .input-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 20px;
+            align-items: center;
+        }
+        /* El input de texto principal siempre toma el espacio disponible */
+        .input-row .ag-input-main { flex: 1 1 200px; min-width: 0; }
+        /* Campos secundarios pueden reducirse pero no demasiado */
+        .input-row .ag-input-sm  { flex: 0 0 110px; }
+        .input-row .ag-input-md  { flex: 0 0 160px; min-width: 130px; }
+        .input-row .ag-input-tag { flex: 0 0 150px; min-width: 120px; }
+        .input-row .ag-input-num { flex: 1 1 100px; min-width: 80px; max-width: 160px; }
+        .agenda-filter-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: -6px 0 14px;
+        }
+        .agenda-filter-label {
+            font-size: 0.84rem;
+            color: #a0a0a8;
+            white-space: nowrap;
+        }
+        .agenda-filter-select {
+            flex: 0 0 220px;
+            max-width: min(220px, 100%);
+        }
+        .agenda-tags-helper {
+            margin: -4px 0 14px;
+            padding: 10px 12px;
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 10px;
+            background: rgba(0,0,0,0.16);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .agenda-tags-helper-title {
+            font-size: 0.77rem;
+            color: #9aa0b7;
+            margin: 0;
+        }
+        .agenda-tag-chip-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            min-height: 30px;
+        }
+        .agenda-tag-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            border-radius: 999px;
+            padding: 3px 9px;
+            font-size: 0.74rem;
+            border: 1px solid rgba(108,92,231,0.34);
+            background: rgba(108,92,231,0.18);
+            color: #d5ceff;
+        }
+        .agenda-tag-chip button {
+            border: none;
+            background: transparent;
+            color: inherit;
+            cursor: pointer;
+            line-height: 1;
+            padding: 0;
+            opacity: 0.8;
+            font-size: 0.82rem;
+        }
+        .agenda-tag-chip button:hover { opacity: 1; }
+        .agenda-tag-chip.clickable {
+            cursor: pointer;
+            border-color: rgba(255,255,255,0.2);
+            background: rgba(255,255,255,0.08);
+            color: #cfd5df;
+        }
+        .agenda-tag-chip.clickable:hover {
+            border-color: rgba(108,92,231,0.45);
+            background: rgba(108,92,231,0.2);
+            color: #ece8ff;
+        }
+        .agenda-tag-chip-empty {
+            font-size: 0.75rem;
+            color: #777d92;
+        }
+        .ag-input {
+            flex: 1;
+            background: #1a1a1e;
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 10px;
+            color: #fff;
+            padding: 10px 14px;
+            font-size: 0.95rem;
+            font-family: inherit;
+            transition: border-color 0.2s;
+        }
+        .ag-input:focus { outline: none; border-color: #6c5ce7; }
+        .ag-input::placeholder { color: #555; }
+        input[type="date"].ag-input { color-scheme: dark; }
+        select.ag-input { cursor: pointer; }
+
+        .ag-btn {
+            padding: 10px 18px;
+            border-radius: 10px;
+            border: none;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-family: inherit;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+        .ag-btn-primary { background: #6c5ce7; color: #fff; }
+        .ag-btn-primary:hover { background: #5a4dd6; }
+        .ag-btn-ghost { background: rgba(255,255,255,0.07); color: #a0a0a8; }
+        .ag-btn-ghost:hover { background: rgba(255,255,255,0.12); color: #fff; }
+
+        /* ===== LIST ITEMS ===== */
+        .ag-list { display: flex; flex-direction: column; gap: 8px; }
+        .ag-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            background: #1a1a1e;
+            border-radius: 10px;
+            border-left: 4px solid transparent;
+            transition: background 0.2s;
+        }
+        .ag-item:hover { background: #222228; }
+        .ag-item-text { flex: 1; font-size: 0.95rem; }
+        .ag-item-meta { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+        .ag-badge {
+            font-size: 0.78rem;
+            background: rgba(255,255,255,0.07);
+            padding: 2px 8px;
+            border-radius: 6px;
+            color: #a0a0a8;
+        }
+        .ag-tag-badge {
+            font-size: 0.74rem;
+            background: rgba(108,92,231,0.2);
+            border: 1px solid rgba(108,92,231,0.38);
+            color: #d5ceff;
+            padding: 2px 8px;
+            border-radius: 999px;
+            max-width: 170px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .ag-delete-btn, .ag-edit-btn {
+            background: none; border: none; cursor: pointer;
+            font-size: 1rem; opacity: 0.35;
+            transition: opacity 0.2s;
+            padding: 2px 5px;
+        }
+        .ag-delete-btn:hover, .ag-edit-btn:hover { opacity: 1; }
+
+        /* ===== CHECKBOX PERSONALIZADO ===== */
+        .ag-check-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        .ag-check-box {
+            width: 20px;
+            height: 20px;
+            border-radius: 5px;
+            border: 2px solid var(--ag-check-border, rgba(255,255,255,0.25));
+            background: var(--ag-check-bg, rgba(255,255,255,0.06));
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+        .ag-check-box svg { display: none; }
+        .ag-check-btn:hover .ag-check-box {
+            border-color: var(--ag-check-active-border, #2ed573);
+            background: var(--ag-check-active-bg, rgba(46,213,115,0.1));
+        }
+        .ag-check-btn.checked .ag-check-box {
+            background: var(--ag-check-active-border, #2ed573);
+            border-color: var(--ag-check-active-border, #2ed573);
+        }
+        .ag-check-btn.checked .ag-check-box svg { display: block; }
+        .ag-item-paid { opacity: 0.6; }
+        .ag-empty { text-align: center; color: #555; padding: 40px 0; font-size: 0.95rem; }
+
+        /* ===== TOTALS ===== */
+        .shop-totals {
+            display: flex; gap: 16px; align-items: center;
+            background: #1a1a1e;
+            padding: 12px 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        .shop-totals-col { display: flex; flex-direction: column; gap: 4px; }
+        .shop-totals-col-label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: #666; }
+        .shop-totals-row { display: flex; gap: 12px; }
+        .shop-totals-divider { width: 1px; background: rgba(255,255,255,0.1); align-self: stretch; margin: 0 4px; }
+        .shop-total-item { font-size: 0.9rem; color: #a0a0a8; }
+        .shop-total-item span { font-weight: 700; color: #fff; font-size: 1rem; }
+        .shop-total-combined span { color: #a78bfa !important; font-size: 1.1rem !important; }
+        .shop-total-combined span.saldo-positive { color: #6ee7b7 !important; }
+        .shop-total-combined span.saldo-negative { color: #ff6b81 !important; }
+        .income-totals-mini { margin-bottom: 0; padding: 10px 16px; }
+        .ag-btn-income {
+            background: linear-gradient(135deg, #059669, #10b981);
+            color: #fff; border: none; border-radius: 10px;
+            padding: 10px 18px; font-size: 0.95rem; font-family: inherit;
+            cursor: pointer; font-weight: 600; white-space: nowrap;
+            transition: opacity 0.2s;
+        }
+        .ag-btn-income:hover { opacity: 0.85; }
+        .income-item { border-left-color: #10b981 !important; }
+        .income-item.received { border-left-color: #444 !important; }
+
+        /* ===== PAYMENT METHOD SUMMARY ===== */
+        .payment-summary {
+            background: #141418;
+            border: 1px solid rgba(255,255,255,0.07);
+            border-radius: 10px;
+            padding: 14px 20px;
+            margin-bottom: 16px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px 24px;
+        }
+        .payment-summary-title {
+            width: 100%;
+            font-size: 0.78rem;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: #555;
+            margin-bottom: 2px;
+        }
+        .payment-summary-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.88rem;
+        }
+        .payment-summary-label {
+            color: #a0a0a8;
+            font-weight: 600;
+        }
+        .payment-summary-amount {
+            color: #fff;
+            font-weight: 700;
+        }
+        .payment-summary-amount.gtq { color: #eccc68; }
+        .payment-summary-amount.usd { color: #2ed573; }
+
+        .shop-total-combined { border-left: 1px solid rgba(255,255,255,0.12); padding-left: 16px; }
+        .shop-total-combined span { color: #a78bfa !important; }
+        .pm-exchange-row {
+            display: flex; align-items: center; gap: 8px;
+            padding: 10px 12px;
+            background: rgba(255,255,255,0.04);
+            border-radius: 8px;
+        }
+        .pm-exchange-label { font-size: 0.88rem; color: #a0a0a8; white-space: nowrap; }
+        .pm-exchange-input { width: 80px !important; text-align: right; }
+        .pm-exchange-unit { font-size: 0.9rem; color: #eccc68; font-weight: 700; }
+        /* ===== PAYMENT METHOD BADGE ===== */
+        .pm-badge {
+            font-size: 0.72rem;
+            padding: 2px 8px;
+            border-radius: 20px;
+            font-weight: 600;
+            letter-spacing: 0.02em;
+            white-space: nowrap;
+        }
+        .pm-badge-efectivo   { background: rgba(116,185,255,0.15); color: #74b9ff; }
+        .pm-badge-tarjeta    { background: rgba(162,155,254,0.15); color: #a29bfe; }
+        .pm-badge-transferencia { background: rgba(85,239,196,0.15); color: #55efc4; }
+        .pm-badge-default    { background: rgba(255,255,255,0.07); color: #a0a0a8; }
+
+        /* ===== SETTINGS BUTTON ===== */
+        .ag-settings-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1rem;
+            opacity: 0.5;
+            transition: opacity 0.2s;
+            padding: 2px 6px;
+            line-height: 1;
+        }
+        .ag-settings-btn:hover { opacity: 1; }
+
+        /* ===== PAGINATION ===== */
+        .ag-pagination {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 14px;
+            margin-top: 16px;
+            padding: 8px 0;
+        }
+        .ag-page-btn {
+            background: rgba(255,255,255,0.07);
+            border: 1px solid rgba(255,255,255,0.1);
+            color: #a0a0a8;
+            border-radius: 8px;
+            padding: 5px 14px;
+            font-size: 0.88rem;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .ag-page-btn:hover:not(:disabled) { background: rgba(255,255,255,0.14); color: #fff; }
+        .ag-page-btn:disabled { opacity: 0.3; cursor: default; }
+        .ag-page-label { font-size: 0.88rem; color: #a0a0a8; }
+
+        /* ===== MODAL DE EDICIÓN ===== */
+        .edit-modal-overlay {
+            display: none;
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(4px);
+            z-index: 9999;
+            align-items: center;
+            justify-content: center;
+        }
+        .edit-modal-overlay.active { display: flex; }
+        .edit-modal-box {
+            background: #1e1f26;
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 14px;
+            padding: 28px;
+            width: min(480px, 90vw);
+            display: flex; flex-direction: column; gap: 14px;
+        }
+        .edit-modal-box h3 { font-size: 1.1rem; font-weight: 700; margin: 0; }
+        .edit-modal-row { display: flex; gap: 10px; align-items: center; }
+        .edit-modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 4px; }
+
+        /* ===== PAYMENT METHODS MODAL ===== */
+        .pm-modal-overlay {
+            display: none;
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.65);
+            backdrop-filter: blur(4px);
+            z-index: 10000;
+            align-items: center;
+            justify-content: center;
+        }
+        .pm-modal-overlay.active { display: flex; }
+        .pm-modal-box {
+            background: #1e1f26;
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 14px;
+            padding: 28px;
+            width: min(400px, 90vw);
+            display: flex; flex-direction: column; gap: 16px;
+        }
+        .pm-modal-box h3 { font-size: 1.1rem; font-weight: 700; }
+        .pm-method-list {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            max-height: 220px;
+            overflow-y: auto;
+        }
+        .pm-method-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 12px;
+            background: rgba(255,255,255,0.04);
+            border-radius: 8px;
+            font-size: 0.92rem;
+        }
+        .pm-method-actions { display: flex; gap: 4px; align-items: center; }
+        .pm-remove-btn, .pm-edit-btn, .pm-confirm-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 0.85rem;
+            opacity: 0.6;
+            transition: opacity 0.2s;
+            padding: 4px;
+            border-radius: 5px;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .pm-remove-btn { color: #ff6b81; }
+        .pm-edit-btn { color: #a3cef1; }
+        .pm-confirm-btn { color: #6ee7b7; }
+        .pm-remove-btn:hover, .pm-edit-btn:hover, .pm-confirm-btn:hover { opacity: 1; }
+        .pm-method-item.editing { background: rgba(163,206,241,0.08); }
+        .pm-edit-input {
+            background: rgba(255,255,255,0.07);
+            border: 1px solid rgba(163,206,241,0.35);
+            border-radius: 6px;
+            color: #eee;
+            font-size: 0.92rem;
+            padding: 2px 8px;
+            flex: 1;
+            outline: none;
+        }
+        .pm-add-row {
+            display: flex;
+            gap: 8px;
+        }
+        .pm-modal-actions { display: flex; justify-content: flex-end; gap: 10px; }
+
+        /* ===== CALENDAR ICONS ===== */
+        .calendar-icon {
+            width: 40px;
+            height: 42px;
+            background: #fff;
+            border-radius: 8px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+            flex-shrink: 0;
+        }
+        .calendar-icon .cal-month {
+            background: #ff3b30;
+            color: #fff;
+            width: 100%;
+            font-size: 9px;
+            text-transform: uppercase;
+            font-weight: 800;
+            padding: 1px 0;
+            text-align: center;
+        }
+        .calendar-icon .cal-day {
+            color: #1a1a1a;
+            font-size: 20px;
+            font-weight: 700;
+            line-height: 1.2;
+        }
+
+        .mini-calendar {
+            width: 18px;
+            height: 20px;
+            background: #fff;
+            border-radius: 3px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+            flex-shrink: 0;
+        }
+        .mini-calendar .cal-month {
+            background: #ff3b30;
+            color: #fff;
+            width: 100%;
+            font-size: 5px;
+            text-transform: uppercase;
+            font-weight: 800;
+            padding: 0;
+            text-align: center;
+        }
+        .mini-calendar .cal-day {
+            color: #1a1a1a;
+            font-size: 10px;
+            font-weight: 700;
+            line-height: 1.1;
+        }
+        .ag-tab { display: flex; align-items: center; gap: 8px; }
+        .section-header h1 { display: flex; align-items: center; gap: 12px; }
+
+        /* ===== KANBAN ===== */
+        #view-kanban { overflow: hidden; }
+        #view-kanban .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            flex-wrap: wrap;
+            gap: 16px;
+            margin-bottom: 12px;
+        }
+
+        .kb-toolbar {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+        .kb-filter-input {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 8px;
+            padding: 4px 10px;
+            color: #fff;
+            font-family: inherit;
+            font-size: 0.8rem;
+            outline: none;
+            width: 160px;
+            height: 28px;
+            transition: border-color 0.2s, width 0.25s;
+        }
+        .kb-filter-input:focus { border-color: #6c5ce7; width: 200px; }
+        .kb-filter-input::placeholder { color: rgba(255,255,255,0.25); }
+        .kb-label-filter {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: flex-end;
+            max-width: min(100%, 560px);
+            margin-left: auto;
+            margin-top: 4px;
+        }
+        .kb-label-chip {
+            font-size: 0.72rem;
+            padding: 3px 10px;
+            border-radius: 20px;
+            cursor: pointer;
+            border: 1px solid rgba(255,255,255,0.12);
+            background: rgba(255,255,255,0.05);
+            color: rgba(255,255,255,0.5);
+            transition: all 0.18s;
+            white-space: nowrap;
+        }
+        .kb-label-chip.active {
+            box-shadow: 0 0 0 1px rgba(255,255,255,0.16), 0 0 0 3px rgba(108,92,231,0.14);
+            transform: translateY(-1px);
+        }
+        .kb-label-chip:hover { color: #fff; }
+
+        .kb-board {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(250px, 1fr));
+            gap: 14px;
+            height: calc(100vh - 52px - 30px - 24px - 44px - 52px);
+            min-height: 0;
+            width: 100%;
+            overflow-x: auto;
+            overflow-y: hidden;
+            padding-bottom: 8px;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        @media (max-width: 1200px) {
+            #view-kanban .section-header {
+                gap: 10px;
+            }
+            .kb-label-filter {
+                flex: 1 1 100%;
+                max-width: none;
+                justify-content: flex-start;
+                margin-left: 0;
+                margin-top: 0;
+            }
+            .kb-board {
+                grid-template-columns: repeat(2, minmax(260px, 1fr));
+                height: auto;
+                overflow-x: hidden;
+                overflow-y: visible;
+            }
+            .ag-content:has(#view-kanban.active) {
+                overflow-y: auto;
+            }
+        }
+
+        @media (max-width: 760px) {
+            #view-kanban .section-header {
+                align-items: stretch;
+            }
+            #view-kanban .section-header h1,
+            #view-kanban .section-header p {
+                width: 100%;
+            }
+            #view-kanban .section-header p {
+                margin-bottom: 2px;
+            }
+            .kb-label-filter {
+                gap: 5px;
+            }
+            .kb-label-chip {
+                font-size: 0.68rem;
+                padding: 3px 8px;
+            }
+            .kb-board {
+                grid-template-columns: 1fr;
+                overflow-x: hidden;
+                overflow-y: visible;
+                height: auto;
+            }
+            .kb-col {
+                min-width: 0;
+                min-height: 300px;
+            }
+            .kb-cards {
+                max-height: none;
+                overflow-y: visible;
+            }
+        }
+
+        .kb-col {
+            display: flex;
+            flex-direction: column;
+            background: rgba(255,255,255,0.025);
+            border: 1px solid rgba(255,255,255,0.07);
+            border-radius: 14px;
+            overflow: hidden;
+            min-height: 0;
+        }
+
+        .kb-col-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 14px 10px;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+            flex-shrink: 0;
+        }
+        .kb-col-title {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            font-size: 0.82rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+        }
+        .kb-col-dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+        .kb-col-count {
+            font-size: 0.72rem;
+            background: rgba(255,255,255,0.08);
+            color: rgba(255,255,255,0.4);
+            border-radius: 20px;
+            padding: 1px 8px;
+            font-weight: 600;
+        }
+        .kb-col-add {
+            background: none;
+            border: none;
+            color: rgba(255,255,255,0.3);
+            cursor: pointer;
+            font-size: 1.1rem;
+            line-height: 1;
+            padding: 2px 4px;
+            border-radius: 5px;
+            transition: color 0.15s, background 0.15s;
+        }
+        .kb-col-add:hover { color: #fff; background: rgba(255,255,255,0.08); }
+
+        .kb-cards {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            min-height: 0;
+        }
+        .kb-cards.drag-over {
+            background: rgba(108,92,231,0.07);
+            border-radius: 8px;
+        }
+
+        .kb-card {
+            background: #1e1e26;
+            border: 1px solid rgba(255,255,255,0.07);
+            border-radius: 10px;
+            padding: 11px 13px;
+            cursor: grab;
+            transition: box-shadow 0.2s, border-color 0.2s, transform 0.15s;
+            position: relative;
+        }
+        .kb-card:hover { border-color: rgba(255,255,255,0.16); box-shadow: 0 4px 16px rgba(0,0,0,0.3); }
+        .kb-card.dragging { opacity: 0.4; transform: scale(0.97); cursor: grabbing; }
+
+        .kb-card-title {
+            font-size: 0.88rem;
+            font-weight: 600;
+            color: #fff;
+            margin-bottom: 5px;
+            line-height: 1.35;
+        }
+        .kb-card-desc {
+            font-size: 0.78rem;
+            color: rgba(255,255,255,0.38);
+            line-height: 1.4;
+            margin-bottom: 8px;
+        }
+        .kb-card-desc ul, .kb-card-desc ol {
+            padding-left: 16px;
+            margin: 4px 0;
+            list-style-position: outside;
+        }
+        .kb-card-desc li {
+            margin-bottom: 2px;
+        }
+        .kb-card-desc strong { color: rgba(255,255,255,0.92); font-weight: 700; }
+        .kb-card-desc em { color: rgba(255,255,255,0.78); font-style: italic; }
+        .kb-card-desc code {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+            font-size: 0.72rem;
+            color: #c6bcff;
+            background: rgba(108,92,231,0.16);
+            border: 1px solid rgba(108,92,231,0.28);
+            border-radius: 4px;
+            padding: 1px 4px;
+        }
+        .kb-card-desc a {
+            color: #8dc4ff;
+            text-decoration: underline;
+            text-underline-offset: 2px;
+            text-decoration-color: rgba(141,196,255,0.6);
+        }
+        .kb-card-desc a:hover {
+            color: #b8ddff;
+            text-decoration-color: rgba(184,221,255,0.9);
+        }
+        .kb-card-desc:empty { display: none; }
+        .kb-card-labels {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin-top: 0;
+            margin-bottom: 0;
+        }
+        .kb-label {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 0.68rem;
+            font-weight: 600;
+            padding: 2px 8px;
+            border-radius: 20px;
+            opacity: 0.95;
+            border: 1px solid transparent;
+            white-space: nowrap;
+        }
+        .kb-card-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            margin-top: 6px;
+            min-height: 28px;
+        }
+        .kb-card-footer .kb-card-labels {
+            flex: 1 1 auto;
+            align-items: center;
+        }
+        .kb-card-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 4px;
+            opacity: 0;
+            transition: opacity 0.15s;
+            flex: 0 0 auto;
+        }
+        .kb-card:hover .kb-card-actions { opacity: 1; }
+        .kb-card-btn {
+            background: none;
+            border: none;
+            color: rgba(255,255,255,0.4);
+            cursor: pointer;
+            font-size: 0.85rem;
+            padding: 2px 5px;
+            border-radius: 5px;
+            transition: color 0.15s, background 0.15s;
+        }
+        .kb-card-btn:hover { color: #fff; background: rgba(255,255,255,0.1); }
+        .kb-card-btn.del:hover { color: #ff6b6b; }
+
+        .kb-col-border-pending  { border-top: 2px solid #fdcb6e; }
+        .kb-col-border-inprogress { border-top: 2px solid #6c5ce7; }
+        .kb-col-border-blocked  { border-top: 2px solid #e17055; }
+        .kb-col-border-done     { border-top: 2px solid #00b894; }
+
+        /* Semáforo de fecha límite */
+        .kb-due {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 0.72rem;
+            font-weight: 600;
+            margin-top: 6px;
+            padding: 3px 8px;
+            border-radius: 6px;
+            width: fit-content;
+        }
+        .kb-due.green  { background: rgba(0,184,148,0.15);  color: #55efc4; border: 1px solid rgba(0,184,148,0.3);  }
+        .kb-due.yellow { background: rgba(253,203,110,0.15); color: #fdcb6e; border: 1px solid rgba(253,203,110,0.3); }
+        .kb-due.red    { background: rgba(225,112,85,0.18);  color: #ff7675; border: 1px solid rgba(225,112,85,0.35); }
+        .kb-due.overdue { background: rgba(214,48,49,0.15); color: #ff6b6b; border: 1px solid rgba(214,48,49,0.4); }
+
+        /* Borde izquierdo semáforo en la tarjeta */
+        .kb-card.due-green   { border-left: 3px solid #00b894; }
+        .kb-card.due-yellow  { border-left: 3px solid #fdcb6e; }
+        .kb-card.due-red     { border-left: 3px solid #e17055; }
+        .kb-card.due-overdue { border-left: 3px solid #d63031; }
+
+        /* Badge de prioridad */
+        .kb-priority {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 0.68rem;
+            font-weight: 700;
+            padding: 2px 7px;
+            border-radius: 5px;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+        .kb-priority.high   { background: rgba(214,48,49,0.15);  color: #ff7675; border: 1px solid rgba(214,48,49,0.3); }
+        .kb-priority.medium { background: rgba(253,203,110,0.12); color: #fdcb6e; border: 1px solid rgba(253,203,110,0.25); }
+        .kb-priority.low    { background: rgba(9,132,227,0.12);   color: #74b9ff; border: 1px solid rgba(9,132,227,0.25); }
+
+        .kb-card-meta {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: wrap;
+            margin-top: 4px;
+        }
+
+        .kb-card-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            margin-bottom: 6px;
+        }
+        .kb-card-top-left {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            min-width: 0;
+            flex: 1 1 auto;
+        }
+        .kb-card-id {
+            font-size: 0.66rem;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            color: rgba(255,255,255,0.38);
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 999px;
+            padding: 2px 7px;
+            white-space: nowrap;
+        }
+        .kb-status-chip {
+            font-size: 0.66rem;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            border-radius: 999px;
+            padding: 2px 8px;
+            border: 1px solid transparent;
+            white-space: nowrap;
+        }
+        .kb-status-chip.pending { background: rgba(253,203,110,0.14); color: #fdcb6e; border-color: rgba(253,203,110,0.3); }
+        .kb-status-chip.inprogress { background: rgba(108,92,231,0.17); color: #c6bcff; border-color: rgba(108,92,231,0.33); }
+        .kb-status-chip.blocked { background: rgba(225,112,85,0.18); color: #fab1a0; border-color: rgba(225,112,85,0.35); }
+        .kb-status-chip.done { background: rgba(0,184,148,0.16); color: #55efc4; border-color: rgba(0,184,148,0.33); }
+
+        .kb-card-timestamps {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 7px;
+        }
+        .kb-ts-chip {
+            font-size: 0.66rem;
+            color: rgba(255,255,255,0.5);
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 6px;
+            padding: 2px 6px;
+            white-space: nowrap;
+        }
+
+        /* ===== KANBAN MODAL ===== */
+        .kb-modal-overlay {
+            display: none;
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.65);
+            backdrop-filter: blur(5px);
+            z-index: 10000;
+            align-items: center;
+            justify-content: center;
+        }
+        .kb-modal-overlay.active { display: flex; }
+        .kb-modal-box {
+            background: #1e1f26;
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 16px;
+            padding: 26px 28px;
+            width: min(760px, 94vw);
+            max-height: 94vh;
+            overflow-y: auto;
+            overflow-x: hidden;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+        .kb-desc-toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: -4px;
+            margin-bottom: 2px;
+        }
+        .kb-desc-tool {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.12);
+            color: rgba(255,255,255,0.78);
+            border-radius: 7px;
+            font-size: 0.78rem;
+            font-family: inherit;
+            width: 32px;
+            height: 30px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+            cursor: pointer;
+            transition: all 0.16s;
+        }
+        .kb-desc-tool svg {
+            width: 14px;
+            height: 14px;
+            fill: currentColor;
+        }
+        .kb-desc-tool:hover {
+            color: #fff;
+            background: rgba(108,92,231,0.2);
+            border-color: rgba(108,92,231,0.45);
+        }
+        .kb-desc-tool.active {
+            color: #fff;
+            background: rgba(108,92,231,0.34);
+            border-color: rgba(108,92,231,0.62);
+            box-shadow: 0 0 0 1px rgba(108,92,231,0.18);
+        }
+        .kb-desc-input {
+            resize: both;
+            min-height: 220px;
+            line-height: 1.48;
+            flex: 0 0 auto;
+        }
+        .kb-desc-editor {
+            height: 220px;
+            min-height: 220px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-word;
+            padding: 12px 14px;
+            outline: none;
+            cursor: text;
+            user-select: text;
+        }
+        .kb-desc-editor:empty::before {
+            content: attr(data-placeholder);
+            color: rgba(255,255,255,0.28);
+            pointer-events: none;
+        }
+        .kb-desc-editor ul,
+        .kb-desc-editor ol {
+            margin: 6px 0 6px 18px;
+        }
+        .kb-desc-editor code {
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+            font-size: 0.82em;
+            color: #c6bcff;
+            background: rgba(108,92,231,0.16);
+            border: 1px solid rgba(108,92,231,0.28);
+            border-radius: 4px;
+            padding: 1px 4px;
+        }
+        .kb-desc-editor a {
+            color: #8dc4ff;
+            text-decoration: underline;
+            text-underline-offset: 2px;
+        }
+        .kb-link-popover {
+            display: none;
+            margin-top: 4px;
+            padding: 10px;
+            border-radius: 10px;
+            border: 1px solid rgba(108,92,231,0.32);
+            background: rgba(15,17,24,0.92);
+            box-shadow: inset 0 0 0 1px rgba(255,255,255,0.03);
+        }
+        .kb-link-popover.active { display: block; }
+        .kb-link-fields {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+        .kb-link-actions {
+            margin-top: 8px;
+            display: flex;
+            justify-content: flex-end;
+            gap: 6px;
+        }
+        .kb-link-btn {
+            padding: 5px 10px;
+            border-radius: 7px;
+            border: 1px solid rgba(255,255,255,0.12);
+            background: rgba(255,255,255,0.06);
+            color: rgba(255,255,255,0.86);
+            cursor: pointer;
+            font-size: 0.76rem;
+            font-family: inherit;
+        }
+        .kb-link-btn:hover { background: rgba(255,255,255,0.12); color: #fff; }
+        .kb-link-btn.primary {
+            border-color: rgba(108,92,231,0.55);
+            background: rgba(108,92,231,0.28);
+            color: #fff;
+        }
+        .kb-link-btn.primary:hover { background: rgba(108,92,231,0.4); }
+        .kb-modal-box h3 { font-size: 1rem; font-weight: 700; }
+        .kb-modal-label-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            align-items: center;
+        }
+        .kb-modal-label-chip {
+            display: inline-flex;
+            align-items: center;
+            font-size: 0.75rem;
+            padding: 3px 10px;
+            border-radius: 20px;
+            cursor: pointer;
+            border: 1px solid transparent;
+            transition: all 0.15s;
+            opacity: 0.75;
+        }
+        .kb-modal-label-chip.selected {
+            opacity: 1;
+            box-shadow: 0 0 0 1px rgba(255,255,255,0.14), 0 0 0 3px rgba(108,92,231,0.16);
+        }
+        .kb-modal-label-chip:not(.selected) { filter: grayscale(0.6); }
+        .kb-modal-new-label {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+        }
+        .kb-modal-new-label input {
+            flex: 1;
+            font-size: 0.8rem;
+        }
+
+        /* ===== SETTINGS VIEW ===== */
+        #view-config .cfg-layout-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(320px, 1fr));
+            gap: 14px;
+            align-items: start;
+        }
+        #view-config .cfg-span-all { grid-column: 1 / -1; }
+        .cfg-section {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.07);
+            border-radius: 14px;
+            padding: 20px 24px;
+            margin-bottom: 0;
+        }
+        .cfg-section-title {
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: rgba(255,255,255,0.35);
+            margin-bottom: 16px;
+        }
+        .cfg-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        .cfg-row:last-child { border-bottom: none; }
+        .cfg-row-label { display: flex; flex-direction: column; gap: 3px; }
+        .cfg-row-label span { font-size: 0.92rem; font-weight: 500; color: #fff; }
+        .cfg-row-label small { font-size: 0.78rem; color: rgba(255,255,255,0.38); }
+
+        #view-config .cfg-section-modules .cfg-module-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(230px, 1fr));
+            gap: 10px 12px;
+        }
+        #view-config .cfg-section-modules .cfg-row {
+            margin: 0;
+            padding: 10px 12px;
+            border: 1px solid rgba(255,255,255,0.09);
+            border-bottom: none;
+            border-radius: 10px;
+            background: rgba(255,255,255,0.02);
+        }
+
+        #view-config .cfg-row-vertical {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 8px;
+        }
+        #view-config .cfg-input-group {
+            display: flex;
+            gap: 6px;
+            width: 100%;
+        }
+        .cfg-toggle {
+            position: relative;
+            width: 42px;
+            height: 24px;
+            flex-shrink: 0;
+        }
+        .cfg-toggle input { opacity: 0; width: 0; height: 0; }
+        .cfg-toggle-track {
+            position: absolute;
+            inset: 0;
+            background: rgba(255,255,255,0.12);
+            border-radius: 999px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .cfg-toggle input:checked + .cfg-toggle-track { background: #6c5ce7; }
+        .cfg-toggle-track::after {
+            content: '';
+            position: absolute;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #fff;
+            top: 3px;
+            left: 3px;
+            transition: transform 0.2s;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+        }
+        .cfg-toggle input:checked + .cfg-toggle-track::after { transform: translateX(18px); }
+
+        .cfg-folder-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.06);
+            cursor: pointer;
+            font-size: 0.85rem;
+            color: rgba(255,255,255,0.75);
+            transition: background 0.15s, border-color 0.15s;
+        }
+        .cfg-folder-item:hover { background: rgba(108,92,231,0.15); border-color: rgba(108,92,231,0.4); color: #fff; }
+        .cfg-folder-item.parent { color: rgba(255,255,255,0.45); font-style: italic; }
+
+        /* Ajustes dedicados para Configuracion en modo claro */
+        :root[data-theme='light'] #view-config .section-header h1 {
+            color: #1f2937;
+        }
+        :root[data-theme='light'] #view-config .section-header p {
+            color: #64748b;
+        }
+        :root[data-theme='light'] #view-config .cfg-section {
+            background: linear-gradient(180deg, #ffffff 0%, #f9fbff 100%);
+            border: 1px solid #d9e1ef;
+            box-shadow: 0 8px 20px rgba(15, 23, 42, 0.06);
+        }
+        :root[data-theme='light'] #view-config .cfg-section-modules .cfg-row {
+            background: #f8fbff;
+            border-color: #dbe4f2;
+        }
+        :root[data-theme='light'] #view-config .cfg-section-title {
+            color: #64748b;
+        }
+        :root[data-theme='light'] #view-config .cfg-row {
+            border-bottom: 1px solid #e6ebf5;
+        }
+        :root[data-theme='light'] #view-config .cfg-row-label span {
+            color: #0f172a;
+        }
+        :root[data-theme='light'] #view-config .cfg-row-label small {
+            color: #64748b;
+        }
+        :root[data-theme='light'] #view-config .cfg-toggle-track {
+            background: #dbe4f3;
+            border: 1px solid #c6d3e8;
+        }
+        :root[data-theme='light'] #view-config .cfg-toggle input:checked + .cfg-toggle-track {
+            background: #4f46e5;
+            border-color: #4f46e5;
+        }
+        :root[data-theme='light'] #view-config .cfg-toggle-track::after {
+            background: #ffffff;
+            box-shadow: 0 2px 7px rgba(15, 23, 42, 0.2);
+        }
+        :root[data-theme='light'] #view-config .ag-input {
+            background: #f8fafc;
+            color: #111827;
+            border: 1px solid #cbd5e1;
+        }
+        :root[data-theme='light'] #view-config .ag-input::placeholder {
+            color: #94a3b8;
+        }
+        :root[data-theme='light'] #view-config .ag-input:focus {
+            border-color: #6366f1;
+            box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.12);
+        }
+        :root[data-theme='light'] #view-config .ag-btn-ghost {
+            background: #eef2ff;
+            color: #334155;
+            border: 1px solid #d5dcf7;
+        }
+        :root[data-theme='light'] #view-config .ag-btn-ghost:hover {
+            background: #e0e7ff;
+            color: #1e293b;
+            border-color: #c7d2fe;
+        }
+        :root[data-theme='light'] #view-config .ag-btn-primary {
+            background: #4f46e5;
+        }
+        :root[data-theme='light'] #view-config .ag-btn-primary:hover {
+            background: #4338ca;
+        }
+
+        @media (max-width: 1100px) {
+            #view-config .cfg-layout-grid {
+                grid-template-columns: 1fr;
+            }
+            #view-config .cfg-section-modules .cfg-module-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+
+
+        /* ===== NOTAS ADHESIVAS ===== */
+        #view-notes { display: none; flex-direction: column; height: calc(100vh - 88px); }
+        #view-notes.active { display: flex; }
+
+        .notes-toolbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 0 14px 0;
+            flex-shrink: 0;
+        }
+        .notes-toolbar h2 {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #fff;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .notes-count-badge {
+            font-size: 0.75rem;
+            font-weight: 700;
+            background: rgba(108,92,231,0.25);
+            color: #a29bfe;
+            border: 1px solid rgba(108,92,231,0.35);
+            border-radius: 20px;
+            padding: 2px 9px;
+            line-height: 1.4;
+        }
+        .notes-new-btn {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 7px 16px;
+            background: #6c5ce7;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.15s, transform 0.1s;
+        }
+        .notes-new-btn:hover { background: #7d6ff0; }
+        .notes-new-btn:active { transform: scale(0.97); }
+
+        .notes-board {
+            flex: 1;
+            min-height: 0;
+            overflow: auto;
+            background: rgba(0,0,0,0.18);
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.06);
+            position: relative;
+            cursor: crosshair;
+        }
+        .notes-board::-webkit-scrollbar { width: 4px; height: 4px; }
+        .notes-board::-webkit-scrollbar-thumb { background: rgba(108,92,231,0.3); border-radius: 4px; }
+
+        .notes-canvas {
+            position: relative;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Patrón de puntos de fondo */
+        .notes-board {
+            background-image: radial-gradient(circle, rgba(255,255,255,0.06) 1px, transparent 1px);
+            background-size: 28px 28px;
+            background-color: #0d0d12;
+        }
+
+        /* Nota adhesiva */
+        .sticky-note {
+            position: absolute;
+            width: 220px;
+            min-width: 220px;
+            min-height: 170px;
+            border-radius: 4px 4px 4px 4px;
+            box-shadow: 3px 4px 14px rgba(0,0,0,0.45), 0 1px 3px rgba(0,0,0,0.3);
+            display: flex;
+            flex-direction: column;
+            user-select: none;
+            overflow: hidden;
+            resize: both;
+            transition: box-shadow 0.15s;
+        }
+        .sticky-note:hover {
+            box-shadow: 6px 8px 24px rgba(0,0,0,0.55), 0 2px 6px rgba(0,0,0,0.4);
+        }
+        .sticky-note.dragging {
+            box-shadow: 12px 16px 36px rgba(0,0,0,0.65);
+            opacity: 0.92;
+        }
+
+        /* Doblez esquina inferior derecha (efecto post-it) */
+        .sticky-note::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            width: 0;
+            height: 0;
+            border-style: solid;
+            border-width: 0 0 18px 18px;
+            border-color: transparent transparent rgba(0,0,0,0.18) transparent;
+            border-radius: 0 0 4px 0;
+            pointer-events: none;
+        }
+
+        .note-header {
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 8px;
+            border-radius: 4px 4px 0 0;
+            cursor: grab;
+            flex-shrink: 0;
+        }
+        .note-header:active { cursor: grabbing; }
+
+        .note-colors {
+            display: flex;
+            gap: 5px;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+        .sticky-note:hover .note-colors { opacity: 1; }
+
+        .note-color-dot {
+            width: 13px;
+            height: 13px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 2px solid rgba(255,255,255,0.25);
+            transition: transform 0.1s, border-color 0.1s;
+            flex-shrink: 0;
+        }
+        .note-color-dot:hover { transform: scale(1.25); border-color: rgba(255,255,255,0.6); }
+        .note-color-dot.active { border-color: rgba(0,0,0,0.4); transform: scale(1.15); }
+
+        .note-delete {
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            font-size: 17px;
+            line-height: 1;
+            color: rgba(0,0,0,0.35);
+            opacity: 0;
+            transition: opacity 0.2s, color 0.15s;
+            padding: 0;
+            flex-shrink: 0;
+        }
+        .sticky-note:hover .note-delete { opacity: 1; }
+        .note-delete:hover { color: rgba(0,0,0,0.7); }
+
+        .note-body {
+            flex: 1;
+            padding: 10px 12px 18px;
+            display: flex;
+        }
+        .note-body textarea {
+            width: 100%;
+            min-height: 0;
+            height: 100%;
+            background: transparent;
+            border: none;
+            outline: none;
+            resize: none;
+            font-family: inherit;
+            font-size: 13px;
+            line-height: 1.55;
+            color: #1e1e2e;
+            cursor: text;
+            padding: 0;
+            user-select: text;
+        }
+        .note-body textarea::placeholder { color: rgba(30,30,46,0.45); }
+
+        /* Colores de fondo por tipo */
+        .sticky-note[data-color="yellow"] { background: #ffeaa7; }
+        .sticky-note[data-color="yellow"] .note-header { background: #fdcb6e; }
+        .sticky-note[data-color="green"]  { background: #c3f4e4; }
+        .sticky-note[data-color="green"]  .note-header { background: #81ecec; }
+        .sticky-note[data-color="blue"]   { background: #c4dfff; }
+        .sticky-note[data-color="blue"]   .note-header { background: #74b9ff; }
+        .sticky-note[data-color="pink"]   { background: #ffcee8; }
+        .sticky-note[data-color="pink"]   .note-header { background: #fd79a8; }
+        .sticky-note[data-color="purple"] { background: #ddd4fe; }
+        .sticky-note[data-color="purple"] .note-header { background: #a29bfe; }
+        .sticky-note[data-color="orange"] { background: #ffe4c0; }
+        .sticky-note[data-color="orange"] .note-header { background: #fab1a0; }
+        .sticky-note[data-color="white"]  { background: #f0f0f5; }
+        .sticky-note[data-color="white"]  .note-header { background: #dde0e8; }
+
+        .notes-hint {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: rgba(255,255,255,0.12);
+            pointer-events: none;
+            user-select: none;
+        }
+        .notes-hint .hint-icon { font-size: 3rem; margin-bottom: 12px; }
+        .notes-hint p { font-size: 0.9rem; line-height: 1.6; }
+
+        /* ===== GESTOR DE CONTRASEÑAS ===== */
+        .pw-toolbar {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .pw-toolbar .ag-input { flex: 1; min-width: 180px; }
+        .pw-filter-group {
+            display: flex;
+            gap: 3px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 8px;
+            padding: 3px;
+            flex-shrink: 0;
+        }
+        .pw-filter {
+            padding: 5px 12px;
+            border-radius: 6px;
+            font-size: 0.82rem;
+            color: rgba(255,255,255,0.5);
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-family: inherit;
+            transition: all 0.15s;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            white-space: nowrap;
+        }
+        .pw-filter:hover { color: #fff; background: rgba(255,255,255,0.06); }
+        .pw-filter.active { background: #2d2d35; color: #fff; font-weight: 600; }
+
+        .pw-autosave-wrap {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 10px;
+            padding: 7px 10px;
+            flex-shrink: 0;
+        }
+
+        .pw-autosave-copy {
+            display: flex;
+            flex-direction: column;
+            gap: 1px;
+            line-height: 1.15;
+        }
+
+        .pw-autosave-copy strong {
+            font-size: 0.78rem;
+            color: rgba(255,255,255,0.9);
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .pw-autosave-copy small {
+            font-size: 0.7rem;
+            color: rgba(255,255,255,0.45);
+            white-space: nowrap;
+        }
+
+        .pw-autosave-select {
+            min-width: 170px;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.14);
+            border-radius: 8px;
+            color: #fff;
+            padding: 6px 9px;
+            font-family: inherit;
+            font-size: 0.78rem;
+            outline: none;
+            color-scheme: dark;
+        }
+
+        .pw-autosave-select option {
+            background: #1a1a22;
+            color: #f8fafc;
+        }
+
+        .pw-autosave-select:focus {
+            border-color: #6c5ce7;
+        }
+
+        .pw-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 12px;
+            align-items: start;
+        }
+        .pw-empty {
+            text-align: center;
+            color: rgba(255,255,255,0.2);
+            padding: 60px 20px;
+            font-size: 0.9rem;
+        }
+        .pw-empty .pw-empty-icon { font-size: 2.5rem; margin-bottom: 10px; }
+
+        .pw-card {
+            background: #1a1a22;
+            border: 1px solid rgba(255,255,255,0.07);
+            border-radius: 12px;
+            padding: 14px 16px;
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            align-items: flex-start;
+            gap: 14px;
+            transition: border-color 0.15s, background 0.15s;
+        }
+        .pw-card:hover { border-color: rgba(108,92,231,0.3); background: #1e1e28; }
+
+        .pw-avatar {
+            width: 42px;
+            height: 42px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1rem;
+            font-weight: 700;
+            flex-shrink: 0;
+            text-transform: uppercase;
+            letter-spacing: -0.5px;
+        }
+        .pw-avatar.web  { background: rgba(9,132,227,0.2);  color: #74b9ff; }
+        .pw-avatar.app  { background: rgba(108,92,231,0.2); color: #a29bfe; }
+        .pw-avatar.db   { background: rgba(0,206,201,0.2); color: #81ecec; }
+
+        .pw-card-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+        .pw-card-name-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .pw-card-name {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: #fff;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .pw-type-badge {
+            font-size: 0.68rem;
+            padding: 2px 7px;
+            border-radius: 20px;
+            font-weight: 600;
+            flex-shrink: 0;
+        }
+        .pw-type-badge.web { background: rgba(9,132,227,0.2); color: #74b9ff; }
+        .pw-type-badge.app { background: rgba(108,92,231,0.2); color: #a29bfe; }
+        .pw-type-badge.db { background: rgba(0,206,201,0.2); color: #81ecec; }
+
+        .pw-card-url {
+            font-size: 0.75rem;
+            color: rgba(255,255,255,0.3);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .pw-field-row {
+            display: grid;
+            grid-template-columns: 68px minmax(0, 1fr) auto;
+            align-items: center;
+            gap: 8px;
+            min-height: 24px;
+        }
+        .pw-field-actions {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            flex-shrink: 0;
+        }
+        .pw-field-label {
+            font-size: 0.72rem;
+            color: rgba(255,255,255,0.3);
+            width: 68px;
+            flex-shrink: 0;
+        }
+        .pw-field-value {
+            font-size: 0.84rem;
+            color: rgba(255,255,255,0.75);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            flex: 1;
+            min-width: 0;
+            font-family: 'Outfit', monospace;
+        }
+        .pw-field-value.masked { letter-spacing: 2px; color: rgba(255,255,255,0.4); }
+
+        .pw-copy-btn {
+            width: 26px;
+            height: 26px;
+            border-radius: 5px;
+            border: none;
+            background: rgba(255,255,255,0.06);
+            color: rgba(255,255,255,0.4);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.15s, color 0.15s;
+            flex-shrink: 0;
+        }
+        .pw-copy-btn:hover { background: rgba(108,92,231,0.3); color: #a29bfe; }
+        .pw-copy-btn.copied { background: rgba(0,184,148,0.25); color: #55efc4; }
+
+        .pw-show-btn {
+            width: 26px;
+            height: 26px;
+            border-radius: 5px;
+            border: none;
+            background: rgba(255,255,255,0.04);
+            color: rgba(255,255,255,0.45);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: color 0.15s, background 0.15s;
+            flex-shrink: 0;
+        }
+        .pw-show-btn:hover { color: #fff; background: rgba(255,255,255,0.12); }
+
+        .pw-card-actions {
+            display: flex;
+            gap: 6px;
+            flex-shrink: 0;
+            margin-left: 4px;
+        }
+        .pw-action-btn {
+            width: 30px;
+            height: 30px;
+            border-radius: 7px;
+            border: none;
+            background: rgba(255,255,255,0.05);
+            color: rgba(255,255,255,0.4);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.15s, color 0.15s;
+        }
+        .pw-action-btn:hover { background: rgba(255,255,255,0.1); color: #fff; }
+        .pw-action-btn.del:hover { background: rgba(214,48,49,0.2); color: #ff7675; }
+
+        :root[data-theme='light'] #view-passwords .pw-filter-group {
+            background: #eef2f8;
+            border: 1px solid #d7dfec;
+        }
+        :root[data-theme='light'] #view-passwords .pw-filter {
+            color: #64748b;
+        }
+        :root[data-theme='light'] #view-passwords .pw-filter:hover {
+            color: #0f172a;
+            background: #e2e8f0;
+        }
+        :root[data-theme='light'] #view-passwords .pw-filter.active {
+            background: #4f46e5;
+            color: #ffffff;
+            box-shadow: 0 4px 10px rgba(79, 70, 229, 0.22);
+        }
+        :root[data-theme='light'] #view-passwords .pw-empty {
+            color: #94a3b8;
+        }
+        :root[data-theme='light'] #view-passwords .pw-card {
+            background: #ffffff;
+            border: 1px solid #d9e1ef;
+            box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06);
+        }
+        :root[data-theme='light'] #view-passwords .pw-card:hover {
+            background: #fcfdff;
+            border-color: #c6d3eb;
+            box-shadow: 0 10px 22px rgba(15, 23, 42, 0.09);
+        }
+        :root[data-theme='light'] #view-passwords .pw-card-name {
+            color: #0f172a;
+        }
+        :root[data-theme='light'] #view-passwords .pw-card-url {
+            color: #64748b;
+        }
+        :root[data-theme='light'] #view-passwords .pw-field-label {
+            color: #64748b;
+        }
+        :root[data-theme='light'] #view-passwords .pw-field-value {
+            color: #1e293b;
+        }
+        :root[data-theme='light'] #view-passwords .pw-field-value.masked {
+            color: #94a3b8;
+        }
+        :root[data-theme='light'] #view-passwords .pw-copy-btn,
+        :root[data-theme='light'] #view-passwords .pw-show-btn {
+            background: #eef2f7;
+            color: #475569;
+            border: 1px solid #d8e0ec;
+        }
+        :root[data-theme='light'] #view-passwords .pw-copy-btn:hover,
+        :root[data-theme='light'] #view-passwords .pw-show-btn:hover {
+            background: #e2e8f0;
+            color: #1e293b;
+            border-color: #c9d3e3;
+        }
+        :root[data-theme='light'] #view-passwords .pw-copy-btn.copied {
+            background: #dcfce7;
+            color: #15803d;
+            border-color: #bbf7d0;
+        }
+        :root[data-theme='light'] #view-passwords .pw-action-btn {
+            background: #eef2f7;
+            color: #475569;
+            border: 1px solid #d8e0ec;
+        }
+        :root[data-theme='light'] #view-passwords .pw-action-btn:hover {
+            background: #e2e8f0;
+            color: #1e293b;
+            border-color: #c9d3e3;
+        }
+        :root[data-theme='light'] #view-passwords .pw-action-btn.del:hover {
+            background: #fee2e2;
+            color: #b91c1c;
+            border-color: #fecaca;
+        }
+        :root[data-theme='light'] #view-passwords .pw-autosave-wrap {
+            background: #f8fafc;
+            border: 1px solid #d9e2ef;
+        }
+        :root[data-theme='light'] #view-passwords .pw-autosave-copy strong {
+            color: #0f172a;
+        }
+        :root[data-theme='light'] #view-passwords .pw-autosave-copy small {
+            color: #64748b;
+        }
+        :root[data-theme='light'] #view-passwords .pw-autosave-select {
+            background: #ffffff;
+            border: 1px solid #cbd5e1;
+            color: #0f172a;
+            color-scheme: light;
+        }
+        :root[data-theme='light'] #view-passwords .pw-autosave-select option {
+            background: #ffffff;
+            color: #0f172a;
+        }
+        :root[data-theme='light'] #view-passwords .pw-autosave-select:focus {
+            border-color: #6366f1;
+            box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.12);
+        }
+
+
+
+        /* Modal contraseñas */
+        .pw-modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.7);
+            backdrop-filter: blur(4px);
+            z-index: 10010;
+            align-items: center;
+            justify-content: center;
+        }
+        .pw-modal-overlay.active { display: flex; }
+        .pw-modal-box {
+            background: #18181f;
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 16px;
+            padding: 24px;
+            width: min(480px, 92vw);
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            box-shadow: 0 24px 60px rgba(0,0,0,0.7);
+        }
+        .pw-modal-box h3 { font-size: 1rem; font-weight: 700; color: #fff; margin: 0; }
+        .pw-type-selector {
+            display: flex;
+            gap: 6px;
+        }
+        .pw-type-btn {
+            flex: 1;
+            padding: 8px;
+            border-radius: 9px;
+            border: 1px solid rgba(255,255,255,0.1);
+            background: rgba(255,255,255,0.04);
+            color: rgba(255,255,255,0.5);
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 0.85rem;
+            font-weight: 500;
+            transition: all 0.15s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+        .pw-type-btn.active { background: rgba(108,92,231,0.2); border-color: #6c5ce7; color: #a29bfe; }
+        .pw-type-btn:hover:not(.active) { background: rgba(255,255,255,0.08); color: #fff; }
+
+        .pw-modal-label {
+            font-size: 0.75rem;
+            color: rgba(255,255,255,0.4);
+            margin-bottom: 4px;
+            display: block;
+        }
+        .pw-pass-wrap {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+        .pw-pass-wrap .ag-input { padding-right: 72px; }
+        .pw-pass-actions {
+            position: absolute;
+            right: 6px;
+            display: flex;
+            gap: 2px;
+        }
+        .pw-pass-icon-btn {
+            width: 26px;
+            height: 26px;
+            border-radius: 5px;
+            border: none;
+            background: transparent;
+            color: rgba(255,255,255,0.4);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: color 0.15s, background 0.15s;
+        }
+        .pw-pass-icon-btn:hover { color: #fff; background: rgba(255,255,255,0.08); }
+        .pw-modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+    </style>
+</head>
+<body>
+
+    <!-- Script de comunicación con el Storage del Navegador -->
+    <script src="storage_bridge.js"></script>
+
+    <!-- HEADER -->
+    <div class="ag-header">
+        <div class="ag-tabs">
+            <button class="ag-tab active" data-tab="notes">Notas</button>
+            <button class="ag-tab" data-tab="kanban">Kanban</button>
+            <button class="ag-tab" data-tab="agenda">Agenda</button>
+            <button class="ag-tab" data-tab="shopping">Compras</button>
+            <button class="ag-tab" data-tab="income">Ingresos</button>
+            <button class="ag-tab" data-tab="passwords">Claves</button>
+        </div>
+
+        <div style="flex:1; -webkit-app-region: drag; height: 100%;"></div>
+
+        <div style="display:flex; align-items:center; gap:8px; flex-shrink:0; -webkit-app-region: no-drag;">
+            <input type="text" class="kb-filter-input" id="kb-search" placeholder="Buscar tarjeta..." style="display:none;">
+            <button id="btn-config" class="ag-nav-btn" title="Configuración">⚙️</button>
+
+            <div class="ag-win-controls" style="margin-left:0; display:none;">
+                <button class="ag-win-btn minimize" id="btn-minimize" title="Minimizar"><svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><path d="M19 13H5v-2h14v2z"/></svg></button>
+                <button class="ag-win-btn maximize" id="btn-maximize" title="Maximizar"><svg viewBox="0 0 24 24" width="10" height="10" fill="currentColor" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z" fill="none"/></svg></button>
+                <button class="ag-win-btn close-btn" id="btn-close" title="Cerrar"><svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- CONTENT -->
+    <div class="ag-content">
+
+        <!-- ===== AGENDA VIEW ===== -->
+        <div id="view-agenda" class="ag-view active">
+            <div class="section-header" style="display:flex; justify-content:space-between; align-items:flex-start;">
+                <div style="display:flex; align-items:center; gap:16px;">
+                    <div>
+                        <h1><div id="main-calendar-icon"></div> Mi Agenda</h1>
+                        <p>Gestión de tareas y recordatorios</p>
+                    </div>
+                    <button class="ag-btn ag-btn-primary" id="open-new-reminder-modal-btn" style="padding: 8px 16px; font-weight: 600; border-radius: 8px;">Nuevo +</button>
+                </div>
+                <div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
+                    <div class="agenda-filter-row" style="margin:0; display:flex; align-items:center; gap:8px;">
+                        <label for="reminder-tag-filter" class="agenda-filter-label">Filtrar por etiqueta:</label>
+                        <select id="reminder-tag-filter" class="ag-input agenda-filter-select" style="margin:0; flex:0 0 160px; max-width:160px; padding:6px 10px; height:auto;">
+                            <option value="__all__">Todas</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div id="reminders-list" class="ag-list">
+                <div class="ag-empty">Cargando tareas...</div>
+            </div>
+            <div id="reminders-pagination" class="ag-pagination" style="display:none;"></div>
+        </div>
+
+        <!-- ===== SHOPPING VIEW ===== -->
+        <div id="view-shopping" class="ag-view">
+            <div class="section-header" style="display:flex; justify-content:space-between; align-items:flex-start;">
+                <div style="display:flex; align-items:center; gap:16px;">
+                    <div>
+                        <h1>🛒 Compras y Pagos <button class="ag-settings-btn" id="btn-payment-methods" title="Administrar medios de pago">⚙️</button></h1>
+                        <p>Control de gastos, facturas y deudas</p>
+                    </div>
+                    <button class="ag-btn ag-btn-primary" id="open-new-shop-modal-btn" style="padding: 8px 16px; font-weight: 600; border-radius: 8px;">Nuevo +</button>
+                </div>
+                <div class="shop-totals">
+                    <div class="shop-totals-col">
+                        <div class="shop-totals-col-label">Gastos pendientes</div>
+                        <div class="shop-totals-row">
+                            <div class="shop-total-item">Q <span id="total-gtq">0.00</span></div>
+                            <div class="shop-total-item">$ <span id="total-usd">0.00</span></div>
+                        </div>
+                    </div>
+                    <div class="shop-totals-divider"></div>
+                    <div class="shop-totals-col">
+                        <div class="shop-totals-col-label">Ingresos pendientes</div>
+                        <div class="shop-totals-row">
+                            <div class="shop-total-item">Q <span id="total-income-gtq">0.00</span></div>
+                            <div class="shop-total-item">$ <span id="total-income-usd">0.00</span></div>
+                        </div>
+                    </div>
+                    <div class="shop-totals-divider"></div>
+                    <div class="shop-totals-col">
+                        <div class="shop-totals-col-label">Saldo general</div>
+                        <div class="shop-total-item shop-total-combined"><span id="total-combined">Q 0.00</span></div>
+                    </div>
+                </div>
+            </div>
+            <!-- Payment method summary -->
+            <div id="payment-summary" class="payment-summary" style="display:none;"></div>
+            <div id="shopping-list" class="ag-list">
+                <div class="ag-empty">Cargando gastos...</div>
+            </div>
+            <div id="shopping-pagination" class="ag-pagination" style="display:none;"></div>
+        </div>
+
+        <!-- ===== INCOME VIEW ===== -->
+        <div id="view-income" class="ag-view">
+            <div class="section-header" style="display:flex; justify-content:space-between; align-items:flex-start;">
+                <div style="display:flex; align-items:center; gap:16px;">
+                    <div>
+                        <h1>💰 Ingresos</h1>
+                        <p>Registro de entradas y cobros</p>
+                    </div>
+                    <button class="ag-btn ag-btn-income" id="open-new-income-modal-btn" style="padding: 8px 16px; font-weight: 600; border-radius: 8px;">Nuevo +</button>
+                </div>
+                <div class="shop-totals income-totals-mini">
+                    <div class="shop-totals-col">
+                        <div class="shop-totals-col-label">Pendientes</div>
+                        <div class="shop-totals-row">
+                            <div class="shop-total-item">Q <span id="income-mini-gtq">0.00</span></div>
+                            <div class="shop-total-item">$ <span id="income-mini-usd">0.00</span></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div id="income-list" class="ag-list">
+                <div class="ag-empty">Cargando ingresos...</div>
+            </div>
+            <div id="income-pagination" class="ag-pagination" style="display:none;"></div>
+        </div>
+
+        <!-- ===== KANBAN VIEW ===== -->
+        <div id="view-kanban" class="ag-view">
+            <div class="section-header">
+                <h1>
+                    <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M4 3h4a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zm6 0h4a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zm6 0h4a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/></svg>
+                    Kanban
+                </h1>
+                <p>Seguimiento de tareas por estatus</p>
+                <div class="kb-label-filter" id="kb-label-filter"></div>
+            </div>
+
+            <div class="kb-board">
+                <!-- Pendientes -->
+                <div class="kb-col kb-col-border-pending" id="col-pending">
+                    <div class="kb-col-header">
+                        <div class="kb-col-title">
+                            <span class="kb-col-dot" style="background:#fdcb6e;"></span>
+                            Pendientes
+                            <span class="kb-col-count" id="count-pending">0</span>
+                        </div>
+                        <button class="kb-col-add" data-status="pending" title="Agregar tarjeta">+</button>
+                    </div>
+                    <div class="kb-cards" id="cards-pending" data-status="pending"></div>
+                </div>
+                <!-- En Proceso -->
+                <div class="kb-col kb-col-border-inprogress" id="col-inprogress">
+                    <div class="kb-col-header">
+                        <div class="kb-col-title">
+                            <span class="kb-col-dot" style="background:#6c5ce7;"></span>
+                            En Proceso
+                            <span class="kb-col-count" id="count-inprogress">0</span>
+                        </div>
+                        <button class="kb-col-add" data-status="inprogress" title="Agregar tarjeta">+</button>
+                    </div>
+                    <div class="kb-cards" id="cards-inprogress" data-status="inprogress"></div>
+                </div>
+                <!-- Detenidos -->
+                <div class="kb-col kb-col-border-blocked" id="col-blocked">
+                    <div class="kb-col-header">
+                        <div class="kb-col-title">
+                            <span class="kb-col-dot" style="background:#e17055;"></span>
+                            Detenidos
+                            <span class="kb-col-count" id="count-blocked">0</span>
+                        </div>
+                        <button class="kb-col-add" data-status="blocked" title="Agregar tarjeta">+</button>
+                    </div>
+                    <div class="kb-cards" id="cards-blocked" data-status="blocked"></div>
+                </div>
+                <!-- Hechos -->
+                <div class="kb-col kb-col-border-done" id="col-done">
+                    <div class="kb-col-header">
+                        <div class="kb-col-title">
+                            <span class="kb-col-dot" style="background:#00b894;"></span>
+                            Hechos
+                            <span class="kb-col-count" id="count-done">0</span>
+                        </div>
+                        <button class="kb-col-add" data-status="done" title="Agregar tarjeta">+</button>
+                    </div>
+                    <div class="kb-cards" id="cards-done" data-status="done"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== NOTES VIEW ===== -->
+        <div id="view-notes" class="ag-view">
+            <div class="notes-toolbar">
+                <h2>📌 Pizarra de Notas <span id="notes-total" class="notes-count-badge">0</span></h2>
+                <button id="notes-new-btn" class="notes-new-btn">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+                    Nueva nota
+                </button>
+            </div>
+            <div class="notes-board" id="notes-board">
+                <div class="notes-canvas" id="notes-canvas">
+                    <div class="notes-hint" id="notes-hint">
+                        <div class="hint-icon">📌</div>
+                        <p>Haz doble clic en la pizarra<br>o usa el botón para crear una nota</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== CONFIG VIEW ===== -->
+        <div id="view-config" class="ag-view">
+            <div class="section-header">
+                <h1>
+                    <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M19.14 12.94c.04-.3.06-.61.06-.94s-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.59-.22l-2.39.96a7.07 7.07 0 0 0-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.37 1.04.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.57 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
+                    Configuración
+                </h1>
+                <p>Preferencias de la aplicación</p>
+            </div>
+
+            <div class="cfg-layout-grid">
+
+            <!-- Módulos -->
+            <div class="cfg-section cfg-section-modules cfg-span-all">
+                <div class="cfg-section-title">Módulos</div>
+                <div class="cfg-module-grid">
+
+                <div class="cfg-row">
+                    <div class="cfg-row-label">
+                        <span>Notas Adhesivas</span>
+                        <small>Muestra la pestaña de Notas en la agenda</small>
+                    </div>
+                    <label class="cfg-toggle">
+                        <input type="checkbox" id="cfg-notes-enabled" checked>
+                        <span class="cfg-toggle-track"></span>
+                    </label>
+                </div>
+                <div class="cfg-row">
+                    <div class="cfg-row-label">
+                        <span>Kanban</span>
+                        <small>Muestra la pestaña de Kanban en la agenda</small>
+                    </div>
+                    <label class="cfg-toggle">
+                        <input type="checkbox" id="cfg-kanban-enabled" checked>
+                        <span class="cfg-toggle-track"></span>
+                    </label>
+                </div>
+                <div class="cfg-row">
+                    <div class="cfg-row-label">
+                        <span>Agenda</span>
+                        <small>Muestra la pestaña de Agenda (recordatorios y tareas)</small>
+                    </div>
+                    <label class="cfg-toggle">
+                        <input type="checkbox" id="cfg-agenda-enabled" checked>
+                        <span class="cfg-toggle-track"></span>
+                    </label>
+                </div>
+                <div class="cfg-row">
+                    <div class="cfg-row-label">
+                        <span>Compras y Pagos</span>
+                        <small>Muestra la pestaña de Compras y Pagos en la agenda</small>
+                    </div>
+                    <label class="cfg-toggle">
+                        <input type="checkbox" id="cfg-shopping-enabled" checked>
+                        <span class="cfg-toggle-track"></span>
+                    </label>
+                </div>
+                <div class="cfg-row">
+                    <div class="cfg-row-label">
+                        <span>Ingresos</span>
+                        <small>Muestra la pestaña de Ingresos en la agenda</small>
+                    </div>
+                    <label class="cfg-toggle">
+                        <input type="checkbox" id="cfg-income-enabled" checked>
+                        <span class="cfg-toggle-track"></span>
+                    </label>
+                </div>
+                <div class="cfg-row">
+                    <div class="cfg-row-label">
+                        <span>Claves</span>
+                        <small>Muestra la pestaña de Contraseñas en la agenda</small>
+                    </div>
+                    <label class="cfg-toggle">
+                        <input type="checkbox" id="cfg-passwords-enabled" checked>
+                        <span class="cfg-toggle-track"></span>
+                    </label>
+                </div>
+
+                </div>
+            </div>
+
+
+
+
+
+            <div class="cfg-span-all" style="display:flex; justify-content:flex-end; padding-top:4px;">
+                <button class="ag-btn ag-btn-primary" id="cfg-save-btn">Guardar cambios</button>
+            </div>
+            </div>
+        </div>
+
+        <!-- ===== PASSWORDS VIEW ===== -->
+        <div id="view-passwords" class="ag-view">
+            <div class="section-header" style="margin-bottom:16px;">
+                <h1>
+                    <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1s3.1 1.39 3.1 3.1v2z"/></svg>
+                    Contraseñas
+                </h1>
+                <p>Almacén local de credenciales para sitios web, aplicaciones y bases de datos</p>
+            </div>
+            <div class="pw-toolbar">
+                <input type="text" id="pw-search" class="ag-input" placeholder="🔍 Buscar por nombre o usuario...">
+                <div class="pw-filter-group">
+                    <button class="pw-filter active" data-filter="all">Todos</button>
+                    <button class="pw-filter" data-filter="web">
+                        <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
+                        Sitios Web
+                    </button>
+                    <button class="pw-filter" data-filter="app">
+                        <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><path d="M21 2H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h7l-2 3v1h8v-1l-2-3h7c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 12H3V4h18v10z"/></svg>
+                        Aplicaciones
+                    </button>
+                    <button class="pw-filter" data-filter="db">
+                        <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><path d="M12 2C7.58 2 4 3.79 4 6v12c0 2.21 3.58 4 8 4s8-1.79 8-4V6c0-2.21-3.58-4-8-4zm0 2c3.31 0 6 .9 6 2s-2.69 2-6 2-6-.9-6-2 2.69-2 6-2zm0 16c-3.31 0-6-.9-6-2v-2.27c1.36.8 3.53 1.27 6 1.27s4.64-.47 6-1.27V18c0 1.1-2.69 2-6 2zm0-5c-3.31 0-6-.9-6-2v-2.27c1.36.8 3.53 1.27 6 1.27s4.64-.47 6-1.27V13c0 1.1-2.69 2-6 2z"/></svg>
+                        Bases de datos
+                    </button>
+                </div>
+                <div class="pw-autosave-wrap" title="Solo aplica al guardado detectado automaticamente al iniciar sesion en sitios web">
+                    <div class="pw-autosave-copy">
+                        <strong>Autoguardado web</strong>
+                        <small>Manual siempre permitido</small>
+                    </div>
+                    <select id="pw-autosave-policy-agenda" class="pw-autosave-select" aria-label="Modo de autoguardado web">
+                        <option value="ask">Preguntar</option>
+                        <option value="always">Siempre</option>
+                        <option value="never">Nunca</option>
+                    </select>
+                </div>
+                <button class="ag-btn ag-btn-primary" id="pw-add-btn" style="white-space:nowrap;">+ Agregar</button>
+            </div>
+            <div id="pw-list" class="pw-list">
+                <div class="pw-empty"><div class="pw-empty-icon">🔑</div>No hay contraseñas guardadas</div>
+            </div>
+        </div>
+
+    <!-- MODAL NUEVA COMPRA -->
+    <div class="edit-modal-overlay" id="new-shop-modal">
+        <div class="edit-modal-box">
+            <h3>🛒 Nueva Compra / Pago</h3>
+            <div class="edit-modal-row">
+                <input type="text" id="shop-item-input" class="ag-input" style="flex:1;" placeholder="¿Qué hay que comprar o pagar?">
+                <button class="ag-btn ag-btn-ghost" id="paste-shop-item" title="Pegar del portapapeles">📋</button>
+            </div>
+            <div class="edit-modal-row">
+                <select id="shop-currency-select" class="ag-input ag-input-sm" style="flex:0 0 100px;">
+                    <option value="Q">GTQ (Q)</option>
+                    <option value="$">USD ($)</option>
+                </select>
+                <input type="number" id="shop-value-input" class="ag-input" style="flex:1;" placeholder="Monto" step="0.01" min="0">
+            </div>
+            <div class="edit-modal-row">
+                <select id="shop-payment-method-select" class="ag-input" style="flex:1;">
+                    <option value="">Sin asignar (Medio de Pago)</option>
+                </select>
+            </div>
+            <div class="edit-modal-row">
+                <input type="date" id="shop-date-input" class="ag-input" style="flex:1;" title="Fecha límite">
+            </div>
+            <div class="edit-modal-actions">
+                <button class="ag-btn ag-btn-ghost" id="new-shop-cancel-btn">Cancelar</button>
+                <button class="ag-btn ag-btn-primary" id="add-shop-btn">Añadir</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL NUEVO INGRESO -->
+    <div class="edit-modal-overlay" id="new-income-modal">
+        <div class="edit-modal-box">
+            <h3>💰 Nuevo Ingreso</h3>
+            <div class="edit-modal-row">
+                <input type="text" id="income-item-input" class="ag-input" style="flex:1;" placeholder="¿Cuál es el ingreso?">
+            </div>
+            <div class="edit-modal-row">
+                <select id="income-currency-select" class="ag-input ag-input-sm" style="flex:0 0 100px;">
+                    <option value="Q">GTQ (Q)</option>
+                    <option value="$">USD ($)</option>
+                </select>
+                <input type="number" id="income-value-input" class="ag-input" style="flex:1;" placeholder="Monto" step="0.01" min="0">
+            </div>
+            <div class="edit-modal-row">
+                <input type="date" id="income-date-input" class="ag-input" style="flex:1;" title="Fecha">
+            </div>
+            <div class="edit-modal-actions">
+                <button class="ag-btn ag-btn-ghost" id="new-income-cancel-btn">Cancelar</button>
+                <button class="ag-btn ag-btn-income" id="add-income-btn" style="background:#2ed573; color:#fff;">Añadir</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL NUEVA TAREA / RECORDATORIO -->
+    <div class="edit-modal-overlay" id="new-reminder-modal">
+        <div class="edit-modal-box" style="max-height: 85vh; overflow-y: auto;">
+            <h3>➕ Nuevo Recordatorio</h3>
+            <div class="edit-modal-row">
+                <input type="text" id="new-reminder-input" class="ag-input" style="flex:1;" placeholder="Nueva tarea o recordatorio...">
+                <button class="ag-btn ag-btn-ghost" id="paste-reminder" title="Pegar del portapapeles">📋</button>
+            </div>
+            <div class="edit-modal-row">
+                <input type="date" id="new-reminder-date" class="ag-input" style="flex:1;" title="Fecha límite">
+            </div>
+            <div class="edit-modal-row">
+                <input type="text" id="new-reminder-tag" class="ag-input" style="flex:1;" placeholder="Etiquetas (coma separadas)">
+            </div>
+            <div class="agenda-tags-helper" style="margin-top: 8px;">
+                <p class="agenda-tags-helper-title">Etiquetas de la tarea nueva:</p>
+                <div id="new-reminder-tag-current" class="agenda-tag-chip-list"></div>
+                <p class="agenda-tags-helper-title">Etiquetas existentes (clic para añadir):</p>
+                <div id="new-reminder-tag-available" class="agenda-tag-chip-list"></div>
+            </div>
+            <div class="edit-modal-actions">
+                <button class="ag-btn ag-btn-ghost" id="new-reminder-cancel-btn">Cancelar</button>
+                <button class="ag-btn ag-btn-primary" id="add-reminder-btn">Añadir</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="edit-modal-overlay" id="edit-modal">
+        <div class="edit-modal-box">
+            <h3 id="edit-modal-title">Editar</h3>
+            <div class="edit-modal-row">
+                <input type="text" id="edit-text" class="ag-input" style="flex:1;" placeholder="Descripción">
+            </div>
+            <div class="edit-modal-row">
+                <input type="date" id="edit-date" class="ag-input" style="flex:1;" title="Fecha límite">
+            </div>
+            <div class="edit-modal-row" id="edit-tag-row" style="display:none;">
+                <input type="text" id="edit-tag" class="ag-input" style="flex:1;" placeholder="Etiquetas (coma separadas)">
+            </div>
+            <div id="edit-tag-helper" class="agenda-tags-helper" style="display:none; margin-top:-6px;">
+                <p class="agenda-tags-helper-title">Etiquetas de esta tarea:</p>
+                <div id="edit-reminder-tag-current" class="agenda-tag-chip-list"></div>
+                <p class="agenda-tags-helper-title">Etiquetas existentes (clic para añadir):</p>
+                <div id="edit-reminder-tag-available" class="agenda-tag-chip-list"></div>
+            </div>
+            <div class="edit-modal-row" id="edit-value-row">
+                <select id="edit-currency" class="ag-input ag-input-sm">
+                    <option value="Q">GTQ (Q)</option>
+                    <option value="$">USD ($)</option>
+                </select>
+                <input type="number" id="edit-value" class="ag-input" style="flex:1;" placeholder="Monto" step="0.01" min="0">
+            </div>
+            <div class="edit-modal-row" id="edit-payment-method-row" style="display:none;">
+                <select id="edit-payment-method" class="ag-input" style="flex:1;">
+                    <option value="">Sin asignar</option>
+                </select>
+            </div>
+            <div class="edit-modal-actions">
+                <button class="ag-btn ag-btn-ghost" id="edit-cancel-btn">Cancelar</button>
+                <button class="ag-btn ag-btn-primary" id="edit-save-btn">Guardar cambios</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL MEDIOS DE PAGO -->
+    <div class="pm-modal-overlay" id="pm-modal">
+        <div class="pm-modal-box">
+            <h3>⚙️ Medios de Pago</h3>
+            <div class="pm-exchange-row">
+                <label class="pm-exchange-label">Tasa de cambio: 1 US$ =</label>
+                <input type="number" id="pm-exchange-rate" class="ag-input pm-exchange-input" step="0.01" min="0.01" value="7.80">
+                <span class="pm-exchange-unit">Q</span>
+            </div>
+            <div id="pm-method-list" class="pm-method-list"></div>
+            <div class="pm-add-row">
+                <input type="text" id="pm-new-method-input" class="ag-input" style="flex:1;" placeholder="Nuevo método...">
+                <button class="ag-btn ag-btn-ghost" id="pm-add-method-btn">Agregar</button>
+            </div>
+            <div class="pm-modal-actions">
+                <button class="ag-btn ag-btn-ghost" id="pm-cancel-btn">Cancelar</button>
+                <button class="ag-btn ag-btn-primary" id="pm-save-btn">Guardar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== KANBAN MODAL ===== -->
+    <div class="kb-modal-overlay" id="kb-modal">
+        <div class="kb-modal-box">
+            <h3 id="kb-modal-title">Nueva tarjeta</h3>
+
+            <input type="text" id="kb-card-title" class="ag-input" placeholder="Título de la tarjeta *">
+            <div class="kb-desc-toolbar">
+                <button type="button" class="kb-desc-tool" id="kb-tool-bold" title="Negrita" aria-label="Negrita">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.6 10.79A4.21 4.21 0 0 0 12.4 3H6v18h7.2a4.8 4.8 0 0 0 2.4-9.21zM9 6h3.4a1.4 1.4 0 0 1 0 2.8H9V6zm4.2 12H9v-3.6h4.2a1.8 1.8 0 0 1 0 3.6z"/></svg>
+                </button>
+                <button type="button" class="kb-desc-tool" id="kb-tool-italic" title="Cursiva" aria-label="Cursiva">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 4v3h2.21l-3.42 10H6v3h8v-3h-2.21l3.42-10H18V4z"/></svg>
+                </button>
+                <button type="button" class="kb-desc-tool" id="kb-tool-code" title="Código" aria-label="Código">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.59 16.59 4 12l4.59-4.59L10 8.82 6.83 12 10 15.18zm6.82 0L14 15.18 17.17 12 14 8.82l1.41-1.41L20 12zm-6.98 3.12L11.17 4l2.24.4-2.74 15.71z"/></svg>
+                </button>
+                <button type="button" class="kb-desc-tool" id="kb-link-tool-btn" title="Agregar enlace" aria-label="Agregar enlace">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.9 12a5 5 0 0 1 1.46-3.54l2.1-2.1a5 5 0 0 1 7.07 7.07l-1.4 1.4-1.42-1.42 1.4-1.4a3 3 0 1 0-4.24-4.24l-2.1 2.1a3 3 0 0 0 4.24 4.24l.35-.35 1.41 1.42-.35.35A5 5 0 0 1 3.9 12zm6.2 5.95 1.4-1.4 1.42 1.42-1.4 1.4a5 5 0 0 1-7.07-7.07l.35-.35 1.41 1.42-.35.35a3 3 0 0 0 4.24 4.24zm3.19-8.48 1.42 1.42-4.24 4.24-1.42-1.42z"/></svg>
+                </button>
+                <button type="button" class="kb-desc-tool" id="kb-tool-list" title="Lista" aria-label="Lista">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h14v2H7zm0 6h14v2H7zm0 6h14v2H7zM3 6.5A1.5 1.5 0 1 0 3 3.5a1.5 1.5 0 0 0 0 3zm0 6A1.5 1.5 0 1 0 3 9.5a1.5 1.5 0 0 0 0 3zm0 6A1.5 1.5 0 1 0 3 15.5a1.5 1.5 0 0 0 0 3z"/></svg>
+                </button>
+            </div>
+            <div id="kb-link-popover" class="kb-link-popover">
+                <div class="kb-link-fields">
+                    <input type="text" id="kb-link-label" class="ag-input" placeholder="Texto del enlace" style="font-size:0.82rem;">
+                    <input type="text" id="kb-link-url" class="ag-input" placeholder="https://..." style="font-size:0.82rem;">
+                </div>
+                <div class="kb-link-actions">
+                    <button type="button" id="kb-link-cancel" class="kb-link-btn">Cancelar</button>
+                    <button type="button" id="kb-link-insert" class="kb-link-btn primary">Insertar</button>
+                </div>
+            </div>
+            <div id="kb-card-desc" class="ag-input kb-desc-input kb-desc-editor" contenteditable="true" data-placeholder="Descripción (opcional)"></div>
+
+            <div>
+                <div style="font-size:0.78rem; color:rgba(255,255,255,0.4); margin-bottom:8px; text-transform:uppercase; letter-spacing:0.06em;">Etiquetas</div>
+                <div class="kb-modal-label-row" id="kb-label-selector"></div>
+                <div class="kb-modal-new-label" style="margin-top:8px;">
+                    <input type="text" id="kb-new-label-input" class="ag-input" placeholder="Nueva etiqueta..." style="font-size:0.82rem; padding:6px 10px;">
+                    <button class="ag-btn ag-btn-ghost" id="kb-add-label-btn" style="padding:6px 12px; font-size:0.82rem; white-space:nowrap;">+ Agregar</button>
+                </div>
+            </div>
+
+            <div style="display:flex; gap:10px;">
+                <div style="flex:1; display:flex; flex-direction:column; gap:6px;">
+                    <div style="font-size:0.78rem; color:rgba(255,255,255,0.4); text-transform:uppercase; letter-spacing:0.06em;">Columna</div>
+                    <select id="kb-card-status" class="ag-input" style="font-size:0.85rem;">
+                        <option value="pending">Pendientes</option>
+                        <option value="inprogress">En Proceso</option>
+                        <option value="blocked">Detenidos</option>
+                        <option value="done">Hechos</option>
+                    </select>
+                </div>
+                <div style="flex:1; display:flex; flex-direction:column; gap:6px;">
+                    <div style="font-size:0.78rem; color:rgba(255,255,255,0.4); text-transform:uppercase; letter-spacing:0.06em;">Prioridad</div>
+                    <select id="kb-card-priority" class="ag-input" style="font-size:0.85rem;">
+                        <option value="high">🔺 Alta</option>
+                        <option value="medium" selected>🔸 Media</option>
+                        <option value="low">🔹 Baja</option>
+                    </select>
+                </div>
+                <div style="flex:1; display:flex; flex-direction:column; gap:6px;">
+                    <div style="font-size:0.78rem; color:rgba(255,255,255,0.4); text-transform:uppercase; letter-spacing:0.06em;">Fecha límite</div>
+                    <input type="date" id="kb-card-due" class="ag-input" style="font-size:0.85rem; color-scheme:dark;">
+                </div>
+            </div>
+
+            <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:4px;">
+                <button class="ag-btn ag-btn-ghost" id="kb-modal-cancel">Cancelar</button>
+                <button class="ag-btn ag-btn-primary" id="kb-modal-save">Guardar</button>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- ===== MODAL CONTRASEÑAS ===== -->
+    <div class="pw-modal-overlay" id="pw-modal">
+        <div class="pw-modal-box">
+            <h3 id="pw-modal-title">Nueva contraseña</h3>
+            <div class="pw-type-selector">
+                <button class="pw-type-btn active" data-type="web">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
+                    Sitio Web
+                </button>
+                <button class="pw-type-btn" data-type="app">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M21 2H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h7l-2 3v1h8v-1l-2-3h7c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 12H3V4h18v10z"/></svg>
+                    Aplicación
+                </button>
+                <button class="pw-type-btn" data-type="db">
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M12 2C7.58 2 4 3.79 4 6v12c0 2.21 3.58 4 8 4s8-1.79 8-4V6c0-2.21-3.58-4-8-4zm0 2c3.31 0 6 .9 6 2s-2.69 2-6 2-6-.9-6-2 2.69-2 6-2zm0 16c-3.31 0-6-.9-6-2v-2.27c1.36.8 3.53 1.27 6 1.27s4.64-.47 6-1.27V18c0 1.1-2.69 2-6 2zm0-5c-3.31 0-6-.9-6-2v-2.27c1.36.8 3.53 1.27 6 1.27s4.64-.47 6-1.27V13c0 1.1-2.69 2-6 2z"/></svg>
+                    Base de datos
+                </button>
+            </div>
+            <div>
+                <label class="pw-modal-label" id="pw-name-label">Nombre *</label>
+                <input type="text" id="pw-name" class="ag-input" placeholder="ej: Google, Netflix, Banco…" style="width:100%;">
+            </div>
+            <div id="pw-url-row">
+                <label class="pw-modal-label" id="pw-url-label">URL</label>
+                <input type="text" id="pw-url" class="ag-input" placeholder="https://..." style="width:100%;">
+            </div>
+            <div id="pw-db-port-row" style="display:none;">
+                <label class="pw-modal-label" id="pw-db-port-label">Puerto</label>
+                <input type="text" id="pw-db-port" class="ag-input" placeholder="3306" style="width:100%;">
+            </div>
+            <div id="pw-db-name-row" style="display:none;">
+                <label class="pw-modal-label" id="pw-db-name-label">Base de datos</label>
+                <input type="text" id="pw-db-name" class="ag-input" placeholder="fundascout" style="width:100%;">
+            </div>
+            <div id="pw-db-type-row" style="display:none;">
+                <label class="pw-modal-label" id="pw-db-type-label">Tipo de base de datos</label>
+                <select id="pw-db-type" class="ag-input" style="width:100%;">
+                    <option value="mysql">MySQL</option>
+                    <option value="postgresql">PostgreSQL</option>
+                    <option value="mariadb">MariaDB</option>
+                    <option value="sqlite">SQLite</option>
+                    <option value="sqlserver">SQL Server</option>
+                    <option value="oracle">Oracle</option>
+                    <option value="other">Otro</option>
+                </select>
+            </div>
+            <div>
+                <label class="pw-modal-label" id="pw-username-label">Usuario / Correo *</label>
+                <input type="text" id="pw-username" class="ag-input" placeholder="usuario@ejemplo.com" style="width:100%;" autocomplete="off">
+            </div>
+            <div>
+                <label class="pw-modal-label">Contraseña *</label>
+                <div class="pw-pass-wrap">
+                    <input type="password" id="pw-password" class="ag-input" placeholder="••••••••" style="width:100%;" autocomplete="new-password">
+                    <div class="pw-pass-actions">
+                        <button class="pw-pass-icon-btn" id="pw-modal-toggle" title="Mostrar/ocultar">
+                            <svg id="pw-modal-eye-icon" viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
+                        </button>
+                        <button class="pw-pass-icon-btn" id="pw-modal-gen" title="Generar contraseña aleatoria">
+                            <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div>
+                <label class="pw-modal-label">Notas</label>
+                <textarea id="pw-notes" class="ag-input" rows="2" placeholder="Información adicional..." style="width:100%; resize:vertical; min-height:54px;"></textarea>
+            </div>
+            <div class="pw-modal-actions">
+                <button class="ag-btn ag-btn-ghost" id="pw-modal-cancel">Cancelar</button>
+                <button class="ag-btn ag-btn-primary" id="pw-modal-save">Guardar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Explorador de Carpetas (Configuración) -->    <div id="cfg-folder-modal" class="pm-modal-overlay" style="z-index:10001;">
+        <div class="pm-modal-box" style="width:min(520px,92vw); max-height:80vh; overflow:hidden; display:flex; flex-direction:column; gap:0;">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+                <h3 style="font-size:1rem;">📂 Explorador de Carpetas</h3>
+                <button id="cfg-folder-close" style="background:none;border:none;color:rgba(255,255,255,0.5);font-size:1.4rem;cursor:pointer;line-height:1;">&times;</button>
+            </div>
+            <div id="cfg-folder-path" style="font-size:0.78rem; color:rgba(255,255,255,0.45); padding:6px 10px; background:rgba(0,0,0,0.3); border-radius:7px; margin-bottom:10px; font-family:monospace; word-break:break-all;">/</div>
+            <div id="cfg-folder-list" style="flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:4px; min-height:0; max-height:340px;"></div>
+            <div style="display:flex; gap:8px; margin-top:14px; justify-content:flex-end;">
+                <button class="ag-btn ag-btn-ghost" id="cfg-folder-cancel">Cancelar</button>
+                <button class="ag-btn ag-btn-primary" id="cfg-folder-select">Seleccionar esta carpeta</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sistema global de confirmación y notificaciones (añadido al final del body) -->
+    <div id="global-confirm-modal" class="edit-modal-overlay">
+        <div class="edit-modal-box" style="max-width: 300px; text-align: center;">
+            <h3 id="global-confirm-title" style="margin-bottom: 10px;">Confirmar</h3>
+            <p id="global-confirm-msg" style="font-size: 0.9rem; color: #a0a0a8; margin-bottom: 20px;">¿Estás seguro?</p>
+            <div class="edit-modal-actions" style="justify-content: center;">
+                <button class="ag-btn ag-btn-ghost" id="global-confirm-cancel">Cancelar</button>
+                <button class="ag-btn ag-btn-primary" id="global-confirm-ok" style="background: rgba(255,71,87,0.2); color: #ff4757;">Eliminar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast-container" style="position: fixed; bottom: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 10px;"></div>
+
+
+
+    <!-- MODAL OBSERVACIONES -->
+    <div class="obs-modal-overlay" id="obs-modal">
+        <div class="obs-modal-box">
+            <div class="obs-modal-header">
+                <h3 class="obs-modal-title">📝 Observaciones</h3>
+                <button class="obs-close-btn" id="obs-close-btn" title="Cerrar">✕</button>
+            </div>
+            <textarea id="obs-textarea" class="obs-textarea" placeholder="Escribe tus observaciones aquí..."></textarea>
+            <div class="obs-modal-actions">
+                <button class="ag-btn ag-btn-ghost" id="obs-cancel-btn">Cancelar</button>
+                <button class="ag-btn ag-btn-primary" id="obs-save-btn">Guardar</button>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        /* ===== Modal Observaciones ===== */
+        .obs-modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.55);
+            z-index: 1100;
+            align-items: center;
+            justify-content: center;
+        }
+        .obs-modal-overlay.active { display: flex; }
+
+        .obs-modal-box {
+            background: var(--ag-card-bg, #1e2030);
+            border: 1px solid var(--ag-border, #2e3148);
+            border-radius: 12px;
+            padding: 24px;
+            width: min(480px, 94vw);
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+        }
+
+        .obs-modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .obs-modal-title {
+            margin: 0;
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--ag-text, #e0e0e0);
+        }
+
+        .obs-close-btn {
+            background: none;
+            border: none;
+            color: var(--ag-text-muted, #888);
+            font-size: 1rem;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 6px;
+            transition: background 0.15s;
+        }
+        .obs-close-btn:hover { background: rgba(255,255,255,0.08); }
+
+        .obs-textarea {
+            background: var(--ag-input-bg, #13152a);
+            border: 1px solid var(--ag-border, #2e3148);
+            border-radius: 8px;
+            color: var(--ag-text, #e0e0e0);
+            font-size: 0.9rem;
+            font-family: inherit;
+            padding: 10px 12px;
+            min-height: 140px;
+            resize: vertical;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .obs-textarea:focus { border-color: var(--ag-accent, #5c7cfa); }
+
+        .obs-modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+        }
+
+        /* Botón de notas en los items */
+        .ag-notes-btn {
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 0.95rem;
+            padding: 2px 5px;
+            border-radius: 5px;
+            opacity: 0.55;
+            transition: opacity 0.15s, background 0.15s;
+            line-height: 1;
+            color: var(--ag-text, #e0e0e0);
+        }
+        .ag-notes-btn:hover { opacity: 1; background: rgba(255,255,255,0.07); }
+        .ag-notes-btn.has-notes { opacity: 1; color: #f0a946; }
+    </style>
+
+    <script src="theme.js"></script>
+    <script src="agenda.js"></script>
+    <script src="ui_helpers.js"></script>
+</body>
+</html>

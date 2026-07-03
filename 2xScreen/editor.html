@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Editor de Capturas - ScreenShot Merke</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="editor.css">
+</head>
+<body>
+  <!-- Barra de Herramientas Principal -->
+  <div class="topbar">
+    <div class="logo-area">
+      <svg class="logo-icon" viewBox="0 0 24 24"><path d="M4 4h16v16H4zm2 2v12h12V6zm3 3h6v6H9z"/></svg>
+      <span class="logo-text">ScreenShot Merke</span>
+    </div>
+
+    <div class="group" aria-label="Herramientas de dibujo">
+      <button id="tool-select" class="icon-btn" title="Seleccionar área de recorte" aria-label="Seleccionar área"><svg viewBox="0 0 24 24"><path d="M3 3h7v2H5v5H3zm11 0h7v7h-2V5h-5zM3 14h2v5h5v2H3zm16 0h2v7h-7v-2h5zM8 8h8v8H8z"/></svg></button>
+      <button id="tool-rect" class="icon-btn active" title="Dibujar cuadro" aria-label="Cuadro"><svg viewBox="0 0 24 24"><path d="M4 4h16v16H4z"/></svg></button>
+      <button id="tool-arrow" class="icon-btn" title="Dibujar flecha" aria-label="Flecha"><svg viewBox="0 0 24 24"><path d="M4 20l16-16v6h2V2h-8v2h6L4 18z"/></svg></button>
+      <button id="tool-text" class="icon-btn" title="Agregar texto" aria-label="Texto"><svg viewBox="0 0 24 24"><path d="M4 4h16v3h-6v13h-4V7H4z"/></svg></button>
+      <button id="tool-highlight" class="icon-btn" title="Resaltar área" aria-label="Resaltar"><svg viewBox="0 0 24 24"><path d="M3 17h18v4H3zm2.2-2.8l8.9-8.9 3.6 3.6-8.9 8.9H5.2z"/></svg></button>
+      <button id="tool-blur" class="icon-btn" title="Difuminar / Ocultar datos" aria-label="Difuminar"><svg viewBox="0 0 24 24"><path d="M5 5h14v14H5z" opacity=".22"/><path d="M7 7h3v3H7zm4 0h2v2h-2zm3 0h3v3h-3zM7 11h2v2H7zm3 0h3v3h-3zm4 0h2v2h-2zM7 14h3v3H7zm4 0h2v2h-2zm3 0h3v3h-3z"/></svg></button>
+      <button id="tool-number" class="icon-btn" title="Numerar pasos" aria-label="Numerar"><svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm-1 5h2v10h-2zM9 9h2v2H9zm4 4h2v2h-2z"/></svg><span id="num-badge" class="num-badge">1</span></button>
+    </div>
+
+    <div class="group" aria-label="Propiedades de trazo">
+      <div class="color-picker-wrapper" title="Color de trazo">
+        <input id="color" type="color" value="#ff2d55" aria-label="Color de trazo">
+      </div>
+      <div class="slider-wrap" title="Grosor de trazo" aria-label="Grosor">
+        <svg viewBox="0 0 24 24" class="slider-icon"><circle cx="12" cy="12" r="6"/></svg>
+        <input id="width" type="range" min="1" max="12" value="3">
+      </div>
+      <div class="slider-wrap" title="Tamaño de texto y números de pasos" aria-label="Tamaño de texto">
+        <svg viewBox="0 0 24 24" class="slider-icon" fill="none" stroke="currentColor" stroke-width="2" style="width:16px; height:16px;"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg>
+        <input id="text-size" type="range" min="12" max="80" value="24">
+      </div>
+    </div>
+
+    <div class="group actions-group" aria-label="Acciones de archivo">
+      <button id="undo" class="icon-btn" title="Deshacer última acción (Ctrl+Z)" aria-label="Deshacer"><svg viewBox="0 0 24 24"><path d="M12 5V2L7 7l5 5V9c3.3 0 6 2.7 6 6 0 .7-.1 1.4-.4 2h2.1c.2-.6.3-1.3.3-2 0-4.4-3.6-8-8-8z"/></svg></button>
+      <button id="clear-selection" class="icon-btn" title="Quitar selección" aria-label="Quitar selección"><svg viewBox="0 0 24 24"><path d="M3 3h7v2H5v5H3zm11 0h7v7h-2V5h-5zM3 14h2v5h5v2H3zm16 0h2v7h-7v-2h5zM8 8l8 8m0-8-8 8"/></svg></button>
+      <button id="clear" class="icon-btn danger-hover" title="Limpiar todo" aria-label="Limpiar todo"><svg viewBox="0 0 24 24"><path d="M6 7h12l-1 14H7L6 7zm3-4h6l1 2h4v2H4V5h4z"/></svg></button>
+      <button id="copy" class="icon-btn" title="Copiar al portapapeles" aria-label="Copiar"><svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg></button>
+      <button id="save" class="btn primary" title="Guardar imagen recortada o completa" aria-label="Guardar"><svg viewBox="0 0 24 24" class="btn-icon"><path d="M17 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7l-4-4zM8 5h7v4H8zm4 13-4-4h2.5V10h3v4H16z"/></svg> Guardar</button>
+      <button id="cancel" class="btn danger" title="Cerrar editor" aria-label="Cancelar">Cerrar</button>
+    </div>
+  </div>
+
+  <!-- Contenedor del Lienzo -->
+  <div class="canvas-wrap">
+    <canvas id="canvas"></canvas>
+  </div>
+
+  <!-- Barra de Estado Inferior -->
+  <div id="status" class="status">Listo para anotar. Usa el icono de selección para exportar solo un área.</div>
+
+  <!-- Contenedor para Notificaciones Sticky (Toasts) -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- Modal Personalizado para Confirmaciones de Borrado -->
+  <dialog id="confirm-dialog" class="custom-dialog">
+    <div class="dialog-content">
+      <div class="dialog-header">
+        <svg class="dialog-icon warning" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+        <h3>¿Limpiar todas las anotaciones?</h3>
+      </div>
+      <p>Esta acción eliminará de forma permanente todos los dibujos y textos agregados a la captura de pantalla actual. No se puede deshacer.</p>
+      <div class="dialog-actions">
+        <button id="btn-confirm-cancel" class="dialog-btn secondary">Cancelar</button>
+        <button id="btn-confirm-accept" class="dialog-btn danger">Limpiar todo</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Modal Personalizado para Introducir Texto -->
+  <dialog id="text-dialog" class="custom-dialog">
+    <div class="dialog-content">
+      <div class="dialog-header">
+        <svg class="dialog-icon text-tool" viewBox="0 0 24 24"><path d="M4 4h16v3h-6v13h-4V7H4z"/></svg>
+        <h3>Ingresar texto de anotación</h3>
+      </div>
+      <input type="text" id="text-input" placeholder="Escribe tu anotación aquí..." autocomplete="off">
+      <div class="dialog-actions">
+        <button id="btn-text-cancel" class="dialog-btn secondary">Cancelar</button>
+        <button id="btn-text-submit" class="dialog-btn primary">Aceptar</button>
+      </div>
+    </div>
+  </dialog>
+
+  <script src="editor.js"></script>
+</body>
+</html>
