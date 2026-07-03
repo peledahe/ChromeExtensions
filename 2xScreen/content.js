@@ -635,11 +635,19 @@ function showConfirmationModal(title, text, onConfirm) {
   if (!shadow) return;
 
   // Crear overlay
+  const containerEl = shadow.querySelector(".mc-container");
+  let leftStyle = "";
+  if (containerEl) {
+    const rect = containerEl.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    leftStyle = `left: ${centerX}px;`;
+  }
+
   const overlay = document.createElement("div");
   overlay.className = "mc-modal-overlay";
 
   overlay.innerHTML = `
-    <div class="mc-modal-box">
+    <div class="mc-modal-box" style="${leftStyle}">
       <h3 class="mc-modal-title">${title}</h3>
       <p class="mc-modal-text">${text}</p>
       <div class="mc-modal-buttons">
@@ -738,11 +746,19 @@ function showSecurityInfoModal() {
     `;
   }
 
+  const containerEl = shadow.querySelector(".mc-container");
+  let leftStyle = "";
+  if (containerEl) {
+    const rect = containerEl.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    leftStyle = `left: ${centerX}px;`;
+  }
+
   const overlay = document.createElement("div");
   overlay.className = "mc-modal-overlay";
 
   overlay.innerHTML = `
-    <div class="mc-modal-box" style="text-align: center; max-width: 450px;">
+    <div class="mc-modal-box" style="text-align: center; max-width: 450px; ${leftStyle}">
       ${modalIcon}
       <h3 class="mc-modal-title" style="margin-top: 0;">${modalTitle}</h3>
       <p class="mc-modal-text" style="text-align: left; line-height: 1.5; font-size: 0.92rem;">${modalText}</p>

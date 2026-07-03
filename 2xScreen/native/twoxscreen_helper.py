@@ -9,8 +9,15 @@ import os
 def log_debug(msg):
     try:
         log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "helper_debug.log")
-        with open(log_path, "a", encoding="utf-8") as f:
-            f.write(msg + "\n")
+        lines = []
+        if os.path.exists(log_path):
+            with open(log_path, "r", encoding="utf-8", errors="ignore") as f:
+                lines = f.readlines()
+        lines.append(msg + "\n")
+        if len(lines) > 100:
+            lines = lines[-100:]
+        with open(log_path, "w", encoding="utf-8") as f:
+            f.writelines(lines)
     except Exception as e:
         sys.stderr.write(f"Error escribiendo log: {e}\n")
 

@@ -424,13 +424,16 @@
   padding: 20px;
   box-sizing: border-box;
   box-shadow: 0 15px 40px rgba(0, 0, 0, 0.6);
-  transform: translateY(-20px);
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, calc(-50% - 20px));
   transition: transform 0.25s ease;
   text-align: center;
 }
 
 .mc-modal-overlay.show .mc-modal-box {
-  transform: translateY(0);
+  transform: translate(-50%, -50%);
 }
 
 .mc-modal-title {
