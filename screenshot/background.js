@@ -23,9 +23,10 @@ chrome.action.onClicked.addListener((tab) => {
 // Escuchar solicitudes de captura desde el script de contenido (ej. barra flotante de 2xScreen)
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === "take_screenshot") {
-    chrome.tabs.captureVisibleTab(null, { format: 'png' }, (dataUrl) => {
+    const targetWindowId = sender.tab ? sender.tab.windowId : null;
+    chrome.tabs.captureVisibleTab(targetWindowId, { format: 'png' }, (dataUrl) => {
       if (chrome.runtime.lastError) {
-        console.error("Error al capturar la pestaña desde content script:", chrome.runtime.lastError);
+        console.error("Error al capturar la pestaña desde content script:", chrome.runtime.lastError.message || chrome.runtime.lastError);
         return;
       }
 

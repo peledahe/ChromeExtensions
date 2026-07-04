@@ -1,6 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Mk Agenda & Notas",
+  "short_name": "mk-agenda",
   "version": "1.0",
   "description": "Extensión de Agenda, Compras, Ingresos, Kanban, Notas y Claves basada en Minichrome y persistida localmente.",
   "permissions": [

@@ -1,11 +1,15 @@
 {
   "manifest_version": 3,
   "name": "Mk ScreenShot",
+  "short_name": "mk-screenshot",
   "version": "1.0",
   "description": "Captura y anota la pantalla de manera fácil y rápida (multiplataforma).",
   "permissions": [
     "activeTab",
     "storage"
+  ],
+  "host_permissions": [
+    "<all_urls>"
   ],
   "background": {
     "service_worker": "background.js"

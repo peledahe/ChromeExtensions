@@ -238,19 +238,29 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     try {
       switch (message.action) {
         case "checkInstalledExtensions":
-          const results = {};
-          const extIds = {
-            agenda: "bgiopnnblbijgffgdohgmnkhopbonefd",
-            videoplayer: "akmbookdeplgfocoehhjajjakckkdfke",
-            imageplayer: "dkpgjcdnjhempmphhmgnbabiimlccgne"
+          const results = {
+            agenda: null,
+            videoplayer: null,
+            imageplayer: null,
+            screenshot: null
           };
-          for (const [key, id] of Object.entries(extIds)) {
-            try {
-              const ext = await chrome.management.get(id);
-              results[key] = !!(ext && ext.enabled);
-            } catch (e) {
-              results[key] = false;
+          try {
+            const extensions = await chrome.management.getAll();
+            for (const ext of extensions) {
+              if (ext.enabled) {
+                if (ext.shortName === "mk-agenda" || ext.id === "bgiopnnblbijgffgdohgmnkhopbonefd") {
+                  results.agenda = ext.id;
+                } else if (ext.shortName === "mk-videoplayer" || ext.id === "akmbookdeplgfocoehhjajjakckkdfke") {
+                  results.videoplayer = ext.id;
+                } else if (ext.shortName === "mk-imageplayer" || ext.id === "dkpgjcdnjhempmphhmgnbabiimlccgne") {
+                  results.imageplayer = ext.id;
+                } else if (ext.shortName === "mk-screenshot") {
+                  results.screenshot = ext.id;
+                }
+              }
             }
+          } catch (e) {
+            console.error("Error detectando extensiones auxiliares:", e);
           }
           sendResponse(results);
           break;
@@ -343,9 +353,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           break;
 
         case "take_screenshot":
-          chrome.tabs.captureVisibleTab(null, { format: 'png' }, (dataUrl) => {
+          const targetWindowId = sender.tab ? sender.tab.windowId : null;
+          chrome.tabs.captureVisibleTab(targetWindowId, { format: 'png' }, (dataUrl) => {
             if (chrome.runtime.lastError) {
-              console.error("Error al capturar pestaña nativamente:", chrome.runtime.lastError);
+              console.error("Error al capturar pestaña nativamente:", chrome.runtime.lastError.message || chrome.runtime.lastError);
               sendResponse({ error: chrome.runtime.lastError.message });
               return;
             }

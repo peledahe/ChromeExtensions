@@ -241,6 +241,7 @@ async function initUI(alignRightScreen, isCollapsed) {
     if (!extensionsStatus.agenda && btnAgenda) btnAgenda.style.display = "none";
     if (!extensionsStatus.videoplayer && btnVideoPlayer) btnVideoPlayer.style.display = "none";
     if (!extensionsStatus.imageplayer && btnImagePlayer) btnImagePlayer.style.display = "none";
+    if (!extensionsStatus.screenshot && btnScreenshot) btnScreenshot.style.display = "none";
   }
 
   // Mostrar la URL y estado inicial
@@ -409,7 +410,7 @@ async function initUI(alignRightScreen, isCollapsed) {
   if (btnScreenshot) {
     btnScreenshot.addEventListener("click", () => {
       if (!isContextValid()) return destroyUI();
-      chrome.runtime.sendMessage({ action: "take_screenshot" });
+      window.postMessage({ action: 'trigger-screenshot-merke' }, '*');
     });
   }
 
@@ -417,9 +418,10 @@ async function initUI(alignRightScreen, isCollapsed) {
   if (btnAgenda) {
     btnAgenda.addEventListener("click", () => {
       if (!isContextValid()) return destroyUI();
+      const extId = extensionsStatus?.agenda || "bgiopnnblbijgffgdohgmnkhopbonefd";
       chrome.runtime.sendMessage({
         action: "open_url",
-        url: "chrome-extension://bgiopnnblbijgffgdohgmnkhopbonefd/notes.html"
+        url: `chrome-extension://${extId}/notes.html`
       }, (response) => {
         if (chrome.runtime.lastError) {
           showToast("Error de Comunicación", `Asegúrate de recargar la extensión 2xScreen en chrome://extensions. Detalle: ${chrome.runtime.lastError.message}`);
@@ -434,9 +436,10 @@ async function initUI(alignRightScreen, isCollapsed) {
   if (btnVideoPlayer) {
     btnVideoPlayer.addEventListener("click", () => {
       if (!isContextValid()) return destroyUI();
+      const extId = extensionsStatus?.videoplayer || "akmbookdeplgfocoehhjajjakckkdfke";
       chrome.runtime.sendMessage({
         action: "open_url",
-        url: "chrome-extension://akmbookdeplgfocoehhjajjakckkdfke/videoplayer.html"
+        url: `chrome-extension://${extId}/videoplayer.html`
       }, (response) => {
         if (chrome.runtime.lastError) {
           showToast("Error de Comunicación", `Asegúrate de recargar la extensión 2xScreen en chrome://extensions. Detalle: ${chrome.runtime.lastError.message}`);
@@ -451,9 +454,10 @@ async function initUI(alignRightScreen, isCollapsed) {
   if (btnImagePlayer) {
     btnImagePlayer.addEventListener("click", () => {
       if (!isContextValid()) return destroyUI();
+      const extId = extensionsStatus?.imageplayer || "dkpgjcdnjhempmphhmgnbabiimlccgne";
       chrome.runtime.sendMessage({
         action: "open_url",
-        url: "chrome-extension://dkpgjcdnjhempmphhmgnbabiimlccgne/imageplayer.html"
+        url: `chrome-extension://${extId}/imageplayer.html`
       }, (response) => {
         if (chrome.runtime.lastError) {
           showToast("Error de Comunicación", `Asegúrate de recargar la extensión 2xScreen en chrome://extensions. Detalle: ${chrome.runtime.lastError.message}`);
