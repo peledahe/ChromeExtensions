@@ -56,7 +56,18 @@ async function saveSavingsState() {
     await py.save_savings(savingsState.goals);
 }
 
-// ─── Render – Lista de objetivos ─────────────────────────────────�    container.innerHTML = savingsState.goals.map(g => {
+// ─── Render – Lista de objetivos ──────────────────────────────────────────────
+
+function renderSavingsList() {
+    const container = document.getElementById('savings-goals-list');
+    if (!container) return;
+
+    if (savingsState.goals.length === 0) {
+        container.innerHTML = '<div class="ag-empty">No tienes objetivos de ahorro. ¡Crea uno! 🎯</div>';
+        return;
+    }
+
+    container.innerHTML = savingsState.goals.map(g => {
         const sym = svgGetSymbol(g.currency);
         const pct = Math.min(100, Math.round((g.accumulated / g.goal) * 100));
         const remaining = Math.max(0, g.goal - g.accumulated);
@@ -106,14 +117,6 @@ async function saveSavingsState() {
             <div style="display:flex; justify-content:space-between; font-size:0.7rem; color:var(--ag-text-muted); margin-top:-2px; line-height:1;">
                 <span>Mensual: <strong>${sym} ${svgFmtNum(g.monthlyAmount)}</strong></span>
                 <span>${pct >= 100 ? '¡Meta lograda! 🎉' : `${monthsLeft} meses rest.`}</span>
-            </div>
-        </div>`;
-    }).join('');iv class="savings-amount-label">Meta</div>
-                </div>
-            </div>
-
-            <div style="font-size:0.78rem; color:var(--ag-text-muted); margin-top:6px; text-align:right;">
-                Aporte mensual: <strong style="color:var(--ag-text);">${sym} ${svgFmtNum(g.monthlyAmount)}</strong>
             </div>
         </div>`;
     }).join('');

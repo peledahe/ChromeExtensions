@@ -380,6 +380,7 @@ function initDebtsListeners() {
                 saveDebtsState();
                 window.showToast('Presupuesto de deudas actualizado', 'success');
                 fetchDebts();
+                if (window.fetchBudget) window.fetchBudget();
             }
         });
     }

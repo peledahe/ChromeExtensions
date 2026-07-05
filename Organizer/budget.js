@@ -2,7 +2,7 @@
 
 const DEFAULT_CATEGORIES = {
     income: ['Salario', 'Freelance', 'Inversiones', 'Otros'],
-    expense: ['Alimentación', 'Vivienda', 'Transporte', 'Servicios', 'Entretenimiento', 'Deudas', 'Otros']
+    expense: ['Alimentación', 'Vivienda', 'Transporte', 'Servicios', 'Entretenimiento', 'Deudas', 'Ahorros', 'Otros']
 };
 
 let BUDGET_CATEGORIES = {
@@ -387,7 +387,7 @@ async function fetchBudget() {
             py.get_shopping(),
             py.get_config('budget_limits'),
             py.get_config('budget_income_targets'),
-            py.get_config('deudas_presupuesto')
+            py.get_debts_budget()
         ]);
 
         budgetState.income = incomeData || [];
@@ -450,7 +450,7 @@ function renderBudgetDashboard() {
     const balanceCard = document.getElementById('budget-balance-card-main');
     const balanceIcon = document.getElementById('budget-balance-icon-main');
     if (balanceEl) {
-        balanceEl.innerText = formatMoney(balance, 'local');
+        balanceEl.innerHTML = formatMoney(balance, 'local');
         balanceEl.className = 'shop-total-combined ' + (balance >= 0 ? 'positive' : 'negative');
     }
     if (balanceCard && balanceIcon) {
@@ -622,10 +622,8 @@ function renderBudgetTransactions() {
 async function updateDebtAllocation(val) {
     budgetState.debtAllocation = Number(val) || 0;
     if (py) {
-        await py.set_config('deudas_presupuesto', String(budgetState.debtAllocation));
-        if (document.getElementById('view-debts')?.classList.contains('active')) {
-            if (window.fetchDebts) window.fetchDebts();
-        }
+        await py.save_debts_budget(budgetState.debtAllocation);
+        if (window.fetchDebts) window.fetchDebts();
     }
 }
 
