@@ -154,17 +154,20 @@
       "Otros": 200
     };
 
-    const demoKanban = [
-      { id: 1, title: "Por Hacer", cards: [
-        { id: 101, title: "Renovar licencia de conducir", desc: "Llevar examen de la vista e identificación oficial", color: "#ffeaa7", tags: ["Personal", "Trámite"] },
-        { id: 102, title: "Subir actualización Mk Organizer", desc: "Preparar capturas de pantalla de la extensión en español para Google Web Store", color: "#ff7675", tags: ["Trabajo", "Urgente"] }
-      ]},
-      { id: 2, title: "En Progreso", cards: [
-        { id: 103, title: "Rediseño de interfaz de deudas", desc: "Implementar simulador de bola de nieve en deudas.js", color: "#6c5ce7", tags: ["Desarrollo"] }
-      ]},
-      { id: 3, title: "Hecho", cards: [
-        { id: 104, title: "Soporte multi-moneda en presupuesto", desc: "Configuración local, secundaria y tasas de conversión en budget.js", color: "#2ed573", tags: ["Completado"] }
-      ]}
+    const demoKanbanCards = [
+      // Col 1 – Por Hacer
+      { id: 101, col_id: 1, pos: 10, text: "Renovar licencia de conducir | Llevar examen de la vista e identificación oficial | Vence: 2026-07-20 | Prioridad: medium | Etiquetas: Personal, Trámite" },
+      { id: 102, col_id: 1, pos: 20, text: "Subir actualización Mk Organizer | Preparar capturas de pantalla en español para Google Web Store | Vence: 2026-07-12 | Prioridad: high | Etiquetas: Trabajo, Urgente" },
+      { id: 103, col_id: 1, pos: 30, text: "Diseñar logo de la tienda | Crear versiones en SVG y PNG de 512x512 | Vence: 2026-07-18 | Prioridad: low | Etiquetas: Diseño" },
+      // Col 2 – En Progreso
+      { id: 104, col_id: 2, pos: 10, text: "Rediseño de interfaz de deudas | Implementar simulador de bola de nieve con gráfica de proyección | Vence: 2026-07-08 | Prioridad: high | Etiquetas: Desarrollo, Diseño" },
+      { id: 105, col_id: 2, pos: 20, text: "Documentación para Google Play | Escribir descripción corta y larga en español e inglés | Vence: 2026-07-10 | Prioridad: medium | Etiquetas: Trabajo" },
+      // Col 3 – Bloqueado
+      { id: 106, col_id: 3, pos: 10, text: "Integración con Google Calendar | Requiere revisión de permisos OAuth adicionales | Vence: 2026-08-01 | Prioridad: medium | Etiquetas: Desarrollo, Pendiente" },
+      // Col 4 – Hecho
+      { id: 107, col_id: 4, pos: 10, text: "Soporte multi-moneda en presupuesto | Configuración de moneda local, secundaria y tasas de conversión | Prioridad: high | Etiquetas: Completado, Desarrollo" },
+      { id: 108, col_id: 4, pos: 20, text: "Sincronización con Google Drive | Auto-sync con debounce de 3 segundos en cada cambio | Prioridad: high | Etiquetas: Completado" },
+      { id: 109, col_id: 4, pos: 30, text: "Planificador de Deudas | Método Bola de Nieve con proyección mensual interactiva | Prioridad: medium | Etiquetas: Completado, Finanzas" }
     ];
 
     const demoNotes = [
