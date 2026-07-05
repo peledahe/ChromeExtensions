@@ -232,7 +232,7 @@
   }
 
   window.injectDemoData = injectDemoData;
-  injectDemoData(true).catch(err => console.error("Error inyectando demo:", err));
+  injectDemoData(false).catch(err => console.error("Error inyectando demo:", err));
 
   // Helper para obtener el siguiente ID de una lista
   function getNextId(items) {

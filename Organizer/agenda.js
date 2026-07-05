@@ -2931,33 +2931,25 @@ document.getElementById('notes-board').addEventListener('dblclick', (e) => {
             if (!isNotesViewVisible()) return;
             const bw = board.clientWidth  - 10;
             const bh = board.clientHeight - 10;
-            const displaced = [];
+            if (bw < 220 || bh < 170) return; // Evitar recolocación en tamaños temporales o muy pequeños
+            
             board.querySelectorAll('.sticky-note').forEach(el => {
                 const noteW = el.offsetWidth  || 220;
                 const noteH = el.offsetHeight || 170;
                 const x = parseInt(el.style.left) || 0;
                 const y = parseInt(el.style.top)  || 0;
-                if (x + noteW > bw || y + noteH > bh) {
-                    displaced.push({ el, noteW, noteH });
+                
+                const newX = Math.max(0, Math.min(x, bw - noteW));
+                const newY = Math.max(0, Math.min(y, bh - noteH));
+                
+                if (newX !== x || newY !== y) {
+                    el.style.left = newX + 'px';
+                    el.style.top  = newY + 'px';
+                    const id = parseInt(el.dataset.id);
+                    const note = notesData.find(n => n.id == id);
+                    if (note) { note.x = newX; note.y = newY; }
+                    py.update_note_pos(id, newX, newY).catch(() => {});
                 }
-            });
-
-            const gap = 14;
-            let curX = gap, curY = gap, rowH = 0;
-            displaced.forEach(({ el, noteW, noteH }) => {
-                if (curX + noteW + gap > bw && curX > gap) {
-                    curX = gap; curY += rowH + gap; rowH = 0;
-                }
-                const newX = Math.min(curX, Math.max(0, bw - noteW));
-                const newY = Math.min(curY, Math.max(0, bh - noteH));
-                el.style.left = newX + 'px';
-                el.style.top  = newY + 'px';
-                const id = parseInt(el.dataset.id);
-                const note = notesData.find(n => n.id == id);
-                if (note) { note.x = newX; note.y = newY; }
-                py.update_note_pos(id, newX, newY).catch(() => {});
-                curX += noteW + gap;
-                rowH  = Math.max(rowH, noteH);
             });
             updateCanvasSize();
         }, 300);

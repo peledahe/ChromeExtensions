@@ -28,14 +28,13 @@ window.showToast = (msg, type = 'success') => {
     
     container.appendChild(toast);
     
-    if (!isSticky) {
-        setTimeout(() => {
-            if (toast.parentNode) {
-                toast.classList.add('hide');
-                setTimeout(() => toast.remove(), 300);
-            }
-        }, 3000);
-    }
+    const duration = isSticky ? 10000 : 3000; // 10 segundos para sticky, 3 segundos para normal
+    setTimeout(() => {
+        if (toast.parentNode) {
+            toast.classList.add('hide');
+            setTimeout(() => toast.remove(), 300);
+        }
+    }, duration);
 };
 
 window.showConfirm = (msg, callback) => {

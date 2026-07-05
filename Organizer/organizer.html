@@ -84,11 +84,11 @@
                     </div>
 
                     <button class="ag-btn" id="open-budget-limits-btn" style="padding: 8px 14px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08); font-weight:600; cursor:pointer;">Límites ⚙️</button>
-                    <div style="display:flex; flex-direction:column; gap:4px; font-size:0.8rem; background: rgba(255,255,255,0.04); padding: 6px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.06);">
-                        <span style="color:var(--ag-text-muted);">Asignación Deudas</span>
-                        <div style="display:flex; align-items:center; gap:4px;">
-                            <span style="color:var(--ag-text-muted); font-size:0.8rem;" id="budget-debt-allocation-symbol">Q</span>
-                            <input type="number" id="budget-debt-allocation" style="background:transparent; border:none; color:var(--ag-text); font-weight:700; width:70px; outline:none; font-size:0.85rem;">
+                    <div class="budget-debt-container">
+                        <span style="color:var(--ag-text-muted); font-weight:600; white-space:nowrap;">Asignación Deudas</span>
+                        <div class="budget-debt-input-wrapper">
+                            <span style="color:var(--ag-text-muted); font-weight:bold; font-size:0.8rem;" id="budget-debt-allocation-symbol">Q</span>
+                            <input type="number" id="budget-debt-allocation" style="background:transparent; border:none; color:var(--ag-text); font-weight:700; width:65px; outline:none; font-size:0.85rem; text-align:right;" placeholder="0">
                         </div>
                     </div>
                 </div>
