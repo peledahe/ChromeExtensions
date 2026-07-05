@@ -475,6 +475,13 @@
             <div class="edit-modal-row">
                 <input type="date" id="shop-date-input" class="ag-input" style="flex:1;" title="Fecha límite">
             </div>
+            <div class="edit-modal-row" style="gap:8px;">
+                <label style="font-size:0.82rem; color:var(--ag-text-muted); white-space:nowrap;">Estado:</label>
+                <div class="budget-status-toggle" id="shop-status-toggle">
+                    <button class="status-btn active" data-value="projected" id="shop-status-projected">📋 Proyectado</button>
+                    <button class="status-btn" data-value="confirmed" id="shop-status-confirmed">✅ Confirmado</button>
+                </div>
+            </div>
             <div class="edit-modal-actions">
                 <button class="ag-btn ag-btn-ghost" id="new-shop-cancel-btn">Cancelar</button>
                 <button class="ag-btn ag-btn-primary" id="add-shop-btn">Añadir</button>
@@ -506,6 +513,13 @@
             </div>
             <div class="edit-modal-row">
                 <input type="date" id="income-date-input" class="ag-input" style="flex:1;" title="Fecha">
+            </div>
+            <div class="edit-modal-row" style="gap:8px;">
+                <label style="font-size:0.82rem; color:var(--ag-text-muted); white-space:nowrap;">Estado:</label>
+                <div class="budget-status-toggle" id="income-status-toggle">
+                    <button class="status-btn active" data-value="projected" id="income-status-projected">📋 Proyectado</button>
+                    <button class="status-btn" data-value="confirmed" id="income-status-confirmed">✅ Confirmado</button>
+                </div>
             </div>
             <div class="edit-modal-actions">
                 <button class="ag-btn ag-btn-ghost" id="new-income-cancel-btn">Cancelar</button>

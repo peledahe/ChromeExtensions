@@ -116,19 +116,19 @@
     ];
 
     const demoIncome = [
-      { id: 1, text: "Salario Corporativo", value: 14500, currency: "local", dueDate: todayStr, category: "Salario" },
-      { id: 2, text: "Consultoría UI Freelance", value: 500, currency: "second", dueDate: todayStr, category: "Freelance" },
-      { id: 3, text: "Rendimiento Inversiones", value: 850, currency: "local", dueDate: todayStr, category: "Inversiones" }
+      { id: 1, text: "Salario Corporativo", value: 14500, currency: "local", dueDate: todayStr, category: "Salario", status: "confirmed" },
+      { id: 2, text: "Consultoría UI Freelance", value: 500, currency: "second", dueDate: tomorrowStr, category: "Freelance", status: "projected" },
+      { id: 3, text: "Rendimiento Inversiones", value: 850, currency: "local", dueDate: in3DaysStr, category: "Inversiones", status: "projected" }
     ];
 
     const demoShopping = [
-      { id: 1, text: "Alquiler de Apartamento", value: 3500, currency: "local", dueDate: todayStr, category: "Vivienda", paymentMethod: "Transferencia" },
-      { id: 2, text: "Suscripción Mensual Netflix", value: 12, currency: "second", dueDate: todayStr, category: "Entretenimiento", paymentMethod: "Tarjeta Visa" },
-      { id: 3, text: "Supermercado La Torre", value: 950.50, currency: "local", dueDate: todayStr, category: "Alimentación", paymentMethod: "Tarjeta Visa" },
-      { id: 4, text: "Combustible Gasolinera Shell", value: 320, currency: "local", dueDate: todayStr, category: "Transporte", paymentMethod: "Efectivo" },
-      { id: 5, text: "Pago de Energía Eléctrica EEGSA", value: 410.20, currency: "local", dueDate: todayStr, category: "Servicios", paymentMethod: "Banca en Línea" },
-      { id: 6, text: "Cena en Restaurante El Portal", value: 280, currency: "local", dueDate: todayStr, category: "Entretenimiento", paymentMethod: "Efectivo" },
-      { id: 7, text: "Suscripción Spotify Premium", value: 6, currency: "second", dueDate: todayStr, category: "Entretenimiento", paymentMethod: "Tarjeta Visa" }
+      { id: 1, text: "Alquiler de Apartamento", value: 3500, currency: "local", dueDate: todayStr, category: "Vivienda", paymentMethod: "Transferencia", status: "confirmed" },
+      { id: 2, text: "Suscripción Mensual Netflix", value: 12, currency: "second", dueDate: todayStr, category: "Entretenimiento", paymentMethod: "Tarjeta Visa", status: "confirmed" },
+      { id: 3, text: "Supermercado La Torre", value: 950.50, currency: "local", dueDate: todayStr, category: "Alimentación", paymentMethod: "Tarjeta Visa", status: "confirmed" },
+      { id: 4, text: "Combustible Gasolinera Shell", value: 320, currency: "local", dueDate: tomorrowStr, category: "Transporte", paymentMethod: "Efectivo", status: "projected" },
+      { id: 5, text: "Pago de Energía Eléctrica EEGSA", value: 410.20, currency: "local", dueDate: in3DaysStr, category: "Servicios", paymentMethod: "Banca en Línea", status: "projected" },
+      { id: 6, text: "Cena en Restaurante El Portal", value: 280, currency: "local", dueDate: todayStr, category: "Entretenimiento", paymentMethod: "Efectivo", status: "confirmed" },
+      { id: 7, text: "Suscripción Spotify Premium", value: 6, currency: "second", dueDate: in3DaysStr, category: "Entretenimiento", paymentMethod: "Tarjeta Visa", status: "projected" }
     ];
 
     const demoDebts = [
@@ -191,6 +191,13 @@
       { id: 3, site: "Netflix Familiar", username: "perry.casa@gmail.com", password: "netflixpremium4k", type: "web", url: "https://netflix.com", notes: "Plan Premium 4K de la casa.", ts: new Date().toISOString() }
     ];
 
+    const demoSavings = [
+      { id: 1, name: "Fondo de Emergencia", currency: "local", goal: 15000, accumulated: 4500, monthlyAmount: 800, targetDate: "2026-12-31", notes: "6 meses de gastos básicos cubiertos" },
+      { id: 2, name: "Vacaciones en Cancún", currency: "second", goal: 1500, accumulated: 320, monthlyAmount: 100, targetDate: "2027-01-15", notes: "Vuelos + hotel 7 noches para dos personas" },
+      { id: 3, name: "MacBook Pro M3", currency: "second", goal: 2500, accumulated: 800, monthlyAmount: 150, targetDate: "2026-10-01", notes: "Reemplazo de equipo de trabajo" },
+      { id: 4, name: "Enganche Vehículo", currency: "local", goal: 50000, accumulated: 8000, monthlyAmount: 1500, targetDate: "2027-06-01", notes: "30% del valor del vehículo" }
+    ];
+
     await Promise.all([
       storage.set('agenda', demoAgenda),
       storage.set('income', demoIncome),
@@ -203,6 +210,7 @@
       storage.set('kanban', []),
       storage.set('notes', demoNotes),
       storage.set('passwords', demoPasswords),
+      storage.set('savings_goals', demoSavings),
       storage.set('budget_currency_symbol', 'Q'),
       storage.set('budget_currency_code', 'GTQ'),
       storage.set('budget_second_currency_enabled', true),
@@ -215,7 +223,8 @@
         debtsEnabled: true,
         kanbanEnabled: true,
         notesEnabled: true,
-        passwordsEnabled: true
+        passwordsEnabled: true,
+        savingsEnabled: true
       })
     ]);
 
@@ -298,7 +307,7 @@
     get_shopping: async function() {
       return await storage.get('shopping', []);
     },
-    add_shopping: async function(text, val, cur, date, pm, category) {
+    add_shopping: async function(text, val, cur, date, pm, category, status) {
       const list = await storage.get('shopping', []);
       const newItem = {
         id: getNextId(list),
@@ -308,13 +317,14 @@
         dueDate: date,
         paymentMethod: pm,
         category: category || 'Otros',
+        status: status || 'projected',
         done: false,
         notes: ''
       };
       list.unshift(newItem);
       await storage.set('shopping', list);
     },
-    update_shopping: async function(sid, text, val, cur, date, pm, category) {
+    update_shopping: async function(sid, text, val, cur, date, pm, category, status) {
       const list = await storage.get('shopping', []);
       const idx = list.findIndex(item => item.id === sid);
       if (idx !== -1) {
@@ -324,6 +334,7 @@
         list[idx].dueDate = date;
         list[idx].paymentMethod = pm;
         list[idx].category = category || 'Otros';
+        if (status) list[idx].status = status;
         await storage.set('shopping', list);
       }
     },
@@ -345,7 +356,7 @@
     get_income: async function() {
       return await storage.get('income', []);
     },
-    add_income: async function(text, val, cur, date, category) {
+    add_income: async function(text, val, cur, date, category, status) {
       const list = await storage.get('income', []);
       const newItem = {
         id: getNextId(list),
@@ -354,13 +365,14 @@
         currency: cur,
         dueDate: date,
         category: category || 'Otros',
+        status: status || 'projected',
         received: false,
         notes: ''
       };
       list.unshift(newItem);
       await storage.set('income', list);
     },
-    update_income: async function(iid, text, val, cur, date, category) {
+    update_income: async function(iid, text, val, cur, date, category, status) {
       const list = await storage.get('income', []);
       const idx = list.findIndex(item => item.id === iid);
       if (idx !== -1) {
@@ -369,6 +381,7 @@
         list[idx].currency = cur;
         list[idx].dueDate = date;
         list[idx].category = category || 'Otros';
+        if (status) list[idx].status = status;
         await storage.set('income', list);
       }
     },
@@ -506,6 +519,28 @@
       let list = await storage.get('notes', []);
       list = list.filter(n => n.id !== nid);
       await storage.set('notes', list);
+    },
+
+    // ── Deudas ──────────────────────────────────────────────────────────
+    get_debts: async function() {
+      return storage.get('deudas_list', []);
+    },
+    save_debts: async function(list) {
+      await storage.set('deudas_list', list);
+    },
+    get_debts_budget: async function() {
+      return storage.get('deudas_presupuesto', 0);
+    },
+    save_debts_budget: async function(amount) {
+      await storage.set('deudas_presupuesto', Number(amount) || 0);
+    },
+
+    // ── Ahorros ─────────────────────────────────────────────────────────
+    get_savings: async function() {
+      return storage.get('savings_goals', []);
+    },
+    save_savings: async function(list) {
+      await storage.set('savings_goals', list);
     },
 
     // Configuración General de la Aplicación (Claves y Valores)

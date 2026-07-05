@@ -21,13 +21,13 @@ async function fetchDebts() {
     try {
         if (!py) return;
 
-        const [debtsRaw, budgetRaw] = await Promise.all([
-            py.get_config('deudas_list'),
-            py.get_config('deudas_presupuesto')
+        const [debtsList, budgetVal] = await Promise.all([
+            py.get_debts(),
+            py.get_debts_budget()
         ]);
 
-        debtsState.debts = parseJSON(debtsRaw, []);
-        debtsState.budget = Number(budgetRaw) || 0;
+        debtsState.debts = Array.isArray(debtsList) ? debtsList : [];
+        debtsState.budget = Number(budgetVal) || 0;
 
         // Sincronizar presupuesto de deudas en el input
         const budgetInput = document.getElementById('debts-budget-input');
@@ -50,8 +50,8 @@ async function fetchDebts() {
 async function saveDebtsState() {
     if (!py) return;
     await Promise.all([
-        py.set_config('deudas_list', JSON.stringify(debtsState.debts)),
-        py.set_config('deudas_presupuesto', String(debtsState.budget))
+        py.save_debts(debtsState.debts),
+        py.save_debts_budget(debtsState.budget)
     ]);
 }
 

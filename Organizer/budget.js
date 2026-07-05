@@ -41,15 +41,14 @@ function formatMoney(amount, recordCurrency = 'local') {
         return `${currencyState.symbol} ${fmtNum(amt)}`;
     }
     
-    // Identificar si la moneda del registro es la secundaria
     const isSecond = recordCurrency === 'second' || recordCurrency === 'USD' || recordCurrency === '$' || recordCurrency === currencyState.secondSymbol || recordCurrency === currencyState.secondCode;
     
     if (isSecond) {
         const localVal = amt * currencyState.exchangeRate;
-        return `${currencyState.secondSymbol} ${fmtNum(amt)} (${currencyState.symbol} ${fmtNum(localVal)})`;
+        return `${currencyState.secondSymbol} ${fmtNum(amt)} <span class="budget-conv-label">(${currencyState.symbol} ${fmtNum(localVal)})</span>`;
     } else {
         const converted = amt / currencyState.exchangeRate;
-        return `${currencyState.symbol} ${fmtNum(amt)} (${currencyState.secondSymbol} ${fmtNum(converted)})`;
+        return `${currencyState.symbol} ${fmtNum(amt)} <span class="budget-conv-label">(${currencyState.secondSymbol} ${fmtNum(converted)})</span>`;
     }
 }
 
@@ -474,10 +473,12 @@ function renderBudgetDashboard() {
         debtInput.value = budgetState.debtAllocation;
     }
 
-    // Calcular gastos por categoría en moneda local
+    // Calcular gastos por categoría en moneda local — separando confirmed y projected
     const expenseByCat = {};
+    const expenseByCatProjected = {};
     BUDGET_CATEGORIES.expense.forEach(cat => {
         expenseByCat[cat] = 0;
+        expenseByCatProjected[cat] = 0;
     });
 
     budgetState.expense.forEach(item => {
@@ -485,57 +486,60 @@ function renderBudgetDashboard() {
         const val = Number(item.value) || 0;
         const isSecond = item.currency === 'second' || item.currency === '$' || item.currency === currencyState.secondSymbol || item.currency === currencyState.secondCode;
         const valLocal = isSecond ? (val * currencyState.exchangeRate) : val;
+        const isConfirmed = item.status === 'confirmed';
 
-        if (expenseByCat[cat] !== undefined) {
-            expenseByCat[cat] += valLocal;
+        const target = isConfirmed ? expenseByCat : expenseByCatProjected;
+        if (target[cat] !== undefined) {
+            target[cat] += valLocal;
         } else {
-            if (expenseByCat['Otros'] === undefined) {
-                expenseByCat['Otros'] = 0;
-            }
-            expenseByCat['Otros'] += valLocal;
+            if (target['Otros'] === undefined) target['Otros'] = 0;
+            target['Otros'] += valLocal;
         }
     });
 
-    // Renderizar barras de progreso por categoría (Gastos)
+    // Renderizar barras de progreso dobles por categoría
     const progressContainer = document.getElementById('budget-category-progress');
     if (progressContainer) {
         progressContainer.innerHTML = BUDGET_CATEGORIES.expense.map(cat => {
-            const spent = expenseByCat[cat] || 0;
+            const confirmed = expenseByCat[cat] || 0;
+            const projected = expenseByCatProjected[cat] || 0;
+            const total = confirmed + projected;
             const limit = budgetState.limits[cat] || 0;
-            const isOverLimit = limit > 0 && spent > limit;
-            const percent = limit > 0 ? Math.min(100, (spent / limit) * 100) : 0;
+            const isOverLimit = limit > 0 && total > limit;
+            const pctConfirmed = limit > 0 ? Math.min(100, (confirmed / limit) * 100) : 0;
+            const pctProjected = limit > 0 ? Math.min(100 - pctConfirmed, (projected / limit) * 100) : 0;
             
             let barColor = '#6c5ce7'; 
             let txtColor = 'var(--ag-text)';
-            let limitTxtColor = 'var(--ag-text-muted)';
-            
-            if (isOverLimit) {
-                barColor = '#ff7675'; 
-                txtColor = '#ff7675'; 
-                limitTxtColor = '#ff7675';
-            } else if (percent >= 90) {
-                barColor = '#ff7675'; 
-            } else if (percent >= 75) {
-                barColor = '#ffeaa7'; 
-            }
+            if (isOverLimit) { barColor = '#ff7675'; txtColor = '#ff7675'; }
+            else if ((pctConfirmed + pctProjected) >= 90) barColor = '#ff7675';
+            else if ((pctConfirmed + pctProjected) >= 75) barColor = '#ffeaa7';
 
+            const localSym = currencyState.symbol;
             return `
-                <div class="budget-cat-progress-row" style="margin-bottom: 12px; padding: 4px; border-radius: 6px; background: ${isOverLimit ? 'rgba(255, 118, 117, 0.04)' : 'transparent'};">
-                     <div style="display: flex; justify-content: space-between; font-size: 0.84rem; margin-bottom: 4px;">
-                         <span style="font-weight: 600; color: ${txtColor};">${cat} ${isOverLimit ? '⚠️' : ''}</span>
-                         <span style="color: ${limitTxtColor}; font-weight: ${isOverLimit ? '700' : 'normal'};">${currencyState.symbol} ${fmtNum(spent)} / ${currencyState.symbol} ${fmtNum(limit)}</span>
-                     </div>
-                     <div style="background: rgba(255,255,255,0.06); height: 8px; border-radius: 99px; overflow: hidden; display: flex; border: 1px solid rgba(255,255,255,0.04);">
-                         <div style="width: ${percent}%; background: ${barColor}; height: 100%; border-radius: 99px; transition: width 0.4s ease; box-shadow: ${isOverLimit ? '0 0 6px rgba(255, 118, 117, 0.4)' : 'none'};"></div>
-                     </div>
+                <div class="budget-cat-progress-row" style="margin-bottom:12px; padding:4px; border-radius:6px; background:${isOverLimit ? 'rgba(255,118,117,0.04)' : 'transparent'};">
+                    <div style="display:flex; justify-content:space-between; font-size:0.84rem; margin-bottom:4px;">
+                        <span style="font-weight:600; color:${txtColor};">${cat} ${isOverLimit ? '⚠️' : ''}</span>
+                        <span style="color:var(--ag-text-muted); font-size:0.78rem;">
+                            <span style="color:var(--ag-text);">${localSym} ${fmtNum(confirmed)}</span>
+                            ${projected > 0 ? `<span style="color:#a29bfe;"> +${localSym} ${fmtNum(projected)} proy.</span>` : ''}
+                            / ${localSym} ${fmtNum(limit)}
+                        </span>
+                    </div>
+                    <div style="background:rgba(255,255,255,0.06); height:8px; border-radius:99px; overflow:hidden; display:flex; border:1px solid rgba(255,255,255,0.04);">
+                        <div style="width:${pctConfirmed}%; background:${barColor}; height:100%; border-radius:99px 0 0 99px; transition:width 0.4s ease;"></div>
+                        <div style="width:${pctProjected}%; background:rgba(162,155,254,0.45); height:100%; background-image:repeating-linear-gradient(45deg,transparent,transparent 3px,rgba(255,255,255,0.08) 3px,rgba(255,255,255,0.08) 6px); transition:width 0.4s ease;"></div>
+                    </div>
+                    <div style="display:flex; gap:12px; margin-top:3px; font-size:0.72rem; color:var(--ag-text-muted);">
+                        <span style="display:flex; align-items:center; gap:3px;"><span style="width:8px; height:8px; border-radius:50%; background:${barColor}; display:inline-block;"></span>Ejecutado</span>
+                        ${projected > 0 ? `<span style="display:flex; align-items:center; gap:3px;"><span style="width:8px; height:8px; border-radius:50%; background:rgba(162,155,254,0.6); display:inline-block;"></span>Proyectado</span>` : ''}
+                    </div>
                 </div>
             `;
         }).join('');
     }
 }
 
-// Renderizar las tablas o listados de ingresos y gastos
-function renderBudgetTransactions() {
     // Ingresos
     const incomeList = document.getElementById('budget-income-list');
     if (incomeList) {
@@ -545,19 +549,24 @@ function renderBudgetTransactions() {
             incomeList.innerHTML = budgetState.income.map(item => {
                 const isSecond = item.currency === 'second' || item.currency === '$' || item.currency === currencyState.secondSymbol || item.currency === currencyState.secondCode;
                 const formattedVal = formatMoney(item.value, isSecond ? 'second' : 'local');
+                const isProjected = item.status !== 'confirmed';
 
                 return `
-                    <div class="ag-item budget-item" style="border-left: 3px solid #2ed573; margin-bottom: 6px; padding: 10px 14px; background: var(--ag-card-bg); border-radius: 6px; display: flex; justify-content: space-between; align-items: center;">
+                    <div class="ag-item budget-item ${isProjected ? 'budget-projected' : ''}" style="border-left: 3px ${isProjected ? 'dashed' : 'solid'} ${isProjected ? 'rgba(46,213,115,0.45)' : '#2ed573'}; margin-bottom: 6px; padding: 10px 14px; background: ${isProjected ? 'rgba(46,213,115,0.03)' : 'var(--ag-card-bg)'}; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; opacity:${isProjected ? '0.82' : '1'}">
                         <div>
-                            <div style="font-weight: 600; font-size: 0.88rem; color: var(--ag-text);">${escapeHtml(item.text)}</div>
+                            <div style="font-weight: 600; font-size: 0.88rem; color: var(--ag-text); display:flex; align-items:center; gap:6px;">
+                                ${isProjected ? '<span class="budget-projected-badge">📋 Proyectado</span>' : ''}
+                                ${escapeHtml(item.text)}
+                            </div>
                             <div style="font-size: 0.76rem; color: var(--ag-text-muted); display: flex; gap: 8px;">
                                 <span>🏷️ ${escapeHtml(item.category || 'Otros')}</span>
                                 <span>📅 ${item.dueDate || 'Sin fecha'}</span>
                             </div>
                         </div>
-                        <div style="display: flex; align-items: center; gap: 12px;">
-                            <span style="font-weight: 700; color: #2ed573; font-size: 0.9rem;">+ ${formattedVal}</span>
-                            <div style="display: flex; gap: 4px;">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span style="font-weight: 700; color: ${isProjected ? 'rgba(46,213,115,0.6)' : '#2ed573'}; font-size: 0.9rem;">+ ${formattedVal}</span>
+                            <div style="display: flex; gap: 4px; align-items:center;">
+                                ${isProjected ? `<button class="ag-btn budget-confirm-btn" data-type="income" data-id="${item.id}" style="padding:2px 8px; font-size:0.72rem; background:rgba(46,213,115,0.15); border:1px solid rgba(46,213,115,0.4); color:#2ed573; cursor:pointer; border-radius:4px;" title="Confirmar ingreso">✓ Confirmar</button>` : ''}
                                 <button class="ag-edit-btn" data-action="openEditModal" data-type="income" data-json='${jsonStr(item)}' style="background:none; border:none; cursor:pointer; font-size:0.85rem;">✏️</button>
                                 <button class="ag-delete-btn" data-action="deleteIncome" data-id="${item.id}" style="background:none; border:none; cursor:pointer; font-size:0.85rem;">🗑️</button>
                             </div>
@@ -568,7 +577,7 @@ function renderBudgetTransactions() {
         }
     }
 
-    // Gastos / Compras
+    // Gastos
     const expenseList = document.getElementById('budget-expense-list');
     if (expenseList) {
         if (budgetState.expense.length === 0) {
@@ -577,20 +586,25 @@ function renderBudgetTransactions() {
             expenseList.innerHTML = budgetState.expense.map(item => {
                 const isSecond = item.currency === 'second' || item.currency === '$' || item.currency === currencyState.secondSymbol || item.currency === currencyState.secondCode;
                 const formattedVal = formatMoney(item.value, isSecond ? 'second' : 'local');
+                const isProjected = item.status !== 'confirmed';
 
                 return `
-                    <div class="ag-item budget-item" style="border-left: 3px solid #ff7675; margin-bottom: 6px; padding: 10px 14px; background: var(--ag-card-bg); border-radius: 6px; display: flex; justify-content: space-between; align-items: center;">
+                    <div class="ag-item budget-item ${isProjected ? 'budget-projected' : ''}" style="border-left: 3px ${isProjected ? 'dashed' : 'solid'} ${isProjected ? 'rgba(255,118,117,0.45)' : '#ff7675'}; margin-bottom: 6px; padding: 10px 14px; background: ${isProjected ? 'rgba(255,118,117,0.03)' : 'var(--ag-card-bg)'}; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; opacity:${isProjected ? '0.82' : '1'}">
                         <div>
-                            <div style="font-weight: 600; font-size: 0.88rem; color: var(--ag-text);">${escapeHtml(item.text)}</div>
+                            <div style="font-weight: 600; font-size: 0.88rem; color: var(--ag-text); display:flex; align-items:center; gap:6px;">
+                                ${isProjected ? '<span class="budget-projected-badge">📋 Proyectado</span>' : ''}
+                                ${escapeHtml(item.text)}
+                            </div>
                             <div style="font-size: 0.76rem; color: var(--ag-text-muted); display: flex; gap: 8px;">
                                 <span>🏷️ ${escapeHtml(item.category || 'Otros')}</span>
                                 <span>📅 ${item.dueDate || 'Sin fecha'}</span>
                                 ${item.paymentMethod ? `<span>💳 ${escapeHtml(item.paymentMethod)}</span>` : ''}
                             </div>
                         </div>
-                        <div style="display: flex; align-items: center; gap: 12px;">
-                            <span style="font-weight: 700; color: #ff7675; font-size: 0.9rem;">- ${formattedVal}</span>
-                            <div style="display: flex; gap: 4px;">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span style="font-weight: 700; color: ${isProjected ? 'rgba(255,118,117,0.6)' : '#ff7675'}; font-size: 0.9rem;">- ${formattedVal}</span>
+                            <div style="display: flex; gap: 4px; align-items:center;">
+                                ${isProjected ? `<button class="ag-btn budget-confirm-btn" data-type="shopping" data-id="${item.id}" style="padding:2px 8px; font-size:0.72rem; background:rgba(255,118,117,0.15); border:1px solid rgba(255,118,117,0.4); color:#ff7675; cursor:pointer; border-radius:4px;" title="Confirmar gasto">✓ Confirmar</button>` : ''}
                                 <button class="ag-edit-btn" data-action="openEditModal" data-type="shopping" data-json='${jsonStr(item)}' style="background:none; border:none; cursor:pointer; font-size:0.85rem;">✏️</button>
                                 <button class="ag-delete-btn" data-action="deleteShopping" data-id="${item.id}" style="background:none; border:none; cursor:pointer; font-size:0.85rem;">🗑️</button>
                             </div>

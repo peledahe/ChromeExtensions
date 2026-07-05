@@ -1562,16 +1562,21 @@ async function addShopping() {
     const pm = document.getElementById('shop-payment-method-select')?.value || '';
     const date = document.getElementById('shop-date-input')?.value || '';
     const category = document.getElementById('shop-category-select')?.value || 'Otros';
+    const statusBtn = document.querySelector('#shop-status-toggle .status-btn.active');
+    const status = statusBtn?.dataset.value || 'projected';
 
     if (!text || Number.isNaN(val)) return;
 
-    await py.add_shopping(text, val, cur, date, pm, category);
+    await py.add_shopping(text, val, cur, date, pm, category, status);
 
     document.getElementById('shop-item-input').value = '';
     document.getElementById('shop-value-input').value = '';
     if (document.getElementById('shop-payment-method-select')) document.getElementById('shop-payment-method-select').value = '';
     if (document.getElementById('shop-date-input')) document.getElementById('shop-date-input').value = '';
     if (document.getElementById('shop-category-select')) document.getElementById('shop-category-select').value = 'Otros';
+    // Reset toggle to default (projected)
+    document.querySelectorAll('#shop-status-toggle .status-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('shop-status-projected')?.classList.add('active');
 
     document.getElementById('new-shop-modal')?.classList.remove('active');
 
@@ -1654,14 +1659,19 @@ async function addIncome() {
     const cur = document.getElementById('income-currency-select')?.value || 'local';
     const date = document.getElementById('income-date-input')?.value || '';
     const category = document.getElementById('income-category-select')?.value || 'Otros';
+    const statusBtn = document.querySelector('#income-status-toggle .status-btn.active');
+    const status = statusBtn?.dataset.value || 'projected';
 
     if (!text || Number.isNaN(val)) return;
 
-    await py.add_income(text, val, cur, date, category);
+    await py.add_income(text, val, cur, date, category, status);
     document.getElementById('income-item-input').value = '';
     document.getElementById('income-value-input').value = '';
     if (document.getElementById('income-date-input')) document.getElementById('income-date-input').value = '';
     if (document.getElementById('income-category-select')) document.getElementById('income-category-select').value = 'Salario';
+    // Reset toggle to default (projected)
+    document.querySelectorAll('#income-status-toggle .status-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('income-status-projected')?.classList.add('active');
 
     document.getElementById('new-income-modal')?.classList.remove('active');
 
