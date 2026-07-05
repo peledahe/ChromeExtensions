@@ -540,6 +540,8 @@ function renderBudgetDashboard() {
     }
 }
 
+// Renderizar las tablas o listados de ingresos y gastos
+function renderBudgetTransactions() {
     // Ingresos
     const incomeList = document.getElementById('budget-income-list');
     if (incomeList) {
@@ -555,8 +557,8 @@ function renderBudgetDashboard() {
                     <div class="ag-item budget-item ${isProjected ? 'budget-projected' : ''}" style="border-left: 3px ${isProjected ? 'dashed' : 'solid'} ${isProjected ? 'rgba(46,213,115,0.45)' : '#2ed573'}; margin-bottom: 6px; padding: 10px 14px; background: ${isProjected ? 'rgba(46,213,115,0.03)' : 'var(--ag-card-bg)'}; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; opacity:${isProjected ? '0.82' : '1'}">
                         <div>
                             <div style="font-weight: 600; font-size: 0.88rem; color: var(--ag-text); display:flex; align-items:center; gap:6px;">
-                                ${isProjected ? '<span class="budget-projected-badge">📋 Proyectado</span>' : ''}
                                 ${escapeHtml(item.text)}
+                                ${isProjected ? '<span class="budget-projected-badge">Proyectado</span>' : ''}
                             </div>
                             <div style="font-size: 0.76rem; color: var(--ag-text-muted); display: flex; gap: 8px;">
                                 <span>🏷️ ${escapeHtml(item.category || 'Otros')}</span>
@@ -566,7 +568,7 @@ function renderBudgetDashboard() {
                         <div style="display: flex; align-items: center; gap: 8px;">
                             <span style="font-weight: 700; color: ${isProjected ? 'rgba(46,213,115,0.6)' : '#2ed573'}; font-size: 0.9rem;">+ ${formattedVal}</span>
                             <div style="display: flex; gap: 4px; align-items:center;">
-                                ${isProjected ? `<button class="ag-btn budget-confirm-btn" data-type="income" data-id="${item.id}" style="padding:2px 8px; font-size:0.72rem; background:rgba(46,213,115,0.15); border:1px solid rgba(46,213,115,0.4); color:#2ed573; cursor:pointer; border-radius:4px;" title="Confirmar ingreso">✓ Confirmar</button>` : ''}
+                                ${isProjected ? `<button class="ag-btn budget-confirm-btn" data-type="income" data-id="${item.id}" style="padding:4px 6px; font-size:0.8rem; background:rgba(46,213,115,0.15); border:1px solid rgba(46,213,115,0.4); color:#2ed573; cursor:pointer; border-radius:4px; line-height:1;" title="Confirmar ingreso">✓</button>` : ''}
                                 <button class="ag-edit-btn" data-action="openEditModal" data-type="income" data-json='${jsonStr(item)}' style="background:none; border:none; cursor:pointer; font-size:0.85rem;">✏️</button>
                                 <button class="ag-delete-btn" data-action="deleteIncome" data-id="${item.id}" style="background:none; border:none; cursor:pointer; font-size:0.85rem;">🗑️</button>
                             </div>
@@ -592,8 +594,8 @@ function renderBudgetDashboard() {
                     <div class="ag-item budget-item ${isProjected ? 'budget-projected' : ''}" style="border-left: 3px ${isProjected ? 'dashed' : 'solid'} ${isProjected ? 'rgba(255,118,117,0.45)' : '#ff7675'}; margin-bottom: 6px; padding: 10px 14px; background: ${isProjected ? 'rgba(255,118,117,0.03)' : 'var(--ag-card-bg)'}; border-radius: 6px; display: flex; justify-content: space-between; align-items: center; opacity:${isProjected ? '0.82' : '1'}">
                         <div>
                             <div style="font-weight: 600; font-size: 0.88rem; color: var(--ag-text); display:flex; align-items:center; gap:6px;">
-                                ${isProjected ? '<span class="budget-projected-badge">📋 Proyectado</span>' : ''}
                                 ${escapeHtml(item.text)}
+                                ${isProjected ? '<span class="budget-projected-badge">Proyectado</span>' : ''}
                             </div>
                             <div style="font-size: 0.76rem; color: var(--ag-text-muted); display: flex; gap: 8px;">
                                 <span>🏷️ ${escapeHtml(item.category || 'Otros')}</span>
@@ -604,7 +606,7 @@ function renderBudgetDashboard() {
                         <div style="display: flex; align-items: center; gap: 8px;">
                             <span style="font-weight: 700; color: ${isProjected ? 'rgba(255,118,117,0.6)' : '#ff7675'}; font-size: 0.9rem;">- ${formattedVal}</span>
                             <div style="display: flex; gap: 4px; align-items:center;">
-                                ${isProjected ? `<button class="ag-btn budget-confirm-btn" data-type="shopping" data-id="${item.id}" style="padding:2px 8px; font-size:0.72rem; background:rgba(255,118,117,0.15); border:1px solid rgba(255,118,117,0.4); color:#ff7675; cursor:pointer; border-radius:4px;" title="Confirmar gasto">✓ Confirmar</button>` : ''}
+                                ${isProjected ? `<button class="ag-btn budget-confirm-btn" data-type="shopping" data-id="${item.id}" style="padding:4px 6px; font-size:0.8rem; background:rgba(255,118,117,0.15); border:1px solid rgba(255,118,117,0.4); color:#ff7675; cursor:pointer; border-radius:4px; line-height:1;" title="Confirmar gasto">✓</button>` : ''}
                                 <button class="ag-edit-btn" data-action="openEditModal" data-type="shopping" data-json='${jsonStr(item)}' style="background:none; border:none; cursor:pointer; font-size:0.85rem;">✏️</button>
                                 <button class="ag-delete-btn" data-action="deleteShopping" data-id="${item.id}" style="background:none; border:none; cursor:pointer; font-size:0.85rem;">🗑️</button>
                             </div>
@@ -910,6 +912,15 @@ function initBudgetListeners() {
             categoryDeleteType = null;
             return;
         }
+
+        // 11. Confirmar un ingreso o gasto proyectado desde el listado
+        const confirmBtn = e.target.closest('.budget-confirm-btn');
+        if (confirmBtn) {
+            const type = confirmBtn.getAttribute('data-type');
+            const id = Number(confirmBtn.getAttribute('data-id'));
+            confirmProjectedItem(type, id);
+            return;
+        }
     });
 
     // Eventos específicos (teclado / cambios de inputs) que no se pueden delegar por clicks
@@ -938,6 +949,31 @@ function initBudgetListeners() {
             }
         }
     });
+}
+
+// Confirmar un ítem proyectado cambiándolo a confirmed
+async function confirmProjectedItem(type, id) {
+    try {
+        if (!py) return;
+        if (type === 'shopping') {
+            const list = await py.get_shopping();
+            const item = list.find(x => x.id === id);
+            if (item) {
+                await py.update_shopping(id, item.text, item.value, item.currency, item.dueDate, item.paymentMethod, item.category, 'confirmed');
+                window.showToast('Gasto confirmado y ejecutado', 'success');
+            }
+        } else if (type === 'income') {
+            const list = await py.get_income();
+            const item = list.find(x => x.id === id);
+            if (item) {
+                await py.update_income(id, item.text, item.value, item.currency, item.dueDate, item.category, 'confirmed');
+                window.showToast('Ingreso confirmado y recibido', 'success');
+            }
+        }
+        await fetchBudget();
+    } catch (e) {
+        console.error('Error confirming item:', e);
+    }
 }
 
 // Ejecutar de inmediato o al cargar

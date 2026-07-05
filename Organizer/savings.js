@@ -56,18 +56,7 @@ async function saveSavingsState() {
     await py.save_savings(savingsState.goals);
 }
 
-// ─── Render – Lista de objetivos ──────────────────────────────────────────────
-
-function renderSavingsList() {
-    const container = document.getElementById('savings-goals-list');
-    if (!container) return;
-
-    if (savingsState.goals.length === 0) {
-        container.innerHTML = '<div class="ag-empty">No tienes objetivos de ahorro. ¡Crea uno! 🎯</div>';
-        return;
-    }
-
-    container.innerHTML = savingsState.goals.map(g => {
+// ─── Render – Lista de objetivos ─────────────────────────────────�    container.innerHTML = savingsState.goals.map(g => {
         const sym = svgGetSymbol(g.currency);
         const pct = Math.min(100, Math.round((g.accumulated / g.goal) * 100));
         const remaining = Math.max(0, g.goal - g.accumulated);
@@ -79,43 +68,47 @@ function renderSavingsList() {
         let dateLabel = '';
         if (g.targetDate) {
             const d = new Date(g.targetDate + 'T00:00:00');
-            dateLabel = `<span style="font-size:0.75rem; color:var(--ag-text-muted);">📅 ${d.toLocaleDateString('es-GT', { day:'2-digit', month:'short', year:'numeric' })}</span>`;
+            dateLabel = `<span style="font-size:0.75rem; color:var(--ag-text-muted);" title="Fecha meta">📅 ${d.toLocaleDateString('es-GT', { day:'2-digit', month:'2-digit', year:'2-digit' })}</span>`;
         }
 
         return `
-        <div class="savings-goal-card" data-id="${g.id}">
-            <div class="savings-goal-header">
-                <div style="flex:1; min-width:0;">
-                    <div class="savings-goal-name">${escapeHtml(g.name)}</div>
-                    <div class="savings-goal-meta">
-                        <span class="savings-currency-badge ${g.currency}">${sym}</span>
+        <div class="savings-goal-card" data-id="${g.id}" style="background:var(--ag-card-bg); border:1px solid var(--ag-border); border-radius:8px; padding:10px 14px; position:relative; overflow:hidden; display:flex; flex-direction:column; gap:6px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+                <div style="flex:1; min-width:0; display:flex; flex-direction:column; gap:2px;">
+                    <div style="display:flex; align-items:center; gap:6px; flex-wrap:nowrap;">
+                        <span class="savings-goal-name" style="font-weight:600; font-size:0.86rem; color:var(--ag-text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(g.name)}</span>
+                        <span style="font-size:0.82rem; font-weight:800; color:${barColor}; flex-shrink:0;">${pct}%</span>
+                    </div>
+                    <div class="savings-goal-meta" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; line-height:1;">
+                        <span class="savings-currency-badge ${g.currency}" style="font-size:0.65rem; background:rgba(255,255,255,0.06); padding:1px 4px; border-radius:3px; color:var(--ag-text-muted);">${sym}</span>
                         ${dateLabel}
-                        ${g.notes ? `<span style="font-size:0.75rem; color:var(--ag-text-muted); font-style:italic;">${escapeHtml(g.notes)}</span>` : ''}
+                        ${g.notes ? `<span style="font-size:0.72rem; color:var(--ag-text-muted); font-style:italic; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:140px;" title="${escapeHtml(g.notes)}">${escapeHtml(g.notes)}</span>` : ''}
                     </div>
                 </div>
-                <div style="display:flex; gap:4px; align-items:center; flex-shrink:0;">
-                    <button class="ag-btn" onclick="window.paySavingQuota(${g.id})" style="padding:4px 10px; font-size:0.78rem; background:rgba(46,213,115,0.12); border:1px solid #2ed573; color:#2ed573; font-weight:600; cursor:pointer;">+Abonar</button>
-                    <button class="ag-edit-btn" onclick="window.openSavingModal(${g.id})" style="background:none;border:none;cursor:pointer;font-size:0.85rem;">✏️</button>
-                    <button class="ag-delete-btn" onclick="window.deleteSavingGoal(${g.id})" style="background:none;border:none;cursor:pointer;font-size:0.85rem;">🗑️</button>
+
+                <div style="text-align:right; flex-shrink:0; display:flex; flex-direction:column; gap:2px; line-height:1.2;">
+                    <div style="font-size:0.85rem; font-weight:700; color:var(--ag-text);">${sym} ${svgFmtNum(g.accumulated)} <span style="font-weight:400; font-size:0.7rem; color:var(--ag-text-muted);">${conv}</span></div>
+                    <div style="font-size:0.75rem; color:var(--ag-text-muted);">Meta: ${sym} ${svgFmtNum(g.goal)}</div>
+                </div>
+
+                <div style="display:flex; gap:3px; align-items:center; flex-shrink:0; border-left:1px solid rgba(255,255,255,0.06); padding-left:8px; margin-left:2px;">
+                    <button class="ag-btn saving-pay-btn" data-id="${g.id}" style="padding:4px 6px; font-size:0.72rem; background:rgba(46,213,115,0.1); border:1px solid rgba(46,213,115,0.3); color:#2ed573; font-weight:600; cursor:pointer; border-radius:4px;" title="Registrar aporte mensual">+Abono</button>
+                    <button class="ag-edit-btn saving-edit-btn" data-id="${g.id}" style="background:none;border:none;cursor:pointer;font-size:0.8rem; padding:2px;">✏️</button>
+                    <button class="ag-delete-btn saving-delete-btn" data-id="${g.id}" style="background:none;border:none;cursor:pointer;font-size:0.8rem; padding:2px;">🗑️</button>
                 </div>
             </div>
 
-            <div class="savings-progress-track">
-                <div class="savings-progress-bar" style="width:${pct}%; background:${barColor};"></div>
+            <!-- Barra de progreso minimalista al pie -->
+            <div class="savings-progress-track" style="background:rgba(255,255,255,0.04); height:4px; border-radius:2px; overflow:hidden; width:100%; margin-top:2px;">
+                <div class="savings-progress-bar" style="width:${pct}%; background:${barColor}; height:100%; transition:width 0.4s ease;"></div>
             </div>
 
-            <div class="savings-goal-amounts">
-                <div>
-                    <div class="savings-amount-main">${sym} ${svgFmtNum(g.accumulated)} <span style="color:var(--ag-text-muted); font-weight:400; font-size:0.78rem;">${conv}</span></div>
-                    <div class="savings-amount-label">Acumulado</div>
-                </div>
-                <div style="text-align:center;">
-                    <div style="font-size:1.4rem; font-weight:800; color:${barColor};">${pct}%</div>
-                    <div class="savings-amount-label">${pct >= 100 ? '¡Meta alcanzada! 🎉' : `${monthsLeft} meses restantes`}</div>
-                </div>
-                <div style="text-align:right;">
-                    <div class="savings-amount-main">${sym} ${svgFmtNum(g.goal)} <span style="color:var(--ag-text-muted); font-weight:400; font-size:0.78rem;">${goalConv}</span></div>
-                    <div class="savings-amount-label">Meta</div>
+            <div style="display:flex; justify-content:space-between; font-size:0.7rem; color:var(--ag-text-muted); margin-top:-2px; line-height:1;">
+                <span>Mensual: <strong>${sym} ${svgFmtNum(g.monthlyAmount)}</strong></span>
+                <span>${pct >= 100 ? '¡Meta lograda! 🎉' : `${monthsLeft} meses rest.`}</span>
+            </div>
+        </div>`;
+    }).join('');iv class="savings-amount-label">Meta</div>
                 </div>
             </div>
 
@@ -322,6 +315,27 @@ async function paySavingQuota(id) {
 function initSavingsListeners() {
     const newBtn = document.getElementById('open-new-saving-btn');
     if (newBtn) newBtn.addEventListener('click', () => openSavingModal());
+
+    const listContainer = document.getElementById('savings-goals-list');
+    if (listContainer) {
+        listContainer.addEventListener('click', (e) => {
+            const payBtn = e.target.closest('.saving-pay-btn');
+            if (payBtn) {
+                paySavingQuota(Number(payBtn.getAttribute('data-id')));
+                return;
+            }
+            const editBtn = e.target.closest('.saving-edit-btn');
+            if (editBtn) {
+                openSavingModal(Number(editBtn.getAttribute('data-id')));
+                return;
+            }
+            const deleteBtn = e.target.closest('.saving-delete-btn');
+            if (deleteBtn) {
+                deleteSavingGoal(Number(deleteBtn.getAttribute('data-id')));
+                return;
+            }
+        });
+    }
 
     const saveBtn = document.getElementById('save-saving-modal-btn');
     if (saveBtn) saveBtn.addEventListener('click', saveSavingGoal);

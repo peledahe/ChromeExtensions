@@ -85,9 +85,9 @@ function renderDebtsList() {
                     <div style="font-size: 0.75rem; color: var(--ag-text-muted);">Saldo Pendiente</div>
                 </div>
                 <div style="display: flex; gap: 4px;">
-                    <button class="ag-btn" onclick="window.payDebtQuota(${d.id})" style="padding: 4px 8px; font-size: 0.78rem; background: rgba(46, 213, 115, 0.15); border: 1px solid #2ed573; color: #2ed573; font-weight: 600; cursor: pointer;" title="Registrar pago mensual">Abonar</button>
-                    <button class="ag-edit-btn" onclick="window.openDebtModal(${d.id})" style="background:none; border:none; cursor:pointer; font-size:0.85rem;">✏️</button>
-                    <button class="ag-delete-btn" onclick="window.deleteDebt(${d.id})" style="background:none; border:none; cursor:pointer; font-size:0.85rem;">🗑️</button>
+                    <button class="ag-btn debt-pay-btn" data-id="${d.id}" style="padding: 4px 8px; font-size: 0.78rem; background: rgba(46, 213, 115, 0.15); border: 1px solid #2ed573; color: #2ed573; font-weight: 600; cursor: pointer;" title="Registrar pago mensual">Abonar</button>
+                    <button class="ag-edit-btn debt-edit-btn" data-id="${d.id}" style="background:none; border:none; cursor:pointer; font-size:0.85rem;">✏️</button>
+                    <button class="ag-delete-btn debt-delete-btn" data-id="${d.id}" style="background:none; border:none; cursor:pointer; font-size:0.85rem;">🗑️</button>
                 </div>
             </div>
         </div>
@@ -343,6 +343,34 @@ async function payDebtQuota(id) {
 
 // Inicializar escuchas del planificador de deudas (programático)
 function initDebtsListeners() {
+    const addDebtDialogBtn = document.getElementById('btn-add-debt-dialog');
+    if (addDebtDialogBtn) {
+        addDebtDialogBtn.addEventListener('click', () => {
+            openDebtModal();
+        });
+    }
+
+    const debtsList = document.getElementById('debts-list');
+    if (debtsList) {
+        debtsList.addEventListener('click', (e) => {
+            const payBtn = e.target.closest('.debt-pay-btn');
+            if (payBtn) {
+                payDebtQuota(Number(payBtn.getAttribute('data-id')));
+                return;
+            }
+            const editBtn = e.target.closest('.debt-edit-btn');
+            if (editBtn) {
+                openDebtModal(Number(editBtn.getAttribute('data-id')));
+                return;
+            }
+            const deleteBtn = e.target.closest('.debt-delete-btn');
+            if (deleteBtn) {
+                deleteDebt(Number(deleteBtn.getAttribute('data-id')));
+                return;
+            }
+        });
+    }
+
     const saveBudgetBtn = document.getElementById('save-debts-budget-btn');
     if (saveBudgetBtn) {
         saveBudgetBtn.addEventListener('click', () => {

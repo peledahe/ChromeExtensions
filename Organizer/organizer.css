@@ -2534,3 +2534,67 @@
             display: inline-block;
             animation: ag-spin-anim 1s linear infinite;
         }
+
+        /* ── Específico Presupuesto Proyectado vs Confirmado ── */
+        .budget-status-toggle {
+            display: flex;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 8px;
+            padding: 2px;
+            width: 100%;
+        }
+        .budget-status-toggle .status-btn {
+            flex: 1;
+            background: none;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            color: var(--ag-text-muted);
+            font-size: 0.8rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+        }
+        .budget-status-toggle .status-btn.active {
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+        }
+        .budget-projected-badge {
+            font-size: 0.68rem;
+            font-weight: 700;
+            background: rgba(162, 155, 254, 0.15);
+            color: #a29bfe;
+            padding: 2px 6px;
+            border-radius: 4px;
+            border: 1px solid rgba(162, 155, 254, 0.25);
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+            display: inline-flex;
+            align-items: center;
+            white-space: nowrap;
+        }
+        .budget-conv-label {
+            font-weight: 400 !important;
+            font-size: 0.76rem !important;
+            opacity: 0.65;
+            display: inline-block;
+            margin-left: 2px;
+        }
+        .budget-item.budget-projected {
+            background-image: repeating-linear-gradient(-45deg, transparent, transparent 4px, rgba(255, 255, 255, 0.01) 4px, rgba(255, 255, 255, 0.01) 8px) !important;
+        }
+        .budget-item.budget-projected:hover {
+            background-color: rgba(255, 255, 255, 0.02) !important;
+        }
+        .budget-confirm-btn:hover {
+            filter: brightness(1.15);
+            transform: scale(1.03);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+        }
+

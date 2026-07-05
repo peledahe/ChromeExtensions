@@ -87,6 +87,7 @@ const DB_NOTE_KEYS = ['DB_CONNECTION', 'DB_PORT', 'DB_DATABASE'];
 const MODULE_META = {
     agenda: { cfgKey: 'agendaEnabled', tab: 'agenda' },
     budget: { cfgKey: 'budgetEnabled', tab: 'budget' },
+    savings: { cfgKey: 'savingsEnabled', tab: 'savings' },
     debts: { cfgKey: 'debtsEnabled', tab: 'debts' },
     kanban: { cfgKey: 'kanbanEnabled', tab: 'kanban' },
     notes: { cfgKey: 'notesEnabled', tab: 'notes' },
@@ -220,6 +221,16 @@ function bindStaticEvents() {
     bindPaymentMethodsEvents();
     bindKanbanEvents();
     bindPasswordEvents();
+
+    // Toggles de estado de presupuesto (proyectado/confirmado)
+    document.querySelectorAll('#shop-status-toggle .status-btn, #income-status-toggle .status-btn').forEach(btn => {
+        btn.onclick = (e) => {
+            e.preventDefault();
+            const parent = btn.parentElement;
+            parent.querySelectorAll('.status-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+        };
+    });
 
     window.onclick = (e) => {
         if (e.target.classList.contains('edit-modal-overlay') || e.target.classList.contains('pm-modal-overlay') || e.target.classList.contains('kb-modal-overlay') || e.target.classList.contains('pw-modal-overlay')) {
@@ -806,6 +817,7 @@ function getTabFromCfgKey(cfgKey) {
 function isTabVisible(tabName) {
     if (tabName === 'agenda') return state.cfg.agendaEnabled !== false;
     if (tabName === 'budget') return state.cfg.budgetEnabled !== false;
+    if (tabName === 'savings') return state.cfg.savingsEnabled !== false;
     if (tabName === 'debts') return state.cfg.debtsEnabled !== false;
     if (tabName === 'kanban') return state.cfg.kanbanEnabled;
     if (tabName === 'notes') return state.cfg.notesEnabled;
@@ -816,6 +828,7 @@ function isTabVisible(tabName) {
 function getFirstVisibleTab() {
     if (isTabVisible('notes')) return 'notes';
     if (isTabVisible('budget')) return 'budget';
+    if (isTabVisible('savings')) return 'savings';
     if (isTabVisible('debts')) return 'debts';
     if (isTabVisible('agenda')) return 'agenda';
     if (isTabVisible('kanban')) return 'kanban';
@@ -834,6 +847,7 @@ function applyModuleFilters() {
         videoEnabled: state.cfg.videoEnabled,
         imagesEnabled: state.cfg.imagesEnabled,
         budgetEnabled: state.cfg.budgetEnabled,
+        savingsEnabled: state.cfg.savingsEnabled,
         debtsEnabled: state.cfg.debtsEnabled,
         kanbanEnabled: state.cfg.kanbanEnabled,
         notesEnabled: state.cfg.notesEnabled,
@@ -854,6 +868,7 @@ function syncCfgFromInputs() {
     state.cfg.videoEnabled = !!document.getElementById('cfg-video-enabled')?.checked;
     state.cfg.imagesEnabled = !!document.getElementById('cfg-images-enabled')?.checked;
     state.cfg.budgetEnabled = !!document.getElementById('cfg-budget-enabled')?.checked;
+    state.cfg.savingsEnabled = !!document.getElementById('cfg-savings-enabled')?.checked;
     state.cfg.debtsEnabled = !!document.getElementById('cfg-debts-enabled')?.checked;
     state.cfg.kanbanEnabled = !!document.getElementById('cfg-kanban-enabled')?.checked;
     state.cfg.notesEnabled = !!document.getElementById('cfg-notes-enabled')?.checked;
@@ -890,7 +905,8 @@ async function loadAppConfig() {
             mediaPathResolved,
             screenshotsPath,
             agendaEnabled,
-            passwordsEnabled
+            passwordsEnabled,
+            savingsEnabled
         ] = await Promise.all([
             py.get_config('videoEnabled'),
             py.get_config('imagesEnabled'),
@@ -909,12 +925,14 @@ async function loadAppConfig() {
             py.get_media_path(),
             py.get_config('screenshotsPath'),
             py.get_config('agendaEnabled'),
-            py.get_config('passwordsEnabled')
+            py.get_config('passwordsEnabled'),
+            py.get_config('savingsEnabled')
         ]);
 
         state.cfg.videoEnabled = toBool(videoEnabled, true);
         state.cfg.imagesEnabled = toBool(imagesEnabled, true);
         state.cfg.budgetEnabled = toBool(budgetEnabled, true);
+        state.cfg.savingsEnabled = toBool(savingsEnabled, true);
         state.cfg.debtsEnabled = toBool(debtsEnabled, true);
         state.cfg.kanbanEnabled = toBool(kanbanEnabled, true);
         state.cfg.notesEnabled = toBool(notesEnabled, true);
@@ -960,6 +978,7 @@ function fillConfigInputs() {
     setChecked('cfg-video-enabled', state.cfg.videoEnabled);
     setChecked('cfg-images-enabled', state.cfg.imagesEnabled);
     setChecked('cfg-budget-enabled', state.cfg.budgetEnabled);
+    setChecked('cfg-savings-enabled', state.cfg.savingsEnabled);
     setChecked('cfg-debts-enabled', state.cfg.debtsEnabled);
     setChecked('cfg-kanban-enabled', state.cfg.kanbanEnabled);
     setChecked('cfg-notes-enabled', state.cfg.notesEnabled);
@@ -994,6 +1013,7 @@ async function saveAppConfig() {
             py.set_config('videoEnabled', state.cfg.videoEnabled ? '1' : '0'),
             py.set_config('imagesEnabled', state.cfg.imagesEnabled ? '1' : '0'),
             py.set_config('budgetEnabled', state.cfg.budgetEnabled ? '1' : '0'),
+            py.set_config('savingsEnabled', state.cfg.savingsEnabled ? '1' : '0'),
             py.set_config('debtsEnabled', state.cfg.debtsEnabled ? '1' : '0'),
             py.set_config('kanbanEnabled', state.cfg.kanbanEnabled ? '1' : '0'),
             py.set_config('notesEnabled', state.cfg.notesEnabled ? '1' : '0'),
@@ -1226,6 +1246,9 @@ async function activateTab(tabName) {
     if (target === 'agenda') await fetchReminders();
     else if (target === 'budget') {
         if (window.fetchBudget) await window.fetchBudget();
+    }
+    else if (target === 'savings') {
+        if (window.fetchSavings) await window.fetchSavings();
     }
     else if (target === 'debts') {
         if (window.fetchDebts) await window.fetchDebts();

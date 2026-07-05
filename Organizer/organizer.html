@@ -20,6 +20,7 @@
             <button class="ag-tab" data-tab="kanban">Kanban</button>
             <button class="ag-tab" data-tab="agenda">Agenda</button>
             <button class="ag-tab" data-tab="budget">Presupuesto</button>
+            <button class="ag-tab" data-tab="savings">Ahorros</button>
             <button class="ag-tab" data-tab="debts">Deudas</button>
             <button class="ag-tab" data-tab="passwords">Claves</button>
         </div>
@@ -183,7 +184,7 @@
                 <div style="display:flex; flex-direction:column; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.04); border-radius:10px; padding:16px; height:100%;">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
                         <h2 style="font-size:1.1rem; color:#ff7675;">Deudas Pendientes</h2>
-                        <button class="ag-btn ag-btn-primary" onclick="window.openDebtModal()" style="padding: 6px 12px; font-size:0.8rem;">+ Agregar Deuda</button>
+                        <button class="ag-btn ag-btn-primary" id="btn-add-debt-dialog" style="padding: 6px 12px; font-size:0.8rem;">+ Agregar Deuda</button>
                     </div>
                     <div id="debts-list" style="flex:1; overflow-y:auto; padding-right:4px;">
                         <div class="ag-empty">Cargando deudas...</div>
@@ -195,6 +196,35 @@
                     <h2 style="font-size:1.1rem; color:#2ed573; margin-bottom:12px;">Plan de Liquidación (Bola de Nieve)</h2>
                     <div id="debts-projection-timeline" style="flex:1; overflow-y:auto; padding-right:4px;">
                         <div class="ag-empty">Calculando proyección...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== SAVINGS VIEW ===== -->
+        <div id="view-savings" class="ag-view">
+            <div class="section-header" style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:16px;">
+                <div>
+                    <h1>🎯 Objetivos de Ahorro</h1>
+                    <p>Planifica y monitorea tus metas financieras a corto, mediano y largo plazo</p>
+                </div>
+                <button class="ag-btn ag-btn-primary" id="open-new-saving-btn" style="padding: 8px 16px; font-weight: 600; border-radius: 8px;">Nuevo Objetivo +</button>
+            </div>
+
+            <div style="display:grid; grid-template-columns: 1.2fr 1fr; gap:20px; height: calc(100vh - 180px); overflow:hidden;">
+                <!-- Columna Izquierda: Mis Objetivos -->
+                <div style="display:flex; flex-direction:column; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.04); border-radius:10px; padding:16px; height:100%;">
+                    <h2 style="font-size:1.1rem; color:#a29bfe; margin-bottom:12px;">Objetivos Activos</h2>
+                    <div id="savings-goals-list" style="flex:1; overflow-y:auto; padding-right:4px; display:flex; flex-direction:column; gap:12px;">
+                        <div class="ag-empty">Cargando objetivos...</div>
+                    </div>
+                </div>
+
+                <!-- Columna Derecha: Resumen de Ahorros -->
+                <div style="display:flex; flex-direction:column; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.04); border-radius:10px; padding:16px; height:100%;">
+                    <h2 style="font-size:1.1rem; color:#2ed573; margin-bottom:12px;">Resumen e Impacto</h2>
+                    <div id="savings-summary-panel" style="flex:1; overflow-y:auto; padding-right:4px;">
+                        <div class="ag-empty">Cargando resumen...</div>
                     </div>
                 </div>
             </div>
@@ -359,6 +389,16 @@
                     </div>
                     <label class="cfg-toggle">
                         <input type="checkbox" id="cfg-budget-enabled" checked>
+                        <span class="cfg-toggle-track"></span>
+                    </label>
+                </div>
+                <div class="cfg-row">
+                    <div class="cfg-row-label">
+                        <span>Ahorros</span>
+                        <small>Muestra la pestaña de Ahorros por objetivos</small>
+                    </div>
+                    <label class="cfg-toggle">
+                        <input type="checkbox" id="cfg-savings-enabled" checked>
                         <span class="cfg-toggle-track"></span>
                     </label>
                 </div>
@@ -958,8 +998,60 @@
         </div>
     </div>
 
+    <!-- MODAL EDITAR / CREAR OBJETIVO DE AHORRO -->
+    <div class="edit-modal-overlay" id="saving-editor-modal">
+        <div class="edit-modal-box" style="width:400px; max-height:90vh; overflow-y:auto; border-radius:12px; background:var(--ag-card-bg); border:1px solid var(--ag-border); box-shadow:0 10px 30px rgba(0,0,0,0.5); display:flex; flex-direction:column; padding:20px;">
+            <h3 id="saving-modal-title" style="font-size:1.1rem; color:var(--ag-text); margin-bottom:12px;">Nuevo Objetivo de Ahorro</h3>
+            <input type="hidden" id="saving-id-hidden">
+
+            <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:16px;">
+                <div>
+                    <label style="display:block; font-size:0.75rem; color:var(--ag-text-muted); margin-bottom:4px;">Nombre del Objetivo *</label>
+                    <input type="text" id="saving-name-input" class="ag-input" style="width:100%; font-size:0.85rem;" placeholder="Ej. Comprar Auto, Fondo de Emergencia...">
+                </div>
+                <div>
+                    <label style="display:block; font-size:0.75rem; color:var(--ag-text-muted); margin-bottom:4px;">Moneda *</label>
+                    <select id="saving-currency-select" class="ag-input" style="width:100%; font-size:0.85rem; color:var(--ag-text); background:rgba(0,0,0,0.2);">
+                        <option value="local">Moneda Local (Q)</option>
+                        <option value="second">Moneda Secundaria (US$)</option>
+                    </select>
+                </div>
+                <div style="display:flex; gap:10px;">
+                    <div style="flex:1;">
+                        <label style="display:block; font-size:0.75rem; color:var(--ag-text-muted); margin-bottom:4px;">Monto Meta *</label>
+                        <input type="number" id="saving-goal-input" class="ag-input" style="width:100%; font-size:0.85rem;" placeholder="Monto Meta" min="0" step="0.01">
+                    </div>
+                    <div style="flex:1;">
+                        <label style="display:block; font-size:0.75rem; color:var(--ag-text-muted); margin-bottom:4px;">Monto Acumulado</label>
+                        <input type="number" id="saving-accumulated-input" class="ag-input" style="width:100%; font-size:0.85rem;" placeholder="Monto Actual" min="0" step="0.01">
+                    </div>
+                </div>
+                <div style="display:flex; gap:10px;">
+                    <div style="flex:1;">
+                        <label style="display:block; font-size:0.75rem; color:var(--ag-text-muted); margin-bottom:4px;">Aporte Mensual</label>
+                        <input type="number" id="saving-monthly-input" class="ag-input" style="width:100%; font-size:0.85rem;" placeholder="Cuota Mensual" min="0" step="0.01">
+                    </div>
+                    <div style="flex:1;">
+                        <label style="display:block; font-size:0.75rem; color:var(--ag-text-muted); margin-bottom:4px;">Fecha Límite</label>
+                        <input type="date" id="saving-date-input" class="ag-input" style="width:100%; font-size:0.85rem;">
+                    </div>
+                </div>
+                <div>
+                    <label style="display:block; font-size:0.75rem; color:var(--ag-text-muted); margin-bottom:4px;">Notas</label>
+                    <textarea id="saving-notes-input" class="ag-input" style="width:100%; font-size:0.85rem; height:60px; resize:none;" placeholder="Notas adicionales..."></textarea>
+                </div>
+            </div>
+
+            <div style="display:flex; justify-content:flex-end; gap:8px; border-top:1px solid rgba(255,255,255,0.08); padding-top:12px;">
+                <button class="ag-btn" id="close-saving-modal-cancel" style="background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.08); cursor:pointer; font-size:0.85rem;">Cancelar</button>
+                <button class="ag-btn ag-btn-primary" id="save-saving-modal-btn" style="cursor:pointer; font-size:0.85rem;">Guardar</button>
+            </div>
+        </div>
+    </div>
+
     <script src="theme.js"></script>
     <script src="budget.js"></script>
+    <script src="savings.js"></script>
     <script src="debts.js"></script>
     <script src="gdrive_sync.js"></script>
     <script src="agenda.js"></script>
