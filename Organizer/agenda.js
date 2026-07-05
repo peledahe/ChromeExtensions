@@ -453,6 +453,8 @@ function bindPaymentMethodsEvents() {
     const newInput = document.getElementById('pm-new-method-input');
 
     if (openBtn) openBtn.addEventListener('click', openPmModal);
+    const openBtnBudget = document.getElementById('btn-payment-methods-budget');
+    if (openBtnBudget) openBtnBudget.addEventListener('click', openPmModal);
     if (cancelBtn) cancelBtn.addEventListener('click', () => pmModal?.classList.remove('active'));
     if (saveBtn) saveBtn.addEventListener('click', savePmModal);
     if (addBtn) addBtn.addEventListener('click', addPmDraft);

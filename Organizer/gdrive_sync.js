@@ -22,6 +22,11 @@ async function initGDriveSync() {
             syncState.lastSync = new Date(result.gdrive_last_sync).toLocaleString();
         }
         updateSyncUI();
+
+        // Sincronización silenciosa automática al abrir la aplicación si está conectado
+        if (syncState.connected) {
+            syncNow(true);
+        }
     });
 }
 
@@ -237,7 +242,19 @@ function updateSyncUI() {
     if (syncBtn) {
         syncBtn.style.display = syncState.connected ? 'inline-block' : 'none';
         syncBtn.disabled = syncState.syncing;
-        syncBtn.innerText = syncState.syncing ? 'Sincronizando...' : 'Sincronizar ahora 🔄';
+        syncBtn.onclick = () => syncNow(false);
+        
+        const svgIcon = `
+            <svg class="${syncState.syncing ? 'ag-spin' : ''}" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-left: 6px; display: inline-block;">
+                <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l.73-.73"/>
+            </svg>
+        `;
+
+        if (syncState.syncing) {
+            syncBtn.innerHTML = `Sincronizando ${svgIcon}`;
+        } else {
+            syncBtn.innerHTML = `Sincronizar ahora ${svgIcon}`;
+        }
     }
 
     if (lastSyncEl) {
@@ -249,4 +266,21 @@ function updateSyncUI() {
 window.initGDriveSync = initGDriveSync;
 window.syncNow = syncNow;
 
+// Escuchar cambios locales para disparar sincronizaciones automáticas diferidas
+let syncDebounceTimeout = null;
+if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.onChanged) {
+    chrome.storage.onChanged.addListener((changes, areaName) => {
+        if (areaName === 'local' && syncState.connected && !syncState.syncing) {
+            // Ignorar cambios en variables de control interno de sincronización para evitar loops infinitos
+            const keys = Object.keys(changes);
+            const isInternal = keys.every(k => k.startsWith('gdrive_'));
+            if (isInternal) return;
 
+            // Debounce de 3 segundos tras cambios locales para evitar saturar la API
+            if (syncDebounceTimeout) clearTimeout(syncDebounceTimeout);
+            syncDebounceTimeout = setTimeout(() => {
+                syncNow(true); // Sincronización silenciosa automática
+            }, 3000);
+        }
+    });
+}

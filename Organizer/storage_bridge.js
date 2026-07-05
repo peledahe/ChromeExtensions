@@ -87,6 +87,140 @@
     }
   };
 
+  // Función para poblar la aplicación con datos de demostración en español
+  async function injectDemoData(force = false) {
+    if (typeof chrome === 'undefined' || !chrome.storage) return;
+
+    const check = await storage.get('agenda', null);
+    if (check !== null && !force) return;
+
+    console.log("Inyectando hermosos datos de demostración en español...");
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowStr = tomorrow.toISOString().split('T')[0];
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toISOString().split('T')[0];
+    const in3Days = new Date();
+    in3Days.setDate(in3Days.getDate() + 3);
+    const in3DaysStr = in3Days.toISOString().split('T')[0];
+
+    const demoAgenda = [
+      { id: 1, text: "Reunión de planificación de sprint", dueDate: todayStr, tag: "Trabajo, Reunión", done: 0, ts: new Date().toISOString() },
+      { id: 2, text: "Comprar café en grano y leche de almendras", dueDate: todayStr, tag: "Personal", done: 1, ts: new Date().toISOString() },
+      { id: 3, text: "Revisar balance contable del mes", dueDate: tomorrowStr, tag: "Finanzas, Urgente", done: 0, ts: new Date().toISOString() },
+      { id: 4, text: "Llamar al soporte del hosting de producción", dueDate: yesterdayStr, tag: "Trabajo", done: 1, ts: new Date().toISOString() },
+      { id: 5, text: "Diseñar propuesta de interfaz de usuario para cliente", dueDate: in3DaysStr, tag: "Diseño, Freelance", done: 0, ts: new Date().toISOString() }
+    ];
+
+    const demoIncome = [
+      { id: 1, text: "Salario Corporativo", value: 14500, currency: "local", dueDate: todayStr, category: "Salario" },
+      { id: 2, text: "Consultoría UI Freelance", value: 500, currency: "second", dueDate: todayStr, category: "Freelance" },
+      { id: 3, text: "Rendimiento Inversiones", value: 850, currency: "local", dueDate: todayStr, category: "Inversiones" }
+    ];
+
+    const demoShopping = [
+      { id: 1, text: "Alquiler de Apartamento", value: 3500, currency: "local", dueDate: todayStr, category: "Vivienda", paymentMethod: "Transferencia" },
+      { id: 2, text: "Suscripción Mensual Netflix", value: 12, currency: "second", dueDate: todayStr, category: "Entretenimiento", paymentMethod: "Tarjeta Visa" },
+      { id: 3, text: "Supermercado La Torre", value: 950.50, currency: "local", dueDate: todayStr, category: "Alimentación", paymentMethod: "Tarjeta Visa" },
+      { id: 4, text: "Combustible Gasolinera Shell", value: 320, currency: "local", dueDate: todayStr, category: "Transporte", paymentMethod: "Efectivo" },
+      { id: 5, text: "Pago de Energía Eléctrica EEGSA", value: 410.20, currency: "local", dueDate: todayStr, category: "Servicios", paymentMethod: "Banca en Línea" },
+      { id: 6, text: "Cena en Restaurante El Portal", value: 280, currency: "local", dueDate: todayStr, category: "Entretenimiento", paymentMethod: "Efectivo" },
+      { id: 7, text: "Suscripción Spotify Premium", value: 6, currency: "second", dueDate: todayStr, category: "Entretenimiento", paymentMethod: "Tarjeta Visa" }
+    ];
+
+    const demoDebts = [
+      { id: 1, name: "Tarjeta Visa Oro", balance: 4500, minPayment: 350 },
+      { id: 2, name: "Préstamo Educativo", balance: 18500, minPayment: 900 },
+      { id: 3, name: "Financiamiento Laptop", balance: 3200, minPayment: 400 }
+    ];
+
+    const demoLimits = {
+      "Alimentación": 1500,
+      "Vivienda": 4000,
+      "Transporte": 800,
+      "Servicios": 600,
+      "Entretenimiento": 500,
+      "Deudas": 2500,
+      "Otros": 500
+    };
+
+    const demoTargets = {
+      "Salario": 14000,
+      "Freelance": 800,
+      "Inversiones": 500,
+      "Otros": 200
+    };
+
+    const demoKanban = [
+      { id: 1, title: "Por Hacer", cards: [
+        { id: 101, title: "Renovar licencia de conducir", desc: "Llevar examen de la vista e identificación oficial", color: "#ffeaa7", tags: ["Personal", "Trámite"] },
+        { id: 102, title: "Subir actualización Mk Organizer", desc: "Preparar capturas de pantalla de la extensión en español para Google Web Store", color: "#ff7675", tags: ["Trabajo", "Urgente"] }
+      ]},
+      { id: 2, title: "En Progreso", cards: [
+        { id: 103, title: "Rediseño de interfaz de deudas", desc: "Implementar simulador de bola de nieve en deudas.js", color: "#6c5ce7", tags: ["Desarrollo"] }
+      ]},
+      { id: 3, title: "Hecho", cards: [
+        { id: 104, title: "Soporte multi-moneda en presupuesto", desc: "Configuración local, secundaria y tasas de conversión en budget.js", color: "#2ed573", tags: ["Completado"] }
+      ]}
+    ];
+
+    const demoNotes = [
+      {
+        id: 1,
+        title: "💡 Ideas para Mk Organizer v1.0",
+        content: "# Ideas y Mejoras Futuras\n\n1. Sincronización en la nube con Google Drive (¡Listo!).\n2. Planificador de Deudas por método Bola de Nieve (¡Listo!).\n3. Tableros Kanban de tareas para organizar flujos visuales (¡Listo!).\n4. Sistema de monedas personalizables para el presupuesto (¡Listo!).\n\n_Creado con amor por el equipo de Mk Organizer._",
+        ts: new Date().toISOString()
+      },
+      {
+        id: 2,
+        title: "🛒 Lista de Compras Especiales",
+        content: "- Café artesanal tostado (Grano)\n- Chocolate negro 85% cacao\n- Nueces y almendras\n- Leche de avena sin azúcar",
+        ts: new Date().toISOString()
+      }
+    ];
+
+    const demoPasswords = [
+      { id: 1, site: "Google Account", username: "perry.dev@gmail.com", password: "mypassword123", type: "web", url: "https://accounts.google.com", notes: "Cuenta de desarrollo principal.", ts: new Date().toISOString() },
+      { id: 2, site: "Banca Virtual", username: "p.gonzalez88", password: "securebankpass99", type: "web", url: "https://banca.gandt.com.gt", notes: "Usar token digital para transferencias superiores a Q5,000.", ts: new Date().toISOString() },
+      { id: 3, site: "Netflix Familiar", username: "perry.casa@gmail.com", password: "netflixpremium4k", type: "web", url: "https://netflix.com", notes: "Plan Premium 4K de la casa.", ts: new Date().toISOString() }
+    ];
+
+    await Promise.all([
+      storage.set('agenda', demoAgenda),
+      storage.set('income', demoIncome),
+      storage.set('shopping', demoShopping),
+      storage.set('deudas_list', demoDebts),
+      storage.set('deudas_presupuesto', 2000),
+      storage.set('budget_limits', demoLimits),
+      storage.set('budget_income_targets', demoTargets),
+      storage.set('kanban', demoKanban),
+      storage.set('notes', demoNotes),
+      storage.set('passwords', demoPasswords),
+      storage.set('budget_currency_symbol', 'Q'),
+      storage.set('budget_currency_code', 'GTQ'),
+      storage.set('budget_second_currency_enabled', true),
+      storage.set('budget_second_currency_symbol', 'US$'),
+      storage.set('budget_second_currency_code', 'USD'),
+      storage.set('budget_exchange_rate', 7.8),
+      storage.set('app_config', {
+        agendaEnabled: true,
+        budgetEnabled: true,
+        debtsEnabled: true,
+        kanbanEnabled: true,
+        notesEnabled: true,
+        passwordsEnabled: true
+      })
+    ]);
+
+    console.log("Datos de demostración inyectados exitosamente.");
+  }
+
+  window.injectDemoData = injectDemoData;
+  injectDemoData(false).catch(err => console.error("Error inyectando demo:", err));
+
   // Helper para obtener el siguiente ID de una lista
   function getNextId(items) {
     if (!items || items.length === 0) return 1;

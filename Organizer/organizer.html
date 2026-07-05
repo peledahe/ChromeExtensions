@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Agenda y Compras</title>
+    <title>Mk Organizer</title>
     <link rel="stylesheet" href="theme.css">
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="organizer.css">
@@ -138,7 +138,13 @@
                 <div id="col-expenses" style="display:flex; flex-direction:column; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.04); border-radius:10px; padding:16px; height:100%; overflow:hidden;">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
                         <h2 style="font-size:1.1rem; color:#ff7675;">➖ Gastos</h2>
-                        <button class="ag-btn ag-btn-primary" id="open-new-shop-modal-btn" style="padding: 6px 12px; font-size:0.8rem;">+ Nuevo</button>
+                        <div style="display:flex; gap:6px;">
+                            <button class="ag-btn ag-btn-ghost" id="btn-payment-methods-budget" title="Administrar medios de pago" style="padding: 6px 10px; font-size:0.8rem;">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+                                Medios de Pago
+                            </button>
+                            <button class="ag-btn ag-btn-primary" id="open-new-shop-modal-btn" style="padding: 6px 12px; font-size:0.8rem;">+ Nuevo</button>
+                        </div>
                     </div>
                     <div id="budget-expense-list" style="flex:1; overflow-y:auto; padding-right:4px;">
                         <div class="ag-empty">Cargando gastos...</div>
@@ -580,11 +586,6 @@
     <div class="pm-modal-overlay" id="pm-modal">
         <div class="pm-modal-box">
             <h3>⚙️ Medios de Pago</h3>
-            <div class="pm-exchange-row">
-                <label class="pm-exchange-label">Tasa de cambio: 1 US$ =</label>
-                <input type="number" id="pm-exchange-rate" class="ag-input pm-exchange-input" step="0.01" min="0.01" value="7.80">
-                <span class="pm-exchange-unit">Q</span>
-            </div>
             <div id="pm-method-list" class="pm-method-list"></div>
             <div class="pm-add-row">
                 <input type="text" id="pm-new-method-input" class="ag-input" style="flex:1;" placeholder="Nuevo método...">

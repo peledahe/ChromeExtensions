@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Mk Agenda & Notas",
-  "short_name": "mk-agenda-notas",
-  "version": "2.0",
+  "name": "Mk Organizer",
+  "short_name": "mk-organizer",
+  "version": "1.0",
   "description": "Organizador personal: agenda, presupuesto categorizado, deudas (Bola de Nieve), Kanban, notas y claves con sincronización en Google Drive.",
   "permissions": [
     "storage",
@@ -16,7 +16,7 @@
     ]
   },
   "action": {
-    "default_title": "Abrir Mk Agenda & Notas",
+    "default_title": "Abrir Mk Organizer",
     "default_icon": {
       "16": "icon16.png",
       "48": "icon48.png",
