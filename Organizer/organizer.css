@@ -1,12 +1,3 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Agenda y Compras</title>
-    <link rel="stylesheet" href="theme.css">
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
-    <style>
         * { margin: 0; padding: 0; box-sizing: border-box; scrollbar-width: thin; scrollbar-color: rgba(108, 92, 231, 0.35) transparent; }
 
         /* ── Tokens de tema (usados por obs-modal, checkboxes y nuevos componentes) ── */
@@ -2171,687 +2162,6 @@
         }
         .pw-pass-icon-btn:hover { color: #fff; background: rgba(255,255,255,0.08); }
         .pw-modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
-    </style>
-</head>
-<body>
-
-    <!-- Script de comunicación con el Storage del Navegador -->
-    <script src="storage_bridge.js"></script>
-
-    <!-- HEADER -->
-    <div class="ag-header">
-        <div class="ag-tabs">
-            <button class="ag-tab active" data-tab="notes">Notas</button>
-            <button class="ag-tab" data-tab="kanban">Kanban</button>
-            <button class="ag-tab" data-tab="agenda">Agenda</button>
-            <button class="ag-tab" data-tab="shopping">Compras</button>
-            <button class="ag-tab" data-tab="income">Ingresos</button>
-            <button class="ag-tab" data-tab="passwords">Claves</button>
-        </div>
-
-        <div style="flex:1; -webkit-app-region: drag; height: 100%;"></div>
-
-        <div style="display:flex; align-items:center; gap:8px; flex-shrink:0; -webkit-app-region: no-drag;">
-            <input type="text" class="kb-filter-input" id="kb-search" placeholder="Buscar tarjeta..." style="display:none;">
-            <button id="btn-config" class="ag-nav-btn" title="Configuración">⚙️</button>
-
-            <div class="ag-win-controls" style="margin-left:0; display:none;">
-                <button class="ag-win-btn minimize" id="btn-minimize" title="Minimizar"><svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><path d="M19 13H5v-2h14v2z"/></svg></button>
-                <button class="ag-win-btn maximize" id="btn-maximize" title="Maximizar"><svg viewBox="0 0 24 24" width="10" height="10" fill="currentColor" stroke="currentColor" stroke-width="2"><path d="M4 4h16v16H4z" fill="none"/></svg></button>
-                <button class="ag-win-btn close-btn" id="btn-close" title="Cerrar"><svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg></button>
-            </div>
-        </div>
-    </div>
-
-    <!-- CONTENT -->
-    <div class="ag-content">
-
-        <!-- ===== AGENDA VIEW ===== -->
-        <div id="view-agenda" class="ag-view active">
-            <div class="section-header" style="display:flex; justify-content:space-between; align-items:flex-start;">
-                <div style="display:flex; align-items:center; gap:16px;">
-                    <div>
-                        <h1><div id="main-calendar-icon"></div> Mi Agenda</h1>
-                        <p>Gestión de tareas y recordatorios</p>
-                    </div>
-                    <button class="ag-btn ag-btn-primary" id="open-new-reminder-modal-btn" style="padding: 8px 16px; font-weight: 600; border-radius: 8px;">Nuevo +</button>
-                </div>
-                <div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
-                    <div class="agenda-filter-row" style="margin:0; display:flex; align-items:center; gap:8px;">
-                        <label for="reminder-tag-filter" class="agenda-filter-label">Filtrar por etiqueta:</label>
-                        <select id="reminder-tag-filter" class="ag-input agenda-filter-select" style="margin:0; flex:0 0 160px; max-width:160px; padding:6px 10px; height:auto;">
-                            <option value="__all__">Todas</option>
-                        </select>
-                    </div>
-                </div>
-            </div>
-            <div id="reminders-list" class="ag-list">
-                <div class="ag-empty">Cargando tareas...</div>
-            </div>
-            <div id="reminders-pagination" class="ag-pagination" style="display:none;"></div>
-        </div>
-
-        <!-- ===== SHOPPING VIEW ===== -->
-        <div id="view-shopping" class="ag-view">
-            <div class="section-header" style="display:flex; justify-content:space-between; align-items:flex-start;">
-                <div style="display:flex; align-items:center; gap:16px;">
-                    <div>
-                        <h1>🛒 Compras y Pagos <button class="ag-settings-btn" id="btn-payment-methods" title="Administrar medios de pago">⚙️</button></h1>
-                        <p>Control de gastos, facturas y deudas</p>
-                    </div>
-                    <button class="ag-btn ag-btn-primary" id="open-new-shop-modal-btn" style="padding: 8px 16px; font-weight: 600; border-radius: 8px;">Nuevo +</button>
-                </div>
-                <div class="shop-totals">
-                    <div class="shop-totals-col">
-                        <div class="shop-totals-col-label">Gastos pendientes</div>
-                        <div class="shop-totals-row">
-                            <div class="shop-total-item">Q <span id="total-gtq">0.00</span></div>
-                            <div class="shop-total-item">$ <span id="total-usd">0.00</span></div>
-                        </div>
-                    </div>
-                    <div class="shop-totals-divider"></div>
-                    <div class="shop-totals-col">
-                        <div class="shop-totals-col-label">Ingresos pendientes</div>
-                        <div class="shop-totals-row">
-                            <div class="shop-total-item">Q <span id="total-income-gtq">0.00</span></div>
-                            <div class="shop-total-item">$ <span id="total-income-usd">0.00</span></div>
-                        </div>
-                    </div>
-                    <div class="shop-totals-divider"></div>
-                    <div class="shop-totals-col">
-                        <div class="shop-totals-col-label">Saldo general</div>
-                        <div class="shop-total-item shop-total-combined"><span id="total-combined">Q 0.00</span></div>
-                    </div>
-                </div>
-            </div>
-            <!-- Payment method summary -->
-            <div id="payment-summary" class="payment-summary" style="display:none;"></div>
-            <div id="shopping-list" class="ag-list">
-                <div class="ag-empty">Cargando gastos...</div>
-            </div>
-            <div id="shopping-pagination" class="ag-pagination" style="display:none;"></div>
-        </div>
-
-        <!-- ===== INCOME VIEW ===== -->
-        <div id="view-income" class="ag-view">
-            <div class="section-header" style="display:flex; justify-content:space-between; align-items:flex-start;">
-                <div style="display:flex; align-items:center; gap:16px;">
-                    <div>
-                        <h1>💰 Ingresos</h1>
-                        <p>Registro de entradas y cobros</p>
-                    </div>
-                    <button class="ag-btn ag-btn-income" id="open-new-income-modal-btn" style="padding: 8px 16px; font-weight: 600; border-radius: 8px;">Nuevo +</button>
-                </div>
-                <div class="shop-totals income-totals-mini">
-                    <div class="shop-totals-col">
-                        <div class="shop-totals-col-label">Pendientes</div>
-                        <div class="shop-totals-row">
-                            <div class="shop-total-item">Q <span id="income-mini-gtq">0.00</span></div>
-                            <div class="shop-total-item">$ <span id="income-mini-usd">0.00</span></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div id="income-list" class="ag-list">
-                <div class="ag-empty">Cargando ingresos...</div>
-            </div>
-            <div id="income-pagination" class="ag-pagination" style="display:none;"></div>
-        </div>
-
-        <!-- ===== KANBAN VIEW ===== -->
-        <div id="view-kanban" class="ag-view">
-            <div class="section-header">
-                <h1>
-                    <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M4 3h4a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zm6 0h4a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zm6 0h4a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/></svg>
-                    Kanban
-                </h1>
-                <p>Seguimiento de tareas por estatus</p>
-                <div class="kb-label-filter" id="kb-label-filter"></div>
-            </div>
-
-            <div class="kb-board">
-                <!-- Pendientes -->
-                <div class="kb-col kb-col-border-pending" id="col-pending">
-                    <div class="kb-col-header">
-                        <div class="kb-col-title">
-                            <span class="kb-col-dot" style="background:#fdcb6e;"></span>
-                            Pendientes
-                            <span class="kb-col-count" id="count-pending">0</span>
-                        </div>
-                        <button class="kb-col-add" data-status="pending" title="Agregar tarjeta">+</button>
-                    </div>
-                    <div class="kb-cards" id="cards-pending" data-status="pending"></div>
-                </div>
-                <!-- En Proceso -->
-                <div class="kb-col kb-col-border-inprogress" id="col-inprogress">
-                    <div class="kb-col-header">
-                        <div class="kb-col-title">
-                            <span class="kb-col-dot" style="background:#6c5ce7;"></span>
-                            En Proceso
-                            <span class="kb-col-count" id="count-inprogress">0</span>
-                        </div>
-                        <button class="kb-col-add" data-status="inprogress" title="Agregar tarjeta">+</button>
-                    </div>
-                    <div class="kb-cards" id="cards-inprogress" data-status="inprogress"></div>
-                </div>
-                <!-- Detenidos -->
-                <div class="kb-col kb-col-border-blocked" id="col-blocked">
-                    <div class="kb-col-header">
-                        <div class="kb-col-title">
-                            <span class="kb-col-dot" style="background:#e17055;"></span>
-                            Detenidos
-                            <span class="kb-col-count" id="count-blocked">0</span>
-                        </div>
-                        <button class="kb-col-add" data-status="blocked" title="Agregar tarjeta">+</button>
-                    </div>
-                    <div class="kb-cards" id="cards-blocked" data-status="blocked"></div>
-                </div>
-                <!-- Hechos -->
-                <div class="kb-col kb-col-border-done" id="col-done">
-                    <div class="kb-col-header">
-                        <div class="kb-col-title">
-                            <span class="kb-col-dot" style="background:#00b894;"></span>
-                            Hechos
-                            <span class="kb-col-count" id="count-done">0</span>
-                        </div>
-                        <button class="kb-col-add" data-status="done" title="Agregar tarjeta">+</button>
-                    </div>
-                    <div class="kb-cards" id="cards-done" data-status="done"></div>
-                </div>
-            </div>
-        </div>
-
-        <!-- ===== NOTES VIEW ===== -->
-        <div id="view-notes" class="ag-view">
-            <div class="notes-toolbar">
-                <h2>📌 Pizarra de Notas <span id="notes-total" class="notes-count-badge">0</span></h2>
-                <button id="notes-new-btn" class="notes-new-btn">
-                    <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
-                    Nueva nota
-                </button>
-            </div>
-            <div class="notes-board" id="notes-board">
-                <div class="notes-canvas" id="notes-canvas">
-                    <div class="notes-hint" id="notes-hint">
-                        <div class="hint-icon">📌</div>
-                        <p>Haz doble clic en la pizarra<br>o usa el botón para crear una nota</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- ===== CONFIG VIEW ===== -->
-        <div id="view-config" class="ag-view">
-            <div class="section-header">
-                <h1>
-                    <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M19.14 12.94c.04-.3.06-.61.06-.94s-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.488.488 0 0 0-.59-.22l-2.39.96a7.07 7.07 0 0 0-1.62-.94l-.36-2.54a.484.484 0 0 0-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.37 1.04.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.57 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
-                    Configuración
-                </h1>
-                <p>Preferencias de la aplicación</p>
-            </div>
-
-            <div class="cfg-layout-grid">
-
-            <!-- Módulos -->
-            <div class="cfg-section cfg-section-modules cfg-span-all">
-                <div class="cfg-section-title">Módulos</div>
-                <div class="cfg-module-grid">
-
-                <div class="cfg-row">
-                    <div class="cfg-row-label">
-                        <span>Notas Adhesivas</span>
-                        <small>Muestra la pestaña de Notas en la agenda</small>
-                    </div>
-                    <label class="cfg-toggle">
-                        <input type="checkbox" id="cfg-notes-enabled" checked>
-                        <span class="cfg-toggle-track"></span>
-                    </label>
-                </div>
-                <div class="cfg-row">
-                    <div class="cfg-row-label">
-                        <span>Kanban</span>
-                        <small>Muestra la pestaña de Kanban en la agenda</small>
-                    </div>
-                    <label class="cfg-toggle">
-                        <input type="checkbox" id="cfg-kanban-enabled" checked>
-                        <span class="cfg-toggle-track"></span>
-                    </label>
-                </div>
-                <div class="cfg-row">
-                    <div class="cfg-row-label">
-                        <span>Agenda</span>
-                        <small>Muestra la pestaña de Agenda (recordatorios y tareas)</small>
-                    </div>
-                    <label class="cfg-toggle">
-                        <input type="checkbox" id="cfg-agenda-enabled" checked>
-                        <span class="cfg-toggle-track"></span>
-                    </label>
-                </div>
-                <div class="cfg-row">
-                    <div class="cfg-row-label">
-                        <span>Compras y Pagos</span>
-                        <small>Muestra la pestaña de Compras y Pagos en la agenda</small>
-                    </div>
-                    <label class="cfg-toggle">
-                        <input type="checkbox" id="cfg-shopping-enabled" checked>
-                        <span class="cfg-toggle-track"></span>
-                    </label>
-                </div>
-                <div class="cfg-row">
-                    <div class="cfg-row-label">
-                        <span>Ingresos</span>
-                        <small>Muestra la pestaña de Ingresos en la agenda</small>
-                    </div>
-                    <label class="cfg-toggle">
-                        <input type="checkbox" id="cfg-income-enabled" checked>
-                        <span class="cfg-toggle-track"></span>
-                    </label>
-                </div>
-                <div class="cfg-row">
-                    <div class="cfg-row-label">
-                        <span>Claves</span>
-                        <small>Muestra la pestaña de Contraseñas en la agenda</small>
-                    </div>
-                    <label class="cfg-toggle">
-                        <input type="checkbox" id="cfg-passwords-enabled" checked>
-                        <span class="cfg-toggle-track"></span>
-                    </label>
-                </div>
-
-                </div>
-            </div>
-
-
-
-
-
-            <div class="cfg-span-all" style="display:flex; justify-content:flex-end; padding-top:4px;">
-                <button class="ag-btn ag-btn-primary" id="cfg-save-btn">Guardar cambios</button>
-            </div>
-            </div>
-        </div>
-
-        <!-- ===== PASSWORDS VIEW ===== -->
-        <div id="view-passwords" class="ag-view">
-            <div class="section-header" style="margin-bottom:16px;">
-                <h1>
-                    <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1s3.1 1.39 3.1 3.1v2z"/></svg>
-                    Contraseñas
-                </h1>
-                <p>Almacén local de credenciales para sitios web, aplicaciones y bases de datos</p>
-            </div>
-            <div class="pw-toolbar">
-                <input type="text" id="pw-search" class="ag-input" placeholder="🔍 Buscar por nombre o usuario...">
-                <div class="pw-filter-group">
-                    <button class="pw-filter active" data-filter="all">Todos</button>
-                    <button class="pw-filter" data-filter="web">
-                        <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
-                        Sitios Web
-                    </button>
-                    <button class="pw-filter" data-filter="app">
-                        <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><path d="M21 2H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h7l-2 3v1h8v-1l-2-3h7c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 12H3V4h18v10z"/></svg>
-                        Aplicaciones
-                    </button>
-                    <button class="pw-filter" data-filter="db">
-                        <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor"><path d="M12 2C7.58 2 4 3.79 4 6v12c0 2.21 3.58 4 8 4s8-1.79 8-4V6c0-2.21-3.58-4-8-4zm0 2c3.31 0 6 .9 6 2s-2.69 2-6 2-6-.9-6-2 2.69-2 6-2zm0 16c-3.31 0-6-.9-6-2v-2.27c1.36.8 3.53 1.27 6 1.27s4.64-.47 6-1.27V18c0 1.1-2.69 2-6 2zm0-5c-3.31 0-6-.9-6-2v-2.27c1.36.8 3.53 1.27 6 1.27s4.64-.47 6-1.27V13c0 1.1-2.69 2-6 2z"/></svg>
-                        Bases de datos
-                    </button>
-                </div>
-                <div class="pw-autosave-wrap" title="Solo aplica al guardado detectado automaticamente al iniciar sesion en sitios web">
-                    <div class="pw-autosave-copy">
-                        <strong>Autoguardado web</strong>
-                        <small>Manual siempre permitido</small>
-                    </div>
-                    <select id="pw-autosave-policy-agenda" class="pw-autosave-select" aria-label="Modo de autoguardado web">
-                        <option value="ask">Preguntar</option>
-                        <option value="always">Siempre</option>
-                        <option value="never">Nunca</option>
-                    </select>
-                </div>
-                <button class="ag-btn ag-btn-primary" id="pw-add-btn" style="white-space:nowrap;">+ Agregar</button>
-            </div>
-            <div id="pw-list" class="pw-list">
-                <div class="pw-empty"><div class="pw-empty-icon">🔑</div>No hay contraseñas guardadas</div>
-            </div>
-        </div>
-
-    <!-- MODAL NUEVA COMPRA -->
-    <div class="edit-modal-overlay" id="new-shop-modal">
-        <div class="edit-modal-box">
-            <h3>🛒 Nueva Compra / Pago</h3>
-            <div class="edit-modal-row">
-                <input type="text" id="shop-item-input" class="ag-input" style="flex:1;" placeholder="¿Qué hay que comprar o pagar?">
-                <button class="ag-btn ag-btn-ghost" id="paste-shop-item" title="Pegar del portapapeles">📋</button>
-            </div>
-            <div class="edit-modal-row">
-                <select id="shop-currency-select" class="ag-input ag-input-sm" style="flex:0 0 100px;">
-                    <option value="Q">GTQ (Q)</option>
-                    <option value="$">USD ($)</option>
-                </select>
-                <input type="number" id="shop-value-input" class="ag-input" style="flex:1;" placeholder="Monto" step="0.01" min="0">
-            </div>
-            <div class="edit-modal-row">
-                <select id="shop-payment-method-select" class="ag-input" style="flex:1;">
-                    <option value="">Sin asignar (Medio de Pago)</option>
-                </select>
-            </div>
-            <div class="edit-modal-row">
-                <input type="date" id="shop-date-input" class="ag-input" style="flex:1;" title="Fecha límite">
-            </div>
-            <div class="edit-modal-actions">
-                <button class="ag-btn ag-btn-ghost" id="new-shop-cancel-btn">Cancelar</button>
-                <button class="ag-btn ag-btn-primary" id="add-shop-btn">Añadir</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- MODAL NUEVO INGRESO -->
-    <div class="edit-modal-overlay" id="new-income-modal">
-        <div class="edit-modal-box">
-            <h3>💰 Nuevo Ingreso</h3>
-            <div class="edit-modal-row">
-                <input type="text" id="income-item-input" class="ag-input" style="flex:1;" placeholder="¿Cuál es el ingreso?">
-            </div>
-            <div class="edit-modal-row">
-                <select id="income-currency-select" class="ag-input ag-input-sm" style="flex:0 0 100px;">
-                    <option value="Q">GTQ (Q)</option>
-                    <option value="$">USD ($)</option>
-                </select>
-                <input type="number" id="income-value-input" class="ag-input" style="flex:1;" placeholder="Monto" step="0.01" min="0">
-            </div>
-            <div class="edit-modal-row">
-                <input type="date" id="income-date-input" class="ag-input" style="flex:1;" title="Fecha">
-            </div>
-            <div class="edit-modal-actions">
-                <button class="ag-btn ag-btn-ghost" id="new-income-cancel-btn">Cancelar</button>
-                <button class="ag-btn ag-btn-income" id="add-income-btn" style="background:#2ed573; color:#fff;">Añadir</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- MODAL NUEVA TAREA / RECORDATORIO -->
-    <div class="edit-modal-overlay" id="new-reminder-modal">
-        <div class="edit-modal-box" style="max-height: 85vh; overflow-y: auto;">
-            <h3>➕ Nuevo Recordatorio</h3>
-            <div class="edit-modal-row">
-                <input type="text" id="new-reminder-input" class="ag-input" style="flex:1;" placeholder="Nueva tarea o recordatorio...">
-                <button class="ag-btn ag-btn-ghost" id="paste-reminder" title="Pegar del portapapeles">📋</button>
-            </div>
-            <div class="edit-modal-row">
-                <input type="date" id="new-reminder-date" class="ag-input" style="flex:1;" title="Fecha límite">
-            </div>
-            <div class="edit-modal-row">
-                <input type="text" id="new-reminder-tag" class="ag-input" style="flex:1;" placeholder="Etiquetas (coma separadas)">
-            </div>
-            <div class="agenda-tags-helper" style="margin-top: 8px;">
-                <p class="agenda-tags-helper-title">Etiquetas de la tarea nueva:</p>
-                <div id="new-reminder-tag-current" class="agenda-tag-chip-list"></div>
-                <p class="agenda-tags-helper-title">Etiquetas existentes (clic para añadir):</p>
-                <div id="new-reminder-tag-available" class="agenda-tag-chip-list"></div>
-            </div>
-            <div class="edit-modal-actions">
-                <button class="ag-btn ag-btn-ghost" id="new-reminder-cancel-btn">Cancelar</button>
-                <button class="ag-btn ag-btn-primary" id="add-reminder-btn">Añadir</button>
-            </div>
-        </div>
-    </div>
-
-    <div class="edit-modal-overlay" id="edit-modal">
-        <div class="edit-modal-box">
-            <h3 id="edit-modal-title">Editar</h3>
-            <div class="edit-modal-row">
-                <input type="text" id="edit-text" class="ag-input" style="flex:1;" placeholder="Descripción">
-            </div>
-            <div class="edit-modal-row">
-                <input type="date" id="edit-date" class="ag-input" style="flex:1;" title="Fecha límite">
-            </div>
-            <div class="edit-modal-row" id="edit-tag-row" style="display:none;">
-                <input type="text" id="edit-tag" class="ag-input" style="flex:1;" placeholder="Etiquetas (coma separadas)">
-            </div>
-            <div id="edit-tag-helper" class="agenda-tags-helper" style="display:none; margin-top:-6px;">
-                <p class="agenda-tags-helper-title">Etiquetas de esta tarea:</p>
-                <div id="edit-reminder-tag-current" class="agenda-tag-chip-list"></div>
-                <p class="agenda-tags-helper-title">Etiquetas existentes (clic para añadir):</p>
-                <div id="edit-reminder-tag-available" class="agenda-tag-chip-list"></div>
-            </div>
-            <div class="edit-modal-row" id="edit-value-row">
-                <select id="edit-currency" class="ag-input ag-input-sm">
-                    <option value="Q">GTQ (Q)</option>
-                    <option value="$">USD ($)</option>
-                </select>
-                <input type="number" id="edit-value" class="ag-input" style="flex:1;" placeholder="Monto" step="0.01" min="0">
-            </div>
-            <div class="edit-modal-row" id="edit-payment-method-row" style="display:none;">
-                <select id="edit-payment-method" class="ag-input" style="flex:1;">
-                    <option value="">Sin asignar</option>
-                </select>
-            </div>
-            <div class="edit-modal-actions">
-                <button class="ag-btn ag-btn-ghost" id="edit-cancel-btn">Cancelar</button>
-                <button class="ag-btn ag-btn-primary" id="edit-save-btn">Guardar cambios</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- MODAL MEDIOS DE PAGO -->
-    <div class="pm-modal-overlay" id="pm-modal">
-        <div class="pm-modal-box">
-            <h3>⚙️ Medios de Pago</h3>
-            <div class="pm-exchange-row">
-                <label class="pm-exchange-label">Tasa de cambio: 1 US$ =</label>
-                <input type="number" id="pm-exchange-rate" class="ag-input pm-exchange-input" step="0.01" min="0.01" value="7.80">
-                <span class="pm-exchange-unit">Q</span>
-            </div>
-            <div id="pm-method-list" class="pm-method-list"></div>
-            <div class="pm-add-row">
-                <input type="text" id="pm-new-method-input" class="ag-input" style="flex:1;" placeholder="Nuevo método...">
-                <button class="ag-btn ag-btn-ghost" id="pm-add-method-btn">Agregar</button>
-            </div>
-            <div class="pm-modal-actions">
-                <button class="ag-btn ag-btn-ghost" id="pm-cancel-btn">Cancelar</button>
-                <button class="ag-btn ag-btn-primary" id="pm-save-btn">Guardar</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- ===== KANBAN MODAL ===== -->
-    <div class="kb-modal-overlay" id="kb-modal">
-        <div class="kb-modal-box">
-            <h3 id="kb-modal-title">Nueva tarjeta</h3>
-
-            <input type="text" id="kb-card-title" class="ag-input" placeholder="Título de la tarjeta *">
-            <div class="kb-desc-toolbar">
-                <button type="button" class="kb-desc-tool" id="kb-tool-bold" title="Negrita" aria-label="Negrita">
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15.6 10.79A4.21 4.21 0 0 0 12.4 3H6v18h7.2a4.8 4.8 0 0 0 2.4-9.21zM9 6h3.4a1.4 1.4 0 0 1 0 2.8H9V6zm4.2 12H9v-3.6h4.2a1.8 1.8 0 0 1 0 3.6z"/></svg>
-                </button>
-                <button type="button" class="kb-desc-tool" id="kb-tool-italic" title="Cursiva" aria-label="Cursiva">
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 4v3h2.21l-3.42 10H6v3h8v-3h-2.21l3.42-10H18V4z"/></svg>
-                </button>
-                <button type="button" class="kb-desc-tool" id="kb-tool-code" title="Código" aria-label="Código">
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.59 16.59 4 12l4.59-4.59L10 8.82 6.83 12 10 15.18zm6.82 0L14 15.18 17.17 12 14 8.82l1.41-1.41L20 12zm-6.98 3.12L11.17 4l2.24.4-2.74 15.71z"/></svg>
-                </button>
-                <button type="button" class="kb-desc-tool" id="kb-link-tool-btn" title="Agregar enlace" aria-label="Agregar enlace">
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.9 12a5 5 0 0 1 1.46-3.54l2.1-2.1a5 5 0 0 1 7.07 7.07l-1.4 1.4-1.42-1.42 1.4-1.4a3 3 0 1 0-4.24-4.24l-2.1 2.1a3 3 0 0 0 4.24 4.24l.35-.35 1.41 1.42-.35.35A5 5 0 0 1 3.9 12zm6.2 5.95 1.4-1.4 1.42 1.42-1.4 1.4a5 5 0 0 1-7.07-7.07l.35-.35 1.41 1.42-.35.35a3 3 0 0 0 4.24 4.24zm3.19-8.48 1.42 1.42-4.24 4.24-1.42-1.42z"/></svg>
-                </button>
-                <button type="button" class="kb-desc-tool" id="kb-tool-list" title="Lista" aria-label="Lista">
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h14v2H7zm0 6h14v2H7zm0 6h14v2H7zM3 6.5A1.5 1.5 0 1 0 3 3.5a1.5 1.5 0 0 0 0 3zm0 6A1.5 1.5 0 1 0 3 9.5a1.5 1.5 0 0 0 0 3zm0 6A1.5 1.5 0 1 0 3 15.5a1.5 1.5 0 0 0 0 3z"/></svg>
-                </button>
-            </div>
-            <div id="kb-link-popover" class="kb-link-popover">
-                <div class="kb-link-fields">
-                    <input type="text" id="kb-link-label" class="ag-input" placeholder="Texto del enlace" style="font-size:0.82rem;">
-                    <input type="text" id="kb-link-url" class="ag-input" placeholder="https://..." style="font-size:0.82rem;">
-                </div>
-                <div class="kb-link-actions">
-                    <button type="button" id="kb-link-cancel" class="kb-link-btn">Cancelar</button>
-                    <button type="button" id="kb-link-insert" class="kb-link-btn primary">Insertar</button>
-                </div>
-            </div>
-            <div id="kb-card-desc" class="ag-input kb-desc-input kb-desc-editor" contenteditable="true" data-placeholder="Descripción (opcional)"></div>
-
-            <div>
-                <div style="font-size:0.78rem; color:rgba(255,255,255,0.4); margin-bottom:8px; text-transform:uppercase; letter-spacing:0.06em;">Etiquetas</div>
-                <div class="kb-modal-label-row" id="kb-label-selector"></div>
-                <div class="kb-modal-new-label" style="margin-top:8px;">
-                    <input type="text" id="kb-new-label-input" class="ag-input" placeholder="Nueva etiqueta..." style="font-size:0.82rem; padding:6px 10px;">
-                    <button class="ag-btn ag-btn-ghost" id="kb-add-label-btn" style="padding:6px 12px; font-size:0.82rem; white-space:nowrap;">+ Agregar</button>
-                </div>
-            </div>
-
-            <div style="display:flex; gap:10px;">
-                <div style="flex:1; display:flex; flex-direction:column; gap:6px;">
-                    <div style="font-size:0.78rem; color:rgba(255,255,255,0.4); text-transform:uppercase; letter-spacing:0.06em;">Columna</div>
-                    <select id="kb-card-status" class="ag-input" style="font-size:0.85rem;">
-                        <option value="pending">Pendientes</option>
-                        <option value="inprogress">En Proceso</option>
-                        <option value="blocked">Detenidos</option>
-                        <option value="done">Hechos</option>
-                    </select>
-                </div>
-                <div style="flex:1; display:flex; flex-direction:column; gap:6px;">
-                    <div style="font-size:0.78rem; color:rgba(255,255,255,0.4); text-transform:uppercase; letter-spacing:0.06em;">Prioridad</div>
-                    <select id="kb-card-priority" class="ag-input" style="font-size:0.85rem;">
-                        <option value="high">🔺 Alta</option>
-                        <option value="medium" selected>🔸 Media</option>
-                        <option value="low">🔹 Baja</option>
-                    </select>
-                </div>
-                <div style="flex:1; display:flex; flex-direction:column; gap:6px;">
-                    <div style="font-size:0.78rem; color:rgba(255,255,255,0.4); text-transform:uppercase; letter-spacing:0.06em;">Fecha límite</div>
-                    <input type="date" id="kb-card-due" class="ag-input" style="font-size:0.85rem; color-scheme:dark;">
-                </div>
-            </div>
-
-            <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:4px;">
-                <button class="ag-btn ag-btn-ghost" id="kb-modal-cancel">Cancelar</button>
-                <button class="ag-btn ag-btn-primary" id="kb-modal-save">Guardar</button>
-            </div>
-        </div>
-    </div>
-
-
-    <!-- ===== MODAL CONTRASEÑAS ===== -->
-    <div class="pw-modal-overlay" id="pw-modal">
-        <div class="pw-modal-box">
-            <h3 id="pw-modal-title">Nueva contraseña</h3>
-            <div class="pw-type-selector">
-                <button class="pw-type-btn active" data-type="web">
-                    <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
-                    Sitio Web
-                </button>
-                <button class="pw-type-btn" data-type="app">
-                    <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M21 2H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h7l-2 3v1h8v-1l-2-3h7c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 12H3V4h18v10z"/></svg>
-                    Aplicación
-                </button>
-                <button class="pw-type-btn" data-type="db">
-                    <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M12 2C7.58 2 4 3.79 4 6v12c0 2.21 3.58 4 8 4s8-1.79 8-4V6c0-2.21-3.58-4-8-4zm0 2c3.31 0 6 .9 6 2s-2.69 2-6 2-6-.9-6-2 2.69-2 6-2zm0 16c-3.31 0-6-.9-6-2v-2.27c1.36.8 3.53 1.27 6 1.27s4.64-.47 6-1.27V18c0 1.1-2.69 2-6 2zm0-5c-3.31 0-6-.9-6-2v-2.27c1.36.8 3.53 1.27 6 1.27s4.64-.47 6-1.27V13c0 1.1-2.69 2-6 2z"/></svg>
-                    Base de datos
-                </button>
-            </div>
-            <div>
-                <label class="pw-modal-label" id="pw-name-label">Nombre *</label>
-                <input type="text" id="pw-name" class="ag-input" placeholder="ej: Google, Netflix, Banco…" style="width:100%;">
-            </div>
-            <div id="pw-url-row">
-                <label class="pw-modal-label" id="pw-url-label">URL</label>
-                <input type="text" id="pw-url" class="ag-input" placeholder="https://..." style="width:100%;">
-            </div>
-            <div id="pw-db-port-row" style="display:none;">
-                <label class="pw-modal-label" id="pw-db-port-label">Puerto</label>
-                <input type="text" id="pw-db-port" class="ag-input" placeholder="3306" style="width:100%;">
-            </div>
-            <div id="pw-db-name-row" style="display:none;">
-                <label class="pw-modal-label" id="pw-db-name-label">Base de datos</label>
-                <input type="text" id="pw-db-name" class="ag-input" placeholder="fundascout" style="width:100%;">
-            </div>
-            <div id="pw-db-type-row" style="display:none;">
-                <label class="pw-modal-label" id="pw-db-type-label">Tipo de base de datos</label>
-                <select id="pw-db-type" class="ag-input" style="width:100%;">
-                    <option value="mysql">MySQL</option>
-                    <option value="postgresql">PostgreSQL</option>
-                    <option value="mariadb">MariaDB</option>
-                    <option value="sqlite">SQLite</option>
-                    <option value="sqlserver">SQL Server</option>
-                    <option value="oracle">Oracle</option>
-                    <option value="other">Otro</option>
-                </select>
-            </div>
-            <div>
-                <label class="pw-modal-label" id="pw-username-label">Usuario / Correo *</label>
-                <input type="text" id="pw-username" class="ag-input" placeholder="usuario@ejemplo.com" style="width:100%;" autocomplete="off">
-            </div>
-            <div>
-                <label class="pw-modal-label">Contraseña *</label>
-                <div class="pw-pass-wrap">
-                    <input type="password" id="pw-password" class="ag-input" placeholder="••••••••" style="width:100%;" autocomplete="new-password">
-                    <div class="pw-pass-actions">
-                        <button class="pw-pass-icon-btn" id="pw-modal-toggle" title="Mostrar/ocultar">
-                            <svg id="pw-modal-eye-icon" viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
-                        </button>
-                        <button class="pw-pass-icon-btn" id="pw-modal-gen" title="Generar contraseña aleatoria">
-                            <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor"><path d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
-                        </button>
-                    </div>
-                </div>
-            </div>
-            <div>
-                <label class="pw-modal-label">Notas</label>
-                <textarea id="pw-notes" class="ag-input" rows="2" placeholder="Información adicional..." style="width:100%; resize:vertical; min-height:54px;"></textarea>
-            </div>
-            <div class="pw-modal-actions">
-                <button class="ag-btn ag-btn-ghost" id="pw-modal-cancel">Cancelar</button>
-                <button class="ag-btn ag-btn-primary" id="pw-modal-save">Guardar</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Explorador de Carpetas (Configuración) -->    <div id="cfg-folder-modal" class="pm-modal-overlay" style="z-index:10001;">
-        <div class="pm-modal-box" style="width:min(520px,92vw); max-height:80vh; overflow:hidden; display:flex; flex-direction:column; gap:0;">
-            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
-                <h3 style="font-size:1rem;">📂 Explorador de Carpetas</h3>
-                <button id="cfg-folder-close" style="background:none;border:none;color:rgba(255,255,255,0.5);font-size:1.4rem;cursor:pointer;line-height:1;">&times;</button>
-            </div>
-            <div id="cfg-folder-path" style="font-size:0.78rem; color:rgba(255,255,255,0.45); padding:6px 10px; background:rgba(0,0,0,0.3); border-radius:7px; margin-bottom:10px; font-family:monospace; word-break:break-all;">/</div>
-            <div id="cfg-folder-list" style="flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:4px; min-height:0; max-height:340px;"></div>
-            <div style="display:flex; gap:8px; margin-top:14px; justify-content:flex-end;">
-                <button class="ag-btn ag-btn-ghost" id="cfg-folder-cancel">Cancelar</button>
-                <button class="ag-btn ag-btn-primary" id="cfg-folder-select">Seleccionar esta carpeta</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Sistema global de confirmación y notificaciones (añadido al final del body) -->
-    <div id="global-confirm-modal" class="edit-modal-overlay">
-        <div class="edit-modal-box" style="max-width: 300px; text-align: center;">
-            <h3 id="global-confirm-title" style="margin-bottom: 10px;">Confirmar</h3>
-            <p id="global-confirm-msg" style="font-size: 0.9rem; color: #a0a0a8; margin-bottom: 20px;">¿Estás seguro?</p>
-            <div class="edit-modal-actions" style="justify-content: center;">
-                <button class="ag-btn ag-btn-ghost" id="global-confirm-cancel">Cancelar</button>
-                <button class="ag-btn ag-btn-primary" id="global-confirm-ok" style="background: rgba(255,71,87,0.2); color: #ff4757;">Eliminar</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="toast-container" style="position: fixed; bottom: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 10px;"></div>
-
-
-
-    <!-- MODAL OBSERVACIONES -->
-    <div class="obs-modal-overlay" id="obs-modal">
-        <div class="obs-modal-box">
-            <div class="obs-modal-header">
-                <h3 class="obs-modal-title">📝 Observaciones</h3>
-                <button class="obs-close-btn" id="obs-close-btn" title="Cerrar">✕</button>
-            </div>
-            <textarea id="obs-textarea" class="obs-textarea" placeholder="Escribe tus observaciones aquí..."></textarea>
-            <div class="obs-modal-actions">
-                <button class="ag-btn ag-btn-ghost" id="obs-cancel-btn">Cancelar</button>
-                <button class="ag-btn ag-btn-primary" id="obs-save-btn">Guardar</button>
-            </div>
-        </div>
-    </div>
-
-    <style>
         /* ===== Modal Observaciones ===== */
         .obs-modal-overlay {
             display: none;
@@ -2937,10 +2247,271 @@
         }
         .ag-notes-btn:hover { opacity: 1; background: rgba(255,255,255,0.07); }
         .ag-notes-btn.has-notes { opacity: 1; color: #f0a946; }
-    </style>
 
-    <script src="theme.js"></script>
-    <script src="agenda.js"></script>
-    <script src="ui_helpers.js"></script>
-</body>
-</html>
+        /* ─── TOAST NOTIFICATIONS PREMIUM ─── */
+        #toast-container {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            pointer-events: none;
+        }
+
+        .toast-notification {
+            pointer-events: auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 12px 20px;
+            border-radius: 10px;
+            color: #ffffff;
+            font-size: 0.88rem;
+            font-weight: 600;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.35);
+            min-width: 280px;
+            max-width: 420px;
+            backdrop-filter: blur(10px);
+            animation: toastSlideIn 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.1) forwards;
+            transition: all 0.3s ease;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .toast-notification.success {
+            background: rgba(46, 213, 115, 0.95);
+            border-left: 4px solid #10ac84;
+        }
+
+        .toast-notification.info {
+            background: rgba(108, 92, 231, 0.95);
+            border-left: 4px solid #5f27cd;
+        }
+
+        .toast-notification.error {
+            background: rgba(255, 107, 107, 0.95);
+            border-left: 4px solid #ee5253;
+        }
+
+        .toast-notification.hide {
+            animation: toastSlideOut 0.3s ease forwards;
+        }
+
+        .toast-close-btn {
+            background: none;
+            border: none;
+            color: #ffffff;
+            cursor: pointer;
+            font-size: 1rem;
+            padding: 2px;
+            opacity: 0.65;
+            transition: opacity 0.2s, transform 0.2s;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .toast-close-btn:hover {
+            opacity: 1;
+            transform: scale(1.15);
+        }
+
+        /* ─── CONFIRM MODAL GLASSMORPHISM ─── */
+        .global-confirm-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(10, 10, 12, 0.6);
+            backdrop-filter: blur(8px);
+            z-index: 10000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .global-confirm-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .global-confirm-box {
+            background: rgba(30, 31, 38, 0.85);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(20px);
+            border-radius: 14px;
+            padding: 24px;
+            width: 90%;
+            max-width: 380px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5);
+            transform: scale(0.9) translateY(10px);
+            transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.1);
+            text-align: center;
+        }
+
+        .global-confirm-overlay.active .global-confirm-box {
+            transform: scale(1) translateY(0);
+        }
+
+        .global-confirm-title {
+            font-size: 1.15rem;
+            font-weight: 700;
+            color: var(--ag-text);
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .global-confirm-message {
+            font-size: 0.9rem;
+            color: var(--ag-text-muted);
+            margin-bottom: 20px;
+            line-height: 1.4;
+        }
+
+        .global-confirm-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        .global-confirm-btn {
+            padding: 8px 18px;
+            border-radius: 8px;
+            font-size: 0.88rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: none;
+        }
+
+        .global-confirm-btn.cancel {
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            color: var(--ag-text);
+        }
+
+        .global-confirm-btn.cancel:hover {
+            background: rgba(255, 255, 255, 0.12);
+        }
+
+        .global-confirm-btn.confirm {
+            background: #ff7675;
+            color: #ffffff;
+        }
+
+        .global-confirm-btn.confirm:hover {
+            background: #ff6b6b;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(255, 118, 117, 0.3);
+        }
+
+        /* ─── ANIMACIONES CSS ─── */
+        @keyframes toastSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(30px) scale(0.9);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        @keyframes toastSlideOut {
+            from {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+            to {
+                opacity: 0;
+                transform: translateY(-20px) scale(0.9);
+            }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        /* Temas de color para inputs y botones de presupuesto */
+        .ag-btn-income:hover {
+            background: #2ed573 !important;
+            box-shadow: 0 4px 12px rgba(46, 213, 115, 0.2);
+            color: #fff !important;
+        }
+        
+        /* Balance */
+        .shop-total-combined.positive {
+            color: #2ed573 !important;
+        }
+        .shop-total-combined.negative {
+            color: #ff7675 !important;
+        }
+
+        /* ─── COLAPSABILIDAD Y RESPONSIVIDAD DE COLUMNAS DE PRESUPUESTO ─── */
+        .col-collapsed {
+            width: 0 !important;
+            min-width: 0 !important;
+            overflow: hidden !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            border: none !important;
+            opacity: 0 !important;
+            pointer-events: none !important;
+            transition: all 0.3s ease !important;
+        }
+
+        #budget-main-grid > div {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .col-toggle-btn {
+            transition: all 0.2s ease;
+        }
+
+        .col-toggle-btn:not(.active) {
+            background: rgba(255,255,255,0.03) !important;
+            border-color: rgba(255,255,255,0.08) !important;
+            color: var(--ag-text-muted) !important;
+            opacity: 0.5;
+        }
+
+        @media (max-width: 850px) {
+            #budget-main-grid {
+                grid-template-columns: 1fr !important;
+                height: auto !important;
+                overflow-y: auto !important;
+                gap: 16px !important;
+            }
+            .col-collapsed {
+                display: none !important;
+            }
+        }
+
+        /* Hover de Tarjetas de Presupuesto y Balances */
+        .budget-item {
+            transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s ease, background 0.2s ease !important;
+        }
+        .budget-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+            background: rgba(255, 255, 255, 0.04) !important;
+        }
+        .budget-balance-card {
+            transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s ease, border-color 0.2s ease !important;
+        }
+        .budget-balance-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35) !important;
+        }
+

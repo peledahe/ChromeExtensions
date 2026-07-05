@@ -5,21 +5,7 @@ window.showToast = (msg, type = 'success') => {
     if (!container) return;
     
     const toast = document.createElement('div');
-    
-    // Configurar diseño base del toast
-    toast.style.padding = '10px 20px';
-    toast.style.background = type === 'success' ? 'rgba(46, 204, 113, 0.95)' : 'rgba(108, 92, 231, 0.95)';
-    toast.style.color = '#fff';
-    toast.style.borderRadius = '8px';
-    toast.style.boxShadow = '0 4px 12px rgba(0,0,0,0.35)';
-    toast.style.fontSize = '0.88rem';
-    toast.style.opacity = '0';
-    toast.style.transform = 'translateY(20px)';
-    toast.style.transition = 'all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)';
-    toast.style.display = 'flex';
-    toast.style.alignItems = 'center';
-    toast.style.justifyContent = 'space-between';
-    toast.style.gap = '16px';
+    toast.className = `toast-notification ${type}`;
     
     const textSpan = document.createElement('span');
     textSpan.innerText = msg;
@@ -29,23 +15,12 @@ window.showToast = (msg, type = 'success') => {
     
     if (isSticky) {
         const closeBtn = document.createElement('button');
+        closeBtn.className = 'toast-close-btn';
         closeBtn.innerText = '✕';
-        closeBtn.style.background = 'none';
-        closeBtn.style.border = 'none';
-        closeBtn.style.color = '#fff';
-        closeBtn.style.cursor = 'pointer';
-        closeBtn.style.fontSize = '0.85rem';
-        closeBtn.style.padding = '2px';
-        closeBtn.style.opacity = '0.7';
-        closeBtn.style.transition = 'opacity 0.2s';
-        closeBtn.style.fontWeight = 'bold';
         
-        closeBtn.addEventListener('mouseenter', () => { closeBtn.style.opacity = '1'; });
-        closeBtn.addEventListener('mouseleave', () => { closeBtn.style.opacity = '0.7'; });
         closeBtn.onclick = (e) => {
             e.stopPropagation();
-            toast.style.opacity = '0';
-            toast.style.transform = 'translateY(20px)';
+            toast.classList.add('hide');
             setTimeout(() => toast.remove(), 300);
         };
         toast.appendChild(closeBtn);
@@ -53,16 +28,10 @@ window.showToast = (msg, type = 'success') => {
     
     container.appendChild(toast);
     
-    setTimeout(() => { 
-        toast.style.opacity = '1'; 
-        toast.style.transform = 'translateY(0)'; 
-    }, 10);
-    
     const duration = isSticky ? 6000 : 3000;
     setTimeout(() => {
         if (toast.parentNode) {
-            toast.style.opacity = '0';
-            toast.style.transform = 'translateY(20px)';
+            toast.classList.add('hide');
             setTimeout(() => toast.remove(), 300);
         }
     }, duration);
@@ -101,6 +70,16 @@ document.addEventListener('click', async (e) => {
                 const id = parseInt(el.dataset.id);
                 const done = el.dataset.done === 'true';
                 if (window.toggleReminder) await window.toggleReminder(id, done);
+                break;
+            }
+            case 'saveCapturedCred': {
+                const idx = parseInt(el.dataset.idx);
+                if (window.saveCapturedCred) window.saveCapturedCred(idx);
+                break;
+            }
+            case 'discardCapturedCred': {
+                const idx = parseInt(el.dataset.idx);
+                if (window.discardCapturedCred) await window.discardCapturedCred(idx);
                 break;
             }
             case 'openObsModal': {

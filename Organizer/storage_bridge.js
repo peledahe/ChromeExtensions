@@ -160,7 +160,7 @@
     get_shopping: async function() {
       return await storage.get('shopping', []);
     },
-    add_shopping: async function(text, val, cur, date, pm) {
+    add_shopping: async function(text, val, cur, date, pm, category) {
       const list = await storage.get('shopping', []);
       const newItem = {
         id: getNextId(list),
@@ -169,13 +169,14 @@
         currency: cur,
         dueDate: date,
         paymentMethod: pm,
+        category: category || 'Otros',
         done: false,
         notes: ''
       };
       list.unshift(newItem);
       await storage.set('shopping', list);
     },
-    update_shopping: async function(sid, text, val, cur, date, pm) {
+    update_shopping: async function(sid, text, val, cur, date, pm, category) {
       const list = await storage.get('shopping', []);
       const idx = list.findIndex(item => item.id === sid);
       if (idx !== -1) {
@@ -184,6 +185,7 @@
         list[idx].currency = cur;
         list[idx].dueDate = date;
         list[idx].paymentMethod = pm;
+        list[idx].category = category || 'Otros';
         await storage.set('shopping', list);
       }
     },
@@ -205,7 +207,7 @@
     get_income: async function() {
       return await storage.get('income', []);
     },
-    add_income: async function(text, val, cur, date) {
+    add_income: async function(text, val, cur, date, category) {
       const list = await storage.get('income', []);
       const newItem = {
         id: getNextId(list),
@@ -213,13 +215,14 @@
         value: Number(val) || 0,
         currency: cur,
         dueDate: date,
+        category: category || 'Otros',
         received: false,
         notes: ''
       };
       list.unshift(newItem);
       await storage.set('income', list);
     },
-    update_income: async function(iid, text, val, cur, date) {
+    update_income: async function(iid, text, val, cur, date, category) {
       const list = await storage.get('income', []);
       const idx = list.findIndex(item => item.id === iid);
       if (idx !== -1) {
@@ -227,6 +230,7 @@
         list[idx].value = Number(val) || 0;
         list[idx].currency = cur;
         list[idx].dueDate = date;
+        list[idx].category = category || 'Otros';
         await storage.set('income', list);
       }
     },
@@ -511,6 +515,37 @@
       list = list.filter(p => p.id !== pid);
       await storage.set('passwords', list);
     }
+  };
+
+  // Función utilitaria global para parsear JSON de forma segura
+  window.parseJSON = function(value, fallback) {
+    if (typeof value === 'object' && value !== null) return value;
+    try {
+      return value ? JSON.parse(value) : fallback;
+    } catch (_err) {
+      return fallback;
+    }
+  };
+
+  // Función utilitaria global para escapar caracteres HTML
+  window.escapeHtml = function(str) {
+    return String(str === undefined || str === null ? '' : str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  };
+
+  // Función utilitaria global para asignar texto a elementos del DOM
+  window.setTxt = function(id, value) {
+    const el = document.getElementById(id);
+    if (el) el.innerText = value;
+  };
+
+  // Función utilitaria global para serializar objetos de forma segura en atributos HTML
+  window.jsonStr = function(obj) {
+    return JSON.stringify(obj).replace(/'/g, '&#39;');
   };
 
   // Mock de QWebChannel para que agenda.js se cargue de inmediato

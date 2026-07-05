@@ -21,6 +21,7 @@ const state = {
     kbActiveLabel: null,
     notes: [],
     passwords: [],
+    capturedCredIndexToSave: null,
     exchangeRate: 7.8,
     paymentMethods: ['Efectivo', 'Tarjeta', 'Transferencia'],
     page: {
@@ -31,8 +32,8 @@ const state = {
     cfg: {
         videoEnabled: true,
         imagesEnabled: true,
-        shoppingEnabled: true,
-        incomeEnabled: true,
+        budgetEnabled: true,
+        debtsEnabled: true,
         kanbanEnabled: true,
         notesEnabled: true,
         arcadeEnabled: true,
@@ -85,8 +86,8 @@ const DB_NOTE_KEYS = ['DB_CONNECTION', 'DB_PORT', 'DB_DATABASE'];
 
 const MODULE_META = {
     agenda: { cfgKey: 'agendaEnabled', tab: 'agenda' },
-    shopping: { cfgKey: 'shoppingEnabled', tab: 'shopping' },
-    income: { cfgKey: 'incomeEnabled', tab: 'income' },
+    budget: { cfgKey: 'budgetEnabled', tab: 'budget' },
+    debts: { cfgKey: 'debtsEnabled', tab: 'debts' },
     kanban: { cfgKey: 'kanbanEnabled', tab: 'kanban' },
     notes: { cfgKey: 'notesEnabled', tab: 'notes' },
     passwords: { cfgKey: 'passwordsEnabled', tab: 'passwords' }
@@ -109,6 +110,8 @@ async function initApp() {
     renderMainCalendarIcon();
 
     await loadAppConfig();
+
+    if (window.initGDriveSync) window.initGDriveSync();
 
     const preferredTab = localStorage.getItem('lastAgendaTab') || 'notes';
     activateTab(preferredTab);
@@ -765,14 +768,7 @@ function toBool(v, fallback = true) {
     return v === '1' || v === 'true' || v === true;
 }
 
-function escapeHtml(str) {
-    return String(str)
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
-}
+
 
 function fmtNum(n) {
     return Number(n || 0).toLocaleString('en-US', {
@@ -790,17 +786,7 @@ function pmBadgeClass(method) {
     return 'pm-badge-default';
 }
 
-function parseJSON(value, fallback) {
-    try {
-        return JSON.parse(value);
-    } catch (_err) {
-        return fallback;
-    }
-}
 
-function jsonStr(obj) {
-    return JSON.stringify(obj).replace(/'/g, '&#39;');
-}
 
 function updateConfigHighlight(tabName) {
     const cfgBtn = document.getElementById('btn-config');
@@ -808,8 +794,8 @@ function updateConfigHighlight(tabName) {
 }
 
 function getTabFromCfgKey(cfgKey) {
-    if (cfgKey === 'shoppingEnabled') return 'shopping';
-    if (cfgKey === 'incomeEnabled') return 'income';
+    if (cfgKey === 'budgetEnabled') return 'budget';
+    if (cfgKey === 'debtsEnabled') return 'debts';
     if (cfgKey === 'kanbanEnabled') return 'kanban';
     if (cfgKey === 'notesEnabled') return 'notes';
     return '';
@@ -817,8 +803,8 @@ function getTabFromCfgKey(cfgKey) {
 
 function isTabVisible(tabName) {
     if (tabName === 'agenda') return state.cfg.agendaEnabled !== false;
-    if (tabName === 'shopping') return state.cfg.shoppingEnabled;
-    if (tabName === 'income') return state.cfg.incomeEnabled;
+    if (tabName === 'budget') return state.cfg.budgetEnabled !== false;
+    if (tabName === 'debts') return state.cfg.debtsEnabled !== false;
     if (tabName === 'kanban') return state.cfg.kanbanEnabled;
     if (tabName === 'notes') return state.cfg.notesEnabled;
     if (tabName === 'passwords') return state.cfg.passwordsEnabled !== false;
@@ -826,13 +812,13 @@ function isTabVisible(tabName) {
 }
 
 function getFirstVisibleTab() {
-    if (isTabVisible('agenda')) return 'agenda';
-    if (isTabVisible('shopping')) return 'shopping';
-    if (isTabVisible('income')) return 'income';
-    if (isTabVisible('kanban')) return 'kanban';
     if (isTabVisible('notes')) return 'notes';
+    if (isTabVisible('budget')) return 'budget';
+    if (isTabVisible('debts')) return 'debts';
+    if (isTabVisible('agenda')) return 'agenda';
+    if (isTabVisible('kanban')) return 'kanban';
     if (isTabVisible('passwords')) return 'passwords';
-    return 'agenda';
+    return 'notes';
 }
 
 function applyModuleFilters() {
@@ -845,8 +831,8 @@ function applyModuleFilters() {
     localStorage.setItem('deskio_app_settings', JSON.stringify({
         videoEnabled: state.cfg.videoEnabled,
         imagesEnabled: state.cfg.imagesEnabled,
-        shoppingEnabled: state.cfg.shoppingEnabled,
-        incomeEnabled: state.cfg.incomeEnabled,
+        budgetEnabled: state.cfg.budgetEnabled,
+        debtsEnabled: state.cfg.debtsEnabled,
         kanbanEnabled: state.cfg.kanbanEnabled,
         notesEnabled: state.cfg.notesEnabled,
         arcadeEnabled: state.cfg.arcadeEnabled,
@@ -865,8 +851,8 @@ function syncCfgFromInputs() {
     state.cfg.agendaEnabled = document.getElementById('cfg-agenda-enabled')?.checked !== false;
     state.cfg.videoEnabled = !!document.getElementById('cfg-video-enabled')?.checked;
     state.cfg.imagesEnabled = !!document.getElementById('cfg-images-enabled')?.checked;
-    state.cfg.shoppingEnabled = !!document.getElementById('cfg-shopping-enabled')?.checked;
-    state.cfg.incomeEnabled = !!document.getElementById('cfg-income-enabled')?.checked;
+    state.cfg.budgetEnabled = !!document.getElementById('cfg-budget-enabled')?.checked;
+    state.cfg.debtsEnabled = !!document.getElementById('cfg-debts-enabled')?.checked;
     state.cfg.kanbanEnabled = !!document.getElementById('cfg-kanban-enabled')?.checked;
     state.cfg.notesEnabled = !!document.getElementById('cfg-notes-enabled')?.checked;
     state.cfg.passwordsEnabled = document.getElementById('cfg-passwords-enabled')?.checked !== false;
@@ -887,8 +873,8 @@ async function loadAppConfig() {
         const [
             videoEnabled,
             imagesEnabled,
-            shoppingEnabled,
-            incomeEnabled,
+            budgetEnabled,
+            debtsEnabled,
             kanbanEnabled,
             notesEnabled,
             arcadeEnabled,
@@ -906,8 +892,8 @@ async function loadAppConfig() {
         ] = await Promise.all([
             py.get_config('videoEnabled'),
             py.get_config('imagesEnabled'),
-            py.get_config('shoppingEnabled'),
-            py.get_config('incomeEnabled'),
+            py.get_config('budgetEnabled'),
+            py.get_config('debtsEnabled'),
             py.get_config('kanbanEnabled'),
             py.get_config('notesEnabled'),
             py.get_config('arcadeEnabled'),
@@ -926,8 +912,8 @@ async function loadAppConfig() {
 
         state.cfg.videoEnabled = toBool(videoEnabled, true);
         state.cfg.imagesEnabled = toBool(imagesEnabled, true);
-        state.cfg.shoppingEnabled = toBool(shoppingEnabled, true);
-        state.cfg.incomeEnabled = toBool(incomeEnabled, true);
+        state.cfg.budgetEnabled = toBool(budgetEnabled, true);
+        state.cfg.debtsEnabled = toBool(debtsEnabled, true);
         state.cfg.kanbanEnabled = toBool(kanbanEnabled, true);
         state.cfg.notesEnabled = toBool(notesEnabled, true);
         state.cfg.arcadeEnabled = toBool(arcadeEnabled, true);
@@ -971,8 +957,8 @@ function fillConfigInputs() {
     setChecked('cfg-agenda-enabled', state.cfg.agendaEnabled !== false);
     setChecked('cfg-video-enabled', state.cfg.videoEnabled);
     setChecked('cfg-images-enabled', state.cfg.imagesEnabled);
-    setChecked('cfg-shopping-enabled', state.cfg.shoppingEnabled);
-    setChecked('cfg-income-enabled', state.cfg.incomeEnabled);
+    setChecked('cfg-budget-enabled', state.cfg.budgetEnabled);
+    setChecked('cfg-debts-enabled', state.cfg.debtsEnabled);
     setChecked('cfg-kanban-enabled', state.cfg.kanbanEnabled);
     setChecked('cfg-notes-enabled', state.cfg.notesEnabled);
     setChecked('cfg-passwords-enabled', state.cfg.passwordsEnabled !== false);
@@ -1005,8 +991,8 @@ async function saveAppConfig() {
         const writes = [
             py.set_config('videoEnabled', state.cfg.videoEnabled ? '1' : '0'),
             py.set_config('imagesEnabled', state.cfg.imagesEnabled ? '1' : '0'),
-            py.set_config('shoppingEnabled', state.cfg.shoppingEnabled ? '1' : '0'),
-            py.set_config('incomeEnabled', state.cfg.incomeEnabled ? '1' : '0'),
+            py.set_config('budgetEnabled', state.cfg.budgetEnabled ? '1' : '0'),
+            py.set_config('debtsEnabled', state.cfg.debtsEnabled ? '1' : '0'),
             py.set_config('kanbanEnabled', state.cfg.kanbanEnabled ? '1' : '0'),
             py.set_config('notesEnabled', state.cfg.notesEnabled ? '1' : '0'),
             py.set_config('arcadeEnabled', state.cfg.arcadeEnabled ? '1' : '0'),
@@ -1120,6 +1106,7 @@ function openEditModal(mode, item) {
     const tagHelper = document.getElementById('edit-tag-helper');
     const valRow = document.getElementById('edit-value-row');
     const pmRow = document.getElementById('edit-payment-method-row');
+    const catRow = document.getElementById('edit-category-row');
 
     if (title) {
         if (mode === 'reminder') title.textContent = 'Editar tarea';
@@ -1136,15 +1123,28 @@ function openEditModal(mode, item) {
         if (tagHelper) tagHelper.style.display = 'flex';
         if (valRow) valRow.style.display = 'none';
         if (pmRow) pmRow.style.display = 'none';
+        if (catRow) catRow.style.display = 'none';
         renderEditReminderTagHelper();
     } else {
         if (tagRow) tagRow.style.display = 'none';
         if (tagHelper) tagHelper.style.display = 'none';
         if (valRow) valRow.style.display = 'flex';
+        if (catRow) {
+            catRow.style.display = 'flex';
+            const catSelect = document.getElementById('edit-category');
+            if (catSelect && window.BUDGET_CATEGORIES) {
+                const cats = mode === 'shopping' ? window.BUDGET_CATEGORIES.expense : window.BUDGET_CATEGORIES.income;
+                catSelect.innerHTML = cats.map(c => `<option value="${c}">${c}</option>`).join('');
+                catSelect.value = item.category || (mode === 'shopping' ? 'Otros' : 'Salario');
+            }
+        }
         const editValue = document.getElementById('edit-value');
         const editCurrency = document.getElementById('edit-currency');
         if (editValue) editValue.value = item.value || '';
-        if (editCurrency) editCurrency.value = item.currency || 'Q';
+        if (editCurrency) {
+            const isSecond = item.currency === 'second' || item.currency === '$' || (window.currencyState && (item.currency === window.currencyState.secondSymbol || item.currency === window.currencyState.secondCode));
+            editCurrency.value = isSecond ? 'second' : 'local';
+        }
 
         if (mode === 'shopping') {
             if (pmRow) pmRow.style.display = 'flex';
@@ -1179,15 +1179,17 @@ async function saveEdit() {
             await fetchReminders(false);
         } else if (mode === 'shopping') {
             const val = parseFloat(document.getElementById('edit-value')?.value || '0') || 0;
-            const cur = document.getElementById('edit-currency')?.value || 'Q';
+            const cur = document.getElementById('edit-currency')?.value || 'local';
             const pm = document.getElementById('edit-payment-method')?.value || '';
-            await py.update_shopping(id, text, val, cur, date || '', pm);
-            await fetchShoppingList(false);
+            const category = document.getElementById('edit-category')?.value || 'Otros';
+            await py.update_shopping(id, text, val, cur, date || '', pm, category);
+            if (window.fetchBudget) window.fetchBudget();
         } else if (mode === 'income') {
             const val = parseFloat(document.getElementById('edit-value')?.value || '0') || 0;
-            const cur = document.getElementById('edit-currency')?.value || 'Q';
-            await py.update_income(id, text, val, cur, date || '');
-            await fetchIncomeList(false);
+            const cur = document.getElementById('edit-currency')?.value || 'local';
+            const category = document.getElementById('edit-category')?.value || 'Otros';
+            await py.update_income(id, text, val, cur, date || '', category);
+            if (window.fetchBudget) window.fetchBudget();
         }
 
         hideEditModal();
@@ -1220,8 +1222,12 @@ async function activateTab(tabName) {
     updateConfigHighlight(target);
 
     if (target === 'agenda') await fetchReminders();
-    else if (target === 'shopping') await fetchShoppingList();
-    else if (target === 'income') await fetchIncomeList();
+    else if (target === 'budget') {
+        if (window.fetchBudget) await window.fetchBudget();
+    }
+    else if (target === 'debts') {
+        if (window.fetchDebts) await window.fetchDebts();
+    }
     else if (target === 'kanban') await fetchKanban();
     else if (target === 'notes') await fetchNotes();
     else if (target === 'passwords') await pwLoad();
@@ -1550,35 +1556,37 @@ function renderPaymentSummary() {
 async function addShopping() {
     const text = (document.getElementById('shop-item-input')?.value || '').trim();
     const val = parseFloat(document.getElementById('shop-value-input')?.value || '');
-    const cur = document.getElementById('shop-currency-select')?.value || 'Q';
+    const cur = document.getElementById('shop-currency-select')?.value || 'local';
     const pm = document.getElementById('shop-payment-method-select')?.value || '';
     const date = document.getElementById('shop-date-input')?.value || '';
+    const category = document.getElementById('shop-category-select')?.value || 'Otros';
 
     if (!text || Number.isNaN(val)) return;
 
-    await py.add_shopping(text, val, cur, date, pm);
+    await py.add_shopping(text, val, cur, date, pm, category);
 
     document.getElementById('shop-item-input').value = '';
     document.getElementById('shop-value-input').value = '';
     if (document.getElementById('shop-payment-method-select')) document.getElementById('shop-payment-method-select').value = '';
     if (document.getElementById('shop-date-input')) document.getElementById('shop-date-input').value = '';
+    if (document.getElementById('shop-category-select')) document.getElementById('shop-category-select').value = 'Otros';
 
     document.getElementById('new-shop-modal')?.classList.remove('active');
 
     notify('Gasto registrado', 'success');
-    fetchShoppingList();
+    if (window.fetchBudget) window.fetchBudget();
 }
 
 async function toggleShopping(id, currentDone) {
     await py.toggle_shopping(id, !currentDone);
-    fetchShoppingList(false);
+    if (window.fetchBudget) window.fetchBudget();
 }
 
 async function deleteShopping(id) {
     window.showConfirm('¿Borrar gasto?', async (ok) => {
         if (!ok) return;
         await py.delete_shopping(id);
-        fetchShoppingList(false);
+        if (window.fetchBudget) window.fetchBudget();
     });
 }
 
@@ -1641,32 +1649,34 @@ function renderIncome() {
 async function addIncome() {
     const text = (document.getElementById('income-item-input')?.value || '').trim();
     const val = parseFloat(document.getElementById('income-value-input')?.value || '');
-    const cur = document.getElementById('income-currency-select')?.value || 'Q';
+    const cur = document.getElementById('income-currency-select')?.value || 'local';
     const date = document.getElementById('income-date-input')?.value || '';
+    const category = document.getElementById('income-category-select')?.value || 'Otros';
 
     if (!text || Number.isNaN(val)) return;
 
-    await py.add_income(text, val, cur, date);
+    await py.add_income(text, val, cur, date, category);
     document.getElementById('income-item-input').value = '';
     document.getElementById('income-value-input').value = '';
     if (document.getElementById('income-date-input')) document.getElementById('income-date-input').value = '';
+    if (document.getElementById('income-category-select')) document.getElementById('income-category-select').value = 'Salario';
 
     document.getElementById('new-income-modal')?.classList.remove('active');
 
     notify('Ingreso registrado', 'success');
-    fetchIncomeList();
+    if (window.fetchBudget) window.fetchBudget();
 }
 
 async function toggleIncome(id, currentReceived) {
     await py.toggle_income(id, !currentReceived);
-    fetchIncomeList(false);
+    if (window.fetchBudget) window.fetchBudget();
 }
 
 async function deleteIncome(id) {
     window.showConfirm('¿Borrar ingreso?', async (ok) => {
         if (!ok) return;
         await py.delete_income(id);
-        fetchIncomeList(false);
+        if (window.fetchBudget) window.fetchBudget();
     });
 }
 
@@ -2933,6 +2943,7 @@ async function pwLoad() {
             notes: p.notes || ''
         }));
         renderPasswords();
+        checkCapturedCredentials();
     } catch (err) {
         console.error('Error loading passwords:', err);
     }
@@ -3073,6 +3084,13 @@ async function savePassword() {
 
     if (!pw) return;
     await pw.upsert_password(state.pwEditId || 0, site, username, password, type, url, notes);
+    
+    // Si proviene de una credencial interceptada, descartarla del almacén temporal
+    if (state.capturedCredIndexToSave !== null && state.capturedCredIndexToSave !== undefined) {
+        await discardCapturedCredentialByIndex(state.capturedCredIndexToSave);
+        state.capturedCredIndexToSave = null;
+    }
+    
     closePasswordModal();
     notify('Contraseña guardada', 'success');
     pwLoad();
@@ -3086,6 +3104,91 @@ async function deletePassword(id) {
         pwLoad();
     });
 }
+
+function checkCapturedCredentials() {
+    const container = document.getElementById('pw-captured-container');
+    if (!container) return;
+
+    if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+        chrome.storage.local.get(['captured_credentials'], (result) => {
+            const list = result.captured_credentials || [];
+            if (list.length === 0) {
+                container.innerHTML = '';
+                return;
+            }
+            renderCapturedCredentials(list);
+        });
+    }
+}
+
+function renderCapturedCredentials(list) {
+    const container = document.getElementById('pw-captured-container');
+    if (!container) return;
+
+    container.innerHTML = list.map((cred, idx) => `
+        <div class="captured-cred-banner" style="background: rgba(108, 92, 231, 0.08); border: 1px dashed rgba(108, 92, 231, 0.4); border-radius: 10px; padding: 12px 16px; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; gap: 16px; animation: fadeIn 0.3s ease;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <span style="font-size: 1.4rem;">🔑</span>
+                <div>
+                    <div style="font-weight: 600; font-size: 0.92rem; color: var(--ag-text);">Nueva contraseña detectada en <span style="color: var(--ag-accent); font-weight: 700;">${escapeHtml(cred.domain)}</span></div>
+                    <div style="font-size: 0.82rem; color: var(--ag-text-muted);">Usuario: <strong>${escapeHtml(cred.username)}</strong></div>
+                </div>
+            </div>
+            <div style="display: flex; gap: 8px; flex-shrink: 0;">
+                <button class="ag-btn ag-btn-primary" style="padding: 6px 12px; font-size: 0.8rem; font-weight: 600;" data-action="saveCapturedCred" data-idx="${idx}">Guardar</button>
+                <button class="ag-btn" style="padding: 6px 12px; font-size: 0.8rem; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08);" data-action="discardCapturedCred" data-idx="${idx}">Descartar</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+async function discardCapturedCredentialByIndex(index) {
+    return new Promise((resolve) => {
+        if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+            chrome.storage.local.get(['captured_credentials'], (result) => {
+                let list = result.captured_credentials || [];
+                list.splice(index, 1);
+                chrome.storage.local.set({ captured_credentials: list }, () => {
+                    checkCapturedCredentials();
+                    resolve();
+                });
+            });
+        } else {
+            resolve();
+        }
+    });
+}
+
+window.saveCapturedCred = function(idx) {
+    if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+        chrome.storage.local.get(['captured_credentials'], (result) => {
+            const list = result.captured_credentials || [];
+            const cred = list[idx];
+            if (!cred) return;
+
+            state.capturedCredIndexToSave = idx;
+            
+            // Abrir el modal precargando los campos
+            openPasswordModal({
+                id: null,
+                site: cred.domain,
+                url: 'https://' + cred.domain,
+                username: cred.username,
+                password: cred.password,
+                type: 'web',
+                notes: 'Capturada automáticamente'
+            });
+        });
+    }
+};
+
+window.discardCapturedCred = async function(idx) {
+    await discardCapturedCredentialByIndex(idx);
+    notify('Sugerencia descartada', 'info');
+};
+
+window.checkCapturedCredentials = checkCapturedCredentials;
+
 
 function generatePassword(length) {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%*+-?';

@@ -1,0 +1,55 @@
+{
+  "manifest_version": 3,
+  "name": "Mk Agenda & Notas",
+  "short_name": "mk-agenda-notas",
+  "version": "2.0",
+  "description": "Organizador personal: agenda, presupuesto categorizado, deudas (Bola de Nieve), Kanban, notas y claves con sincronización en Google Drive.",
+  "permissions": [
+    "storage",
+    "identity",
+    "activeTab"
+  ],
+  "oauth2": {
+    "client_id": "488512596557-1r9q1ckjb5srjbvfp3s7enb7latu1uv0.apps.googleusercontent.com",
+    "scopes": [
+      "https://www.googleapis.com/auth/drive.file"
+    ]
+  },
+  "action": {
+    "default_title": "Abrir Mk Agenda & Notas",
+    "default_icon": {
+      "16": "icon16.png",
+      "48": "icon48.png",
+      "128": "icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "http://*/*",
+        "https://*/*"
+      ],
+      "js": [
+        "content_script.js"
+      ]
+    }
+  ],
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "organizer@merke.net",
+      "data_collection_permissions": {
+        "required": [
+          "none"
+        ]
+      }
+    }
+  }
+}
