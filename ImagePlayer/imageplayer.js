@@ -162,37 +162,6 @@
 
         q('ip-ctx-close').addEventListener('click', closeContextMenu);
 
-        // Aplicar como fondo de pantalla (solo en Linux y con puente de Python disponible)
-        q('ip-ctx-wallpaper').addEventListener('click', async () => {
-            const img = state.filtered.find((i) => i.path === contextImagePath);
-            closeContextMenu();
-            if (!img) return;
-
-            if (!py || !py.set_image_wallpaper) {
-                showNotification('Para cambiar el fondo de pantalla automáticamente, ejecuta el visor desde Minichrome.', 'info', true);
-                return;
-            }
-
-            try {
-                const raw = await py.get_image_settings();
-                const settings = JSON.parse(raw || '{}');
-                const rootPath = settings.imageMediaPath;
-                if (!rootPath) {
-                    showNotification('Por favor, configura la ruta absoluta en Minichrome.', 'info', true);
-                    return;
-                }
-                let absPath = `${rootPath.replace(/[\\/]+$/, '')}/${img.path}`;
-                if (rootPath.includes('\\')) {
-                    absPath = absPath.replace(/\//g, '\\');
-                }
-                const ok = await py.set_image_wallpaper(absPath);
-                showNotification(ok ? 'Fondo de pantalla aplicado exitosamente' : 'No se pudo aplicar el fondo', ok ? 'success' : 'error');
-            } catch (e) {
-                console.error(e);
-                showNotification('Error al aplicar el fondo de pantalla', 'error');
-            }
-        });
-
         // Descargar imagen
         q('ip-ctx-download').addEventListener('click', () => {
             const img = state.filtered.find((i) => i.path === contextImagePath);
@@ -363,12 +332,6 @@
     async function bootstrap() {
         await initWebChannel();
 
-        // Mostrar la opción de wallpaper solo si el sistema operativo es Linux
-        const isLinux = await checkIsLinux();
-        const wpBtn = q('ip-ctx-wallpaper');
-        if (wpBtn) {
-            wpBtn.style.display = isLinux ? 'flex' : 'none';
-        }
 
         // Cargar filtros del localStorage si existen
         state.settings.sortBy = localStorage.getItem('imageSortBy') || 'name-asc';

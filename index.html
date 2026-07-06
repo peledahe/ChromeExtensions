@@ -1,0 +1,1018 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mk Chrome Suite — Extensiones de Productividad y Multimedia</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #08080c;
+            --card-bg: rgba(25, 25, 35, 0.45);
+            --card-border: rgba(255, 255, 255, 0.08);
+            --text-primary: #f0f0f5;
+            --text-secondary: #a0a0b5;
+            --glow-organizer: rgba(139, 92, 246, 0.25);
+            --glow-screen: rgba(6, 182, 212, 0.25);
+            --glow-video: rgba(244, 63, 94, 0.25);
+            --glow-image: rgba(245, 158, 11, 0.25);
+            --glow-screenshot: rgba(16, 185, 129, 0.25);
+            --glow-arcade: rgba(234, 179, 8, 0.25);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            font-family: 'Inter', sans-serif;
+            overflow-x: hidden;
+            line-height: 1.6;
+        }
+
+        h1, h2, h3, .font-outfit {
+            font-family: 'Outfit', sans-serif;
+        }
+
+        /* Background Decorative Gradients */
+        .bg-gradient-radial {
+            position: fixed;
+            width: 100vw;
+            height: 100vh;
+            top: 0;
+            left: 0;
+            background: 
+                radial-gradient(circle at 10% 20%, rgba(139, 92, 246, 0.05) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(6, 182, 212, 0.05) 0%, transparent 40%),
+                radial-gradient(circle at 50% 50%, rgba(8, 8, 12, 1) 0%, rgba(8, 8, 12, 1) 100%);
+            z-index: -2;
+        }
+
+        .grid-overlay {
+            position: fixed;
+            width: 100vw;
+            height: 100vh;
+            top: 0;
+            left: 0;
+            background-image: linear-gradient(rgba(255, 255, 255, 0.007) 1px, transparent 1px),
+                              linear-gradient(90deg, rgba(255, 255, 255, 0.007) 1px, transparent 1px);
+            background-size: 50px 50px;
+            z-index: -1;
+        }
+
+        /* Container */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 24px;
+        }
+
+        /* Header / Navbar */
+        header {
+            padding: 24px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: rgba(8, 8, 12, 0.8);
+        }
+
+        .nav-wrapper {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            text-decoration: none;
+            background: linear-gradient(135deg, #a78bfa 0%, #22d3ee 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 24px;
+            list-style: none;
+        }
+
+        .nav-links a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.95rem;
+            transition: color 0.3s;
+        }
+
+        .nav-links a:hover {
+            color: #fff;
+        }
+
+        .btn-console {
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.2) 0%, rgba(6, 182, 212, 0.2) 100%);
+            border: 1px solid rgba(139, 92, 246, 0.4);
+            color: #fff;
+            padding: 10px 20px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.9rem;
+            transition: all 0.3s;
+            backdrop-filter: blur(5px);
+        }
+
+        .btn-console:hover {
+            border-color: #22d3ee;
+            box-shadow: 0 0 15px rgba(34, 211, 238, 0.3);
+            transform: translateY(-2px);
+        }
+
+        /* Hero Section */
+        .hero {
+            padding: 80px 0 40px 0;
+            text-align: center;
+        }
+
+        .badge {
+            background: rgba(139, 92, 246, 0.1);
+            border: 1px solid rgba(139, 92, 246, 0.3);
+            color: #c084fc;
+            padding: 6px 16px;
+            border-radius: 99px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            display: inline-block;
+            margin-bottom: 20px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            box-shadow: 0 0 10px rgba(139, 92, 246, 0.1);
+        }
+
+        .hero h1 {
+            font-size: 3.5rem;
+            font-weight: 700;
+            letter-spacing: -1px;
+            margin-bottom: 20px;
+            line-height: 1.2;
+        }
+
+        .hero h1 span {
+            background: linear-gradient(135deg, #c084fc 0%, #6366f1 50%, #22d3ee 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .hero p {
+            font-size: 1.2rem;
+            color: var(--text-secondary);
+            max-width: 700px;
+            margin: 0 auto 40px auto;
+        }
+
+        /* Banner Showcase */
+        .banner-showcase {
+            position: relative;
+            margin-bottom: 80px;
+            border-radius: 20px;
+            overflow: hidden;
+            border: 1px solid var(--card-border);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+            background: rgba(25, 25, 35, 0.2);
+        }
+
+        .banner-showcase img {
+            width: 100%;
+            height: auto;
+            display: block;
+            object-fit: cover;
+        }
+
+        /* Section Title */
+        .section-header {
+            text-align: center;
+            margin-bottom: 60px;
+        }
+
+        .section-header h2 {
+            font-size: 2.2rem;
+            font-weight: 700;
+            margin-bottom: 12px;
+        }
+
+        .section-header p {
+            color: var(--text-secondary);
+            font-size: 1.05rem;
+        }
+
+        /* Grid */
+        .extensions-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+            gap: 30px;
+            margin-bottom: 100px;
+        }
+
+        /* Card styles */
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 16px;
+            padding: 30px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
+            position: relative;
+            backdrop-filter: blur(12px);
+            height: 380px;
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border-radius: 16px;
+            background: radial-gradient(circle at top right, var(--glow-color, rgba(255,255,255,0.05)), transparent 60%);
+            opacity: 0;
+            transition: opacity 0.4s;
+            z-index: -1;
+        }
+
+        .card:hover {
+            transform: translateY(-8px);
+            border-color: rgba(255, 255, 255, 0.15);
+            box-shadow: 0 10px 30px -10px var(--glow-color);
+        }
+
+        .card:hover::before {
+            opacity: 1;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 20px;
+        }
+
+        .card-icon-wrapper {
+            width: 54px;
+            height: 54px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            color: var(--icon-color, #fff);
+            font-size: 1.8rem;
+        }
+
+        .card-version {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--icon-color);
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            padding: 4px 10px;
+            border-radius: 20px;
+        }
+
+        .card-body h3 {
+            font-size: 1.35rem;
+            font-weight: 700;
+            margin-bottom: 12px;
+            color: #fff;
+        }
+
+        .card-body p {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+            margin-bottom: 20px;
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .card-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: auto;
+        }
+
+        .btn-more {
+            background: none;
+            border: none;
+            color: var(--text-primary);
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: color 0.3s;
+        }
+
+        .btn-more:hover {
+            color: var(--icon-color);
+        }
+
+        .btn-more svg {
+            transition: transform 0.3s;
+        }
+
+        .btn-more:hover svg {
+            transform: translateX(4px);
+        }
+
+        .btn-install {
+            color: #fff;
+            text-decoration: none;
+            font-size: 0.85rem;
+            font-weight: 600;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 8px 16px;
+            border-radius: 8px;
+            transition: all 0.3s;
+        }
+
+        .btn-install:hover {
+            background: var(--icon-color);
+            border-color: var(--icon-color);
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.1);
+        }
+
+        /* Modal / Overlay Detail Dialog */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(5, 5, 8, 0.85);
+            backdrop-filter: blur(15px);
+            z-index: 500;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .modal.active {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .modal-content {
+            background: #0e0e15;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 24px;
+            max-width: 650px;
+            width: 100%;
+            padding: 40px;
+            transform: scale(0.95);
+            transition: transform 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
+            position: relative;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .modal.active .modal-content {
+            transform: scale(1);
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 24px;
+            right: 24px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            color: #fff;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 1.1rem;
+            transition: all 0.3s;
+        }
+
+        .modal-close:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: rotate(90deg);
+        }
+
+        .modal-header {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .modal-title-wrap h3 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #fff;
+        }
+
+        .modal-features {
+            margin-bottom: 30px;
+        }
+
+        .modal-features h4 {
+            font-size: 1.05rem;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: #fff;
+            border-left: 3px solid var(--theme-color);
+            padding-left: 10px;
+        }
+
+        .modal-features ul {
+            list-style: none;
+            padding-left: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .modal-features li {
+            position: relative;
+            padding-left: 20px;
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+        }
+
+        .modal-features li::before {
+            content: '✓';
+            position: absolute;
+            left: 0;
+            color: var(--theme-color);
+            font-weight: 700;
+        }
+
+        .modal-permissions {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 30px;
+        }
+
+        .modal-permissions h4 {
+            font-size: 0.95rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #fff;
+        }
+
+        .modal-permissions p {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        .modal-action-btn {
+            display: block;
+            width: 100%;
+            text-align: center;
+            background: var(--theme-color);
+            color: #fff;
+            text-decoration: none;
+            padding: 14px;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 0.95rem;
+            transition: all 0.3s;
+        }
+
+        .modal-action-btn:hover {
+            box-shadow: 0 0 15px var(--theme-color);
+            filter: brightness(1.1);
+        }
+
+        /* Footer */
+        footer {
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            padding: 60px 0;
+            text-align: center;
+            background: rgba(5, 5, 8, 0.5);
+            backdrop-filter: blur(10px);
+        }
+
+        .footer-logo {
+            font-size: 1.3rem;
+            font-weight: 700;
+            margin-bottom: 20px;
+            background: linear-gradient(135deg, #a78bfa 0%, #22d3ee 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            display: inline-block;
+        }
+
+        .footer-desc {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            max-width: 500px;
+            margin: 0 auto 30px auto;
+        }
+
+        .footer-links {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            list-style: none;
+            margin-bottom: 30px;
+        }
+
+        .footer-links a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: color 0.3s;
+        }
+
+        .footer-links a:hover {
+            color: #fff;
+        }
+
+        .copyright {
+            font-size: 0.8rem;
+            color: rgba(255, 255, 255, 0.2);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .hero h1 {
+                font-size: 2.5rem;
+            }
+            .hero p {
+                font-size: 1.05rem;
+            }
+            .nav-links {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="bg-gradient-radial"></div>
+    <div class="grid-overlay"></div>
+
+    <header>
+        <div class="container nav-wrapper">
+            <a href="#" class="logo font-outfit">Mk Extensions</a>
+            <ul class="nav-links">
+                <li><a href="#extensions">Extensiones</a></li>
+                <li><a href="#privacy">Privacidad</a></li>
+                <li><a href="#" id="link-privacy-policy">Política de Privacidad</a></li>
+            </ul>
+            <a href="https://chrome.google.com/webstore/devconsole/43564c73-7a3f-4d6f-b5d5-b1f2de2d32bf" target="_blank" class="btn-console">Developer Console</a>
+        </div>
+    </header>
+
+    <main class="container">
+        <!-- Hero Section -->
+        <section class="hero">
+            <div class="badge">Manifest V3 Ecosistema</div>
+            <h1>Empodera tu navegador con la suite <br><span>Mk Chrome Extensions</span></h1>
+            <p>Herramientas ligeras, optimizadas y totalmente privadas diseñadas para organizar tus finanzas, gestionar tus archivos multimedia locales y jugar clásicos retro.</p>
+            
+            <div class="banner-showcase">
+                <img src="assets/suite_banner.png" alt="Showcase de Mk Chrome Suite">
+            </div>
+        </section>
+
+        <!-- Extensions Section -->
+        <section id="extensions">
+            <div class="section-header">
+                <h2>Catálogo de Extensiones</h2>
+                <p>Haz clic en "Ver Detalles" para conocer más sobre sus características y justificaciones de privacidad.</p>
+            </div>
+
+            <div class="extensions-grid">
+                <!-- 1. Mk Organizer -->
+                <div class="card" style="--glow-color: var(--glow-organizer); --icon-color: #a78bfa;" data-ext="organizer">
+                    <div class="card-header">
+                        <div class="card-icon-wrapper">📅</div>
+                        <span class="card-version">v1.1</span>
+                    </div>
+                    <div class="card-body">
+                        <h3>Mk Organizer</h3>
+                        <p>Tu asistente definitivo: presupuesto mensual categorizado (proyectado/confirmado), planificador de deudas por Bola de Nieve, metas de ahorro multi-moneda, Kanban y gestor de claves.</p>
+                    </div>
+                    <div class="card-footer">
+                        <button class="btn-more">
+                            Ver Detalles
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+                        </button>
+                        <a href="https://chromewebstore.google.com/detail/mk-agenda-notas/phebjjgpcneapmgppmppicefookimdfk?hl=es-419&authuser=0" target="_blank" class="btn-install">Instalar</a>
+                    </div>
+                </div>
+
+                <!-- 2. Mk 2xScreen -->
+                <div class="card" style="--glow-color: var(--glow-screen); --icon-color: #22d3ee;" data-ext="twoscreen">
+                    <div class="card-header">
+                        <div class="card-icon-wrapper">🖥️</div>
+                        <span class="card-version">v1.1</span>
+                    </div>
+                    <div class="card-body">
+                        <h3>Mk 2xScreen</h3>
+                        <p>Simula una pantalla de doble ancho sin bordes nativos. Maximiza tu escritorio y gestiona múltiples pestañas mediante una barra flotante e inteligente tipo Minichrome.</p>
+                    </div>
+                    <div class="card-footer">
+                        <button class="btn-more">
+                            Ver Detalles
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+                        </button>
+                        <a href="https://chromewebstore.google.com/detail/mk-2xscreen/jhddmkehgmagebjjifoppgbdmedcnknd?hl=es-419&authuser=0" target="_blank" class="btn-install">Instalar</a>
+                    </div>
+                </div>
+
+                <!-- 3. Mk VideoPlayer -->
+                <div class="card" style="--glow-color: var(--glow-video); --icon-color: #f43f5e;" data-ext="videoplayer">
+                    <div class="card-header">
+                        <div class="card-icon-wrapper">🎬</div>
+                        <span class="card-version">v1.1</span>
+                    </div>
+                    <div class="card-body">
+                        <h3>Mk VideoPlayer</h3>
+                        <p>Reproductor multimedia interactivo de archivos de video locales en memoria y transmisiones HLS (.m3u8). Soporta playlists, historial de progreso y etiquetas personalizadas.</p>
+                    </div>
+                    <div class="card-footer">
+                        <button class="btn-more">
+                            Ver Detalles
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+                        </button>
+                        <a href="https://chromewebstore.google.com/detail/mk-videoplayer/icbdlconfggomjahkjogeifimddnampi?hl=es-419&authuser=0" target="_blank" class="btn-install">Instalar</a>
+                    </div>
+                </div>
+
+                <!-- 4. Mk Visor de Imágenes -->
+                <div class="card" style="--glow-color: var(--glow-image); --icon-color: #f59e0b;" data-ext="imageplayer">
+                    <div class="card-header">
+                        <div class="card-icon-wrapper">🖼️</div>
+                        <span class="card-version">v1.1</span>
+                    </div>
+                    <div class="card-body">
+                        <h3>Mk Visor de Imágenes</h3>
+                        <p>Explora y organiza directorios locales de imágenes mediante la File System Access API nativa. Realiza renombrados, desplazamientos y eliminaciones 100% de manera local.</p>
+                    </div>
+                    <div class="card-footer">
+                        <button class="btn-more">
+                            Ver Detalles
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+                        </button>
+                        <a href="https://chromewebstore.google.com/detail/mk-visor-de-im%C3%A1genes/aifhjgdmiigpkklmbjpokbkdjgojkgbb?hl=es-419&authuser=0" target="_blank" class="btn-install">Instalar</a>
+                    </div>
+                </div>
+
+                <!-- 5. Mk ScreenShot -->
+                <div class="card" style="--glow-color: var(--glow-screenshot); --icon-color: #10b981;" data-ext="screenshot">
+                    <div class="card-header">
+                        <div class="card-icon-wrapper">✂️</div>
+                        <span class="card-version">v1.1</span>
+                    </div>
+                    <div class="card-body">
+                        <h3>Mk ScreenShot</h3>
+                        <p>Captura la pestaña actual del navegador y añade formas geométricas, flechas guías, difuminados de privacidad (blur) o notas flotantes antes de guardar.</p>
+                    </div>
+                    <div class="card-footer">
+                        <button class="btn-more">
+                            Ver Detalles
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+                        </button>
+                        <a href="https://chromewebstore.google.com/detail/mk-screenshot/fieajpanbbbpobmfajnbpgeolicijojd?hl=es-419&authuser=0" target="_blank" class="btn-install">Instalar</a>
+                    </div>
+                </div>
+
+                <!-- 6. Mk Arcade -->
+                <div class="card" style="--glow-color: var(--glow-arcade); --icon-color: #eab308;" data-ext="arcade">
+                    <div class="card-header">
+                        <div class="card-icon-wrapper">👾</div>
+                        <span class="card-version">v1.0</span>
+                    </div>
+                    <div class="card-body">
+                        <h3>Mk Arcade</h3>
+                        <p>Tu sala de juegos clásicos de 8-bits: Space Invaders, Asteroids y Trench Run. Guardado persistente de puntajes altos de forma local, 100% offline y sin anuncios.</p>
+                    </div>
+                    <div class="card-footer">
+                        <button class="btn-more">
+                            Ver Detalles
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+                        </button>
+                        <a href="#" class="btn-install">Instalar</a>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Global Privacy Section in Page -->
+    <section id="privacy" style="background: rgba(255, 255, 255, 0.01); border-top: 1px solid rgba(255,255,255,0.05); padding: 80px 0;">
+        <div class="container" style="max-width: 800px; text-align: center;">
+            <div class="section-header" style="margin-bottom: 40px;">
+                <h2>Compromiso de Privacidad Absoluta</h2>
+                <p>Nuestra filosofía de desarrollo se centra en la autonomía y seguridad del usuario.</p>
+            </div>
+            <p style="color: var(--text-secondary); margin-bottom: 30px; font-size: 1.05rem;">
+                Ninguna de las extensiones de la suite **Mk** recopila, almacena ni transmite tus datos a servidores externos. Todo el procesamiento se realiza de manera local en tu navegador mediante bases de datos aisladas.
+                La sincronización con la nube (en las extensiones soportadas) utiliza canales seguros de comunicación donde únicamente tú tienes el control y acceso mediante tus credenciales privadas.
+            </p>
+            <button id="btn-privacy-full" class="btn-console" style="display: inline-block; cursor: pointer; border: none;">Ver Política de Privacidad Completa</button>
+        </div>
+    </section>
+
+    <footer>
+        <div class="container">
+            <span class="footer-logo font-outfit">Mk Chrome Suite</span>
+            <p class="footer-desc">Una suite unificada de extensiones Manifest V3 ligeras e independientes diseñadas para potenciar tu navegador. Creado por <strong>Perry Daniels</strong>.</p>
+            <ul class="footer-links">
+                <li><a href="#extensions">Extensiones</a></li>
+                <li><a href="#" id="link-privacy-footer">Política de Privacidad</a></li>
+                <li><a href="https://chrome.google.com/webstore/devconsole/43564c73-7a3f-4d6f-b5d5-b1f2de2d32bf" target="_blank">Google Dev Console</a></li>
+            </ul>
+            <p class="copyright">&copy; 2026 Mk Chrome Suite. Todos los derechos reservados. Desarrollado bajo estándares seguros locales por Perry Daniels.</p>
+        </div>
+    </footer>
+
+    <!-- Overlay Dialog (Modal) -->
+    <div class="modal" id="detail-modal">
+        <div class="modal-content">
+            <button class="modal-close">&times;</button>
+            <div class="modal-header">
+                <div class="card-icon-wrapper" id="modal-icon" style="font-size: 2.2rem; width: 64px; height: 64px;">📁</div>
+                <div class="modal-title-wrap">
+                    <h3 id="modal-title">Nombre de la Extensión</h3>
+                    <span id="modal-ver" class="card-version" style="display: inline-block; margin-top: 4px;">v1.0</span>
+                </div>
+            </div>
+            <div class="modal-features">
+                <h4 id="modal-accent-header">Características Principales</h4>
+                <ul id="modal-list">
+                    <!-- Dinámico -->
+                </ul>
+            </div>
+            <div class="modal-permissions" id="modal-perm-box">
+                <h4>🔒 Justificación de Permisos (CWS)</h4>
+                <p id="modal-perm-desc">Descripción de permisos de la extensión.</p>
+            </div>
+            <a href="#" class="modal-action-btn" id="modal-action">Instalar Extensión</a>
+        </div>
+    </div>
+
+    <!-- Privacy Policy Modal -->
+    <div class="modal" id="privacy-modal">
+        <div class="modal-content" style="max-width: 750px; --theme-color: #10b981;">
+            <button class="modal-close" id="privacy-close">&times;</button>
+            <div class="modal-header">
+                <div class="card-icon-wrapper" style="font-size: 2.2rem; width: 64px; height: 64px; --icon-color: #10b981; background: rgba(16,185,129,0.1);">🔒</div>
+                <div class="modal-title-wrap">
+                    <h3>Política de Privacidad</h3>
+                    <span class="card-version" style="display: inline-block; margin-top: 4px; color: #10b981;">Suite Mk Extensions</span>
+                </div>
+            </div>
+            <div style="color: var(--text-secondary); font-size: 0.95rem; display: flex; flex-direction: column; gap: 20px; line-height: 1.7; overflow-y: auto; max-height: 60vh; padding-right: 10px; text-align: left;">
+                <p>Esta política de privacidad describe cómo se maneja la información en las extensiones de Chrome desarrolladas para este ecosistema, incluyendo <strong>Mk 2xScreen</strong>, <strong>Mk VideoPlayer</strong>, <strong>Mk Visor de Imágenes (ImagePlayer)</strong>, <strong>Mk Organizer</strong> y <strong>Mk ScreenShot</strong>.</p>
+                
+                <div>
+                    <h4 style="color: #fff; margin-bottom: 8px; font-size: 1.1rem;">1. Recopilación de Información</h4>
+                    <p><strong>Ninguna de nuestras extensiones recopila, almacena, rastrea ni comparte datos personales, información de navegación ni ningún tipo de información sensible del usuario.</strong> El desarrollo está estructurado bajo la filosofía de privacidad absoluta y autonomía del usuario.</p>
+                </div>
+
+                <div>
+                    <h4 style="color: #fff; margin-bottom: 8px; font-size: 1.1rem;">2. Almacenamiento Local (Local Only)</h4>
+                    <p>Toda la información y configuraciones introducidas por el usuario (como claves del gestor de contraseñas, presupuestos, deudas, tableros Kanban, historial de videos, favoritos de navegación, etc.) se almacenan localmente de manera segura en el navegador del usuario a través de la API <code>chrome.storage.local</code>.</p>
+                    <p>No existe ningún servidor externo de nuestra parte que reciba, procese o guarde estos datos.</p>
+                </div>
+
+                <div>
+                    <h4 style="color: #fff; margin-bottom: 8px; font-size: 1.1rem;">3. Sincronización en la Nube</h4>
+                    <p>Algunas extensiones (como <code>Mk Organizer</code>) permiten al usuario realizar una sincronización voluntaria en la nube:</p>
+                    <ul style="list-style: disc; padding-left: 20px; margin-top: 8px; display: flex; flex-direction: column; gap: 6px;">
+                        <li>Esta sincronización se realiza de manera segura y directa a la cuenta personal de Google Drive del propio usuario mediante la API OAuth 2.0.</li>
+                        <li>La extensión únicamente crea y accede a un archivo específico llamado <code>mkorganizer_data.json</code> dentro de tu espacio privado de Google Drive.</li>
+                        <li>De nuestra parte, no se tiene acceso a tus credenciales de Google ni a los datos almacenados en dicho archivo.</li>
+                    </ul>
+                </div>
+
+                <div>
+                    <h4 style="color: #fff; margin-bottom: 8px; font-size: 1.1rem;">4. Cambios en esta Política</h4>
+                    <p>Nos reservamos el derecho de actualizar esta política de privacidad si se añaden funciones a la suite de extensiones. No obstante, el principio de privacidad absoluta, almacenamiento estrictamente local y nula recolección de datos permanecerá inmutable.</p>
+                </div>
+
+                <div style="background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: 12px; padding: 16px; margin-top: 10px;">
+                    <h4 style="color: #fff; margin-bottom: 6px; font-size: 1rem;">Contacto del Desarrollador</h4>
+                    <p>Para resolver cualquier duda relacionada con las extensiones o su política de privacidad, puedes contactar al desarrollador oficial:</p>
+                    <p style="margin-top: 6px; font-weight: 600; color: #fff;">Autor: Perry Daniels</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Data for dynamic modals
+        const extensionData = {
+            organizer: {
+                title: "Mk Organizer",
+                icon: "📅",
+                version: "v1.1",
+                color: "#a78bfa",
+                link: "https://chromewebstore.google.com/detail/mk-agenda-notas/phebjjgpcneapmgppmppicefookimdfk?hl=es-419&authuser=0",
+                features: [
+                    "Presupuesto categorizado interactivo con barra de progreso dual.",
+                    "Planificador inteligente de deudas usando el método Bola de Nieve.",
+                    "Planificación de metas de ahorro multi-moneda (Q / US$) asociadas al presupuesto.",
+                    "Tablero de tareas visual e interactivo estilo Kanban (drag & drop).",
+                    "Agenda y calendario interactivo de tareas y recordatorios.",
+                    "Gestor de claves y contraseñas local con autocompletado nativo.",
+                    "Sincronización en la nube opcional y encriptada en Google Drive (OAuth 2.0)."
+                ],
+                permissions: "Requiere 'storage' (guardado de bases de datos), 'activeTab' (sugerir y rellenar contraseñas) e 'identity' (sincronización voluntaria con Google Drive). Los permisos de Host se utilizan localmente para capturar e interceptar inicios de sesión y ofrecer guardado."
+            },
+            twoscreen: {
+                title: "Mk 2xScreen",
+                icon: "🖥️",
+                version: "v1.1",
+                color: "#22d3ee",
+                link: "https://chromewebstore.google.com/detail/mk-2xscreen/jhddmkehgmagebjjifoppgbdmedcnknd?hl=es-419&authuser=0",
+                features: [
+                    "Simulación de monitor panorámico dual sin bordes de ventana molestos.",
+                    "Barra de direcciones flotante e inteligente tipo Minichrome.",
+                    "Navegación completa con botones de ir atrás, adelante, actualizar e historial.",
+                    "Control de favoritos locales y zoom adaptable mediante atajos.",
+                    "Integración directa con complementos de vídeo, imágenes y capturas de la suite."
+                ],
+                permissions: "Requiere 'system.display' (cálculo de resoluciones del monitor), 'storage' (guardado de pestañas y favoritos) e 'host_permissions' (<all_urls>) para poder cargar páginas web embebidas sin problemas de CORS."
+            },
+            videoplayer: {
+                title: "Mk VideoPlayer",
+                icon: "🎬",
+                version: "v1.1",
+                color: "#f43f5e",
+                link: "https://chromewebstore.google.com/detail/mk-videoplayer/icbdlconfggomjahkjogeifimddnampi?hl=es-419&authuser=0",
+                features: [
+                    "Reproductor de vídeo local arrastrando archivos directamente en el navegador.",
+                    "Compatibilidad nativa con flujos y transmisiones de streaming HLS (.m3u8).",
+                    "Creación, edición y ordenamiento interactivo de listas de reproducción.",
+                    "Asignación de etiquetas para clasificar y filtrar contenido rápidamente.",
+                    "Registro privado de progreso de reproducción para reanudar videos."
+                ],
+                permissions: "Solo requiere el permiso de 'storage' para almacenar las listas de reproducción, configuraciones de audio y el historial de progreso de los videos del usuario."
+            },
+            imageplayer: {
+                title: "Mk Visor de Imágenes",
+                icon: "🖼️",
+                version: "v1.1",
+                color: "#f59e0b",
+                link: "https://chromewebstore.google.com/detail/mk-visor-de-im%C3%A1genes/aifhjgdmiigpkklmbjpokbkdjgojkgbb?hl=es-419&authuser=0",
+                features: [
+                    "Exploración ágil de carpetas de imágenes del disco local del ordenador.",
+                    "Lightbox premium con controles de zoom y desplazamiento pan libre por arrastre.",
+                    "Gestión de ficheros nativa: renombrar, mover y borrar directamente desde la app.",
+                    "Filtros de búsqueda, ordenamiento alfabético y ordenamiento por fecha.",
+                    "Desactivación controlada en dispositivos móviles o iOS para evitar errores."
+                ],
+                permissions: "No requiere permisos declarativos en el archivo de manifiesto (permissions: []). Funciona mediante consentimiento en tiempo de ejecución del navegador mediante la File System Access API nativa."
+            },
+            screenshot: {
+                title: "Mk ScreenShot",
+                icon: "✂️",
+                version: "v1.1",
+                color: "#10b981",
+                link: "https://chromewebstore.google.com/detail/mk-screenshot/fieajpanbbbpobmfajnbpgeolicijojd?hl=es-419&authuser=0",
+                features: [
+                    "Capturas instantáneas de la pestaña web activa o pantallas completas.",
+                    "Editor gráfico en canvas integrado directamente en la extensión.",
+                    "Herramientas de anotación: flechas, recuadros, texto y numeración de pasos.",
+                    "Herramienta de difuminado (blur) para proteger información confidencial.",
+                    "Descarga directa en PNG/JPEG o copia al portapapeles con un clic."
+                ],
+                permissions: "Requiere 'activeTab' para poder capturar la pestaña en la que el usuario haga clic para disparar la extensión, y 'storage' para guardar historial de capturas temporal."
+            },
+            arcade: {
+                title: "Mk Arcade",
+                icon: "👾",
+                version: "v1.0",
+                color: "#eab308",
+                link: "#",
+                features: [
+                    "Consola de juegos clásicos de 8 bits integrada en tu navegador.",
+                    "Juego clásico Space Invaders con disparos y oleadas alienígenas.",
+                    "Juego Asteroids con controles de inercia y colisiones espaciales.",
+                    "Juego Trench Run en primera persona y esquivado de obstáculos tridimensional.",
+                    "Guardado automático y visualización de récords máximos por juego."
+                ],
+                permissions: "Requiere únicamente el permiso de 'storage' para el guardado local y persistente de tus récords máximos (high scores) en la base de datos local de tu navegador."
+            }
+        };
+
+        const modal = document.getElementById('detail-modal');
+        const modalContent = modal.querySelector('.modal-content');
+        const closeBtn = modal.querySelector('.modal-close');
+
+        // Open details
+        document.querySelectorAll('.card').forEach(card => {
+            const btn = card.querySelector('.btn-more');
+            const extKey = card.dataset.ext;
+            const data = extensionData[extKey];
+
+            if (btn && data) {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    
+                    // Fill modal details
+                    document.getElementById('modal-icon').innerText = data.icon;
+                    document.getElementById('modal-title').innerText = data.title;
+                    document.getElementById('modal-ver').innerText = data.version;
+                    document.getElementById('modal-perm-desc').innerText = data.permissions;
+                    
+                    // Theme coloring
+                    modalContent.style.setProperty('--theme-color', data.color);
+                    document.getElementById('modal-icon').style.setProperty('--icon-color', data.color);
+                    
+                    // Clear and populate feature list
+                    const list = document.getElementById('modal-list');
+                    list.innerHTML = '';
+                    data.features.forEach(f => {
+                        const li = document.createElement('li');
+                        li.innerText = f;
+                        list.appendChild(li);
+                    });
+
+                    // Update action link
+                    const installBtn = document.getElementById('modal-action');
+                    installBtn.href = data.link || '#';
+                    installBtn.target = data.link && data.link !== '#' ? '_blank' : '_self';
+                    installBtn.style.background = data.color;
+                    installBtn.style.boxShadow = `0 4px 15px ${data.color}44`;
+                    
+                    modal.classList.add('active');
+                });
+            }
+        });
+
+        // Close details
+        closeBtn.addEventListener('click', closeContextMenu);
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) closeContextMenu();
+        });
+
+        function closeContextMenu() {
+            modal.classList.remove('active');
+        }
+
+        // Privacy Modal Logic
+        const privacyModal = document.getElementById('privacy-modal');
+        const privacyClose = document.getElementById('privacy-close');
+        
+        function openPrivacyModal(e) {
+            if (e) e.preventDefault();
+            privacyModal.classList.add('active');
+        }
+
+        function closePrivacyModal() {
+            privacyModal.classList.remove('active');
+        }
+
+        // Event listeners to open
+        const linkHeader = document.getElementById('link-privacy-policy');
+        const btnBody = document.getElementById('btn-privacy-full');
+        const linkFooter = document.getElementById('link-privacy-footer');
+
+        if (linkHeader) linkHeader.addEventListener('click', openPrivacyModal);
+        if (btnBody) btnBody.addEventListener('click', openPrivacyModal);
+        if (linkFooter) linkFooter.addEventListener('click', openPrivacyModal);
+
+        // Event listeners to close
+        if (privacyClose) privacyClose.addEventListener('click', closePrivacyModal);
+        if (privacyModal) {
+            privacyModal.addEventListener('click', (e) => {
+                if (e.target === privacyModal) closePrivacyModal();
+            });
+        }
+    </script>
+</body>
+</html>
