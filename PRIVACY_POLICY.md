@@ -1,6 +1,6 @@
 # Política de Privacidad
 
-Esta política de privacidad describe cómo se maneja la información en las extensiones de Chrome desarrolladas para este ecosistema, incluyendo **Mk 2xScreen**, **Mk VideoPlayer**, **Mk Visor de Imágenes (ImagePlayer)**, **Mk Agenda & Notas (Notes)** y **Mk ScreenShot**.
+Esta política de privacidad describe cómo se maneja la información en las extensiones de Chrome desarrolladas para este ecosistema, incluyendo **Mk 2xScreen**, **Mk VideoPlayer**, **Mk Visor de Imágenes (ImagePlayer)**, **Mk Organizer (Organizer)** y **Mk ScreenShot**.
 
 ## 1. Recopilación de Información
 **Ninguna de nuestras extensiones recopila, almacena, rastrea ni comparte datos personales, información de navegación ni ningún tipo de información sensible del usuario.** 

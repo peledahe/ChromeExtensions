@@ -1,4 +1,4 @@
-# Mk Agenda & Notas
+# Mk Organizer
 
 Extensión de Chrome (Manifest V3) que unifica tu productividad personal en un solo lugar: agenda de tareas, presupuesto personal categorizado, planificador de deudas con el método Bola de Nieve, tablero Kanban, pizarra de notas rápidas y gestor seguro de contraseñas.
 
@@ -9,14 +9,14 @@ Extensión de Chrome (Manifest V3) que unifica tu productividad personal en un s
 *Esta sección contiene la información oficial requerida para subir y registrar la extensión en las tiendas de aplicaciones.*
 
 ### 🏷️ Datos Básicos
-- **Nombre de la Extensión:** Mk Agenda & Notas
+- **Nombre de la Extensión:** Mk Organizer
 - **Versión:** 2.0 (Nueva Versión Reestructurada)
 - **Descripción Corta (Máx. 150 caracteres):** Tu organizador personal en Chrome: presupuesto unificado, planificador de deudas (Bola de Nieve), tareas Kanban, notas y sincronización opcional con Google Drive.
 - **Categoría:** Productividad / Herramientas de desarrollo
 - **Idioma principal:** Español (es)
 
 ### 📝 Descripción Detallada (Larga)
-**Mk Agenda & Notas** es la extensión definitiva para organizar tu día a día, tus finanzas y tus metas de forma sencilla, fluida y con privacidad absoluta. Diseñada bajo un enfoque *local-first*, tus datos se guardan de manera segura en tu navegador y te permite realizar sincronización en la nube opcional con tu cuenta personal de Google Drive.
+**Mk Organizer** es la extensión definitiva para organizar tu día a día, tus finanzas y tus metas de forma sencilla, fluida y con privacidad absoluta. Diseñada bajo un enfoque *local-first*, tus datos se guardan de manera segura en tu navegador y te permite realizar sincronización en la nube opcional con tu cuenta personal de Google Drive.
 
 #### Características Destacadas:
 1. 💸 **Presupuesto Categorizado e Interactivo (Ejecución):** Olvídate de complicadas hojas de cálculo. Registra tus ingresos y gastos mensuales por categorías definiendo si están **Proyectados** (pendientes de confirmarse) o **Confirmados** (ejecutados). Esto te permite ver la ejecución de tu mes frente a los límites definidos. Las barras de progreso por categoría muestran secciones duales (sólido para ejecutado real y rayado translúcido para proyección) e integra un botón interactivo de un solo clic para confirmar transacciones proyectadas rápidamente. Soporta visualización de moneda secundaria con etiquetas optimizadas para evitar el bold y facilitar la lectura.
@@ -36,6 +36,7 @@ Al publicar la extensión, Chrome Web Store solicita declarar la necesidad de lo
 - **`storage`:** Requerido para almacenar de manera persistente las tareas, notas, presupuestos, configuraciones y credenciales del usuario de forma local mediante `chrome.storage.local`.
 - **`activeTab`:** Necesario únicamente para que el detector de credenciales pueda evaluar y proponer el guardado de contraseñas de forma segura en la página web en la que el usuario decida iniciar sesión activamente.
 - **`identity`:** Requerido para conectar opcionalmente con la API de Google Drive mediante el inicio de sesión OAuth 2.0 seguro, permitiendo al usuario respaldar y sincronizar sus datos.
+- **Permisos de Host (`http://*/*` y `https://*/*`):** Requeridos para inyectar de forma segura el script detector de credenciales (`content_script.js`) en las páginas web en las que navega el usuario. Esto permite interceptar localmente los envíos de formularios para sugerir y almacenar nuevas claves en el Gestor de Contraseñas local.
 
 ---
 

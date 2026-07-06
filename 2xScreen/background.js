@@ -242,13 +242,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             agenda: null,
             videoplayer: null,
             imageplayer: null,
-            screenshot: null
+            screenshot: null,
+            arcade: null
           };
           try {
             const extensions = await chrome.management.getAll();
             for (const ext of extensions) {
               if (ext.enabled) {
-                if (ext.shortName === "mk-agenda" || ext.id === "bgiopnnblbijgffgdohgmnkhopbonefd") {
+                if (ext.shortName === "mk-organizer" || ext.shortName === "mk-agenda" || ext.id === "bgiopnnblbijgffgdohgmnkhopbonefd") {
                   results.agenda = ext.id;
                 } else if (ext.shortName === "mk-videoplayer" || ext.id === "akmbookdeplgfocoehhjajjakckkdfke") {
                   results.videoplayer = ext.id;
@@ -256,6 +257,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
                   results.imageplayer = ext.id;
                 } else if (ext.shortName === "mk-screenshot") {
                   results.screenshot = ext.id;
+                } else if (ext.shortName === "mk-arcade" || ext.name === "Mk Arcade") {
+                  results.arcade = ext.id;
                 }
               }
             }

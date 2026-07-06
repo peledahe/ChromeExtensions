@@ -182,7 +182,7 @@ async function initUI(alignRightScreen, isCollapsed) {
         </svg>
       </button>
 
-      <button class="mc-btn" id="mc-agenda" title="Abrir Agenda (Notes)" style="display: flex; align-items: center; justify-content: center;">
+      <button class="mc-btn" id="mc-agenda" title="Abrir Mk Organizer" style="display: flex; align-items: center; justify-content: center;">
         <svg viewBox="0 0 24 24" style="width:14px; height:14px; fill:none; stroke:currentColor; stroke-width:2.2; stroke-linecap:round; stroke-linejoin:round;">
           <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
           <line x1="16" y1="2" x2="16" y2="6"/>
@@ -203,6 +203,15 @@ async function initUI(alignRightScreen, isCollapsed) {
           <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
           <circle cx="8.5" cy="8.5" r="1.5"/>
           <polyline points="21 15 16 10 5 21"/>
+        </svg>
+      </button>
+
+      <button class="mc-btn" id="mc-arcade" title="Abrir Arcade" style="display: flex; align-items: center; justify-content: center;">
+        <svg viewBox="0 0 24 24" style="width:14px; height:14px; fill:none; stroke:currentColor; stroke-width:2.2; stroke-linecap:round; stroke-linejoin:round;">
+          <rect x="2" y="6" width="20" height="12" rx="3" ry="3"/>
+          <path d="M6 12h4m-2-2v4"/>
+          <circle cx="15" cy="11" r="1"/>
+          <circle cx="18" cy="13" r="1"/>
         </svg>
       </button>
 
@@ -233,6 +242,7 @@ async function initUI(alignRightScreen, isCollapsed) {
   const btnAgenda = shadow.querySelector("#mc-agenda");
   const btnVideoPlayer = shadow.querySelector("#mc-videoplayer");
   const btnImagePlayer = shadow.querySelector("#mc-imageplayer");
+  const btnArcade = shadow.querySelector("#mc-arcade");
   const btnRestore = shadow.querySelector("#mc-2x");
   const btnCloseWindow = shadow.querySelector("#mc-close-window");
 
@@ -242,6 +252,7 @@ async function initUI(alignRightScreen, isCollapsed) {
     if (!extensionsStatus.videoplayer && btnVideoPlayer) btnVideoPlayer.style.display = "none";
     if (!extensionsStatus.imageplayer && btnImagePlayer) btnImagePlayer.style.display = "none";
     if (!extensionsStatus.screenshot && btnScreenshot) btnScreenshot.style.display = "none";
+    if (!extensionsStatus.arcade && btnArcade) btnArcade.style.display = "none";
   }
 
   // Mostrar la URL y estado inicial
@@ -414,19 +425,19 @@ async function initUI(alignRightScreen, isCollapsed) {
     });
   }
 
-  // Abrir Agenda / Notes
+  // Abrir Mk Organizer
   if (btnAgenda) {
     btnAgenda.addEventListener("click", () => {
       if (!isContextValid()) return destroyUI();
       const extId = extensionsStatus?.agenda || "bgiopnnblbijgffgdohgmnkhopbonefd";
       chrome.runtime.sendMessage({
         action: "open_url",
-        url: `chrome-extension://${extId}/notes.html`
+        url: `chrome-extension://${extId}/organizer.html`
       }, (response) => {
         if (chrome.runtime.lastError) {
           showToast("Error de Comunicación", `Asegúrate de recargar la extensión 2xScreen en chrome://extensions. Detalle: ${chrome.runtime.lastError.message}`);
         } else if (response && response.error) {
-          showToast("Error al abrir Agenda", response.error);
+          showToast("Error al abrir Mk Organizer", response.error);
         }
       });
     });
@@ -463,6 +474,28 @@ async function initUI(alignRightScreen, isCollapsed) {
           showToast("Error de Comunicación", `Asegúrate de recargar la extensión 2xScreen en chrome://extensions. Detalle: ${chrome.runtime.lastError.message}`);
         } else if (response && response.error) {
           showToast("Error al abrir Image Player", response.error);
+        }
+      });
+    });
+  }
+
+  // Abrir Arcade
+  if (btnArcade) {
+    btnArcade.addEventListener("click", () => {
+      if (!isContextValid()) return destroyUI();
+      const extId = extensionsStatus?.arcade;
+      if (!extId) {
+        showToast("Error", "Extensión Mk Arcade no detectada");
+        return;
+      }
+      chrome.runtime.sendMessage({
+        action: "open_url",
+        url: `chrome-extension://${extId}/arcade.html`
+      }, (response) => {
+        if (chrome.runtime.lastError) {
+          showToast("Error de Comunicación", `Asegúrate de recargar la extensión 2xScreen en chrome://extensions. Detalle: ${chrome.runtime.lastError.message}`);
+        } else if (response && response.error) {
+          showToast("Error al abrir Mk Arcade", response.error);
         }
       });
     });
