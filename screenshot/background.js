@@ -44,3 +44,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     });
   }
 });
+
+// Escuchar solicitudes de imágenes externas para abrir en el editor (ej. desde ImagePlayer)
+chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => {
+  if (message.action === "open_image_in_editor" && message.tempScreenshot) {
+    chrome.storage.local.set({ tempScreenshot: message.tempScreenshot }, () => {
+      chrome.tabs.create({
+        url: chrome.runtime.getURL('editor.html')
+      });
+      sendResponse({ success: true });
+    });
+    return true; // Mantiene el canal abierto para la respuesta asíncrona
+  }
+});

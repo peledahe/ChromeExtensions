@@ -26,7 +26,8 @@
             lastFolder: '.'
         },
         moveTarget: null,
-        moveDestPath: null
+        moveDestPath: null,
+        screenshotExtId: null
     };
 
     const q = (id) => document.getElementById(id);
@@ -63,6 +64,31 @@
                 resolve(platform.toLowerCase().includes('linux') || navigator.userAgent.toLowerCase().includes('linux'));
             }
         });
+    }
+
+    function fileToDataUrl(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
+    }
+
+    async function getOrLoadImageUrl(img) {
+        if (!img) return null;
+        if (!img.url) {
+            try {
+                if (!img.file) {
+                    img.file = await img.handle.getFile();
+                }
+                img.url = URL.createObjectURL(img.file);
+            } catch (e) {
+                console.error('Error al generar ObjectURL para la imagen:', e);
+                return null;
+            }
+        }
+        return img.url;
     }
 
     // --- Lógica de IndexedDB para persistir Handles ---
@@ -195,13 +221,19 @@
         });
     }
 
-    function downloadImageFile(img) {
-        const a = document.createElement('a');
-        a.href = img.url;
-        a.download = img.name;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
+    async function downloadImageFile(img) {
+        try {
+            const url = await getOrLoadImageUrl(img);
+            if (!url) return;
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = img.name;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        } catch (e) {
+            console.error('Error al descargar el archivo:', e);
+        }
     }
 
     // --- Notificaciones ---
@@ -328,9 +360,28 @@
         renderGallery();
     }
 
+    async function checkMkScreenshot() {
+        return new Promise((resolve) => {
+            if (typeof chrome !== 'undefined' && chrome.management && chrome.management.getAll) {
+                chrome.management.getAll((extensions) => {
+                    const ext = extensions.find(e => e.name === "Mk ScreenShot" && e.enabled);
+                    if (ext) {
+                        state.screenshotExtId = ext.id;
+                        const btn = q('ip-lb-screenshot');
+                        if (btn) btn.style.display = 'inline-flex';
+                    }
+                    resolve();
+                });
+            } else {
+                resolve();
+            }
+        });
+    }
+
     // --- Bootstrap & File System API ---
     async function bootstrap() {
         await initWebChannel();
+        await checkMkScreenshot();
 
 
         // Cargar filtros del localStorage si existen
@@ -519,24 +570,47 @@
 
             const items = [];
             const supportedExts = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.bmp'];
+            const fileEntries = [];
 
             for await (const entry of folderHandle.values()) {
                 if (entry.kind === 'file') {
                     const nameLower = entry.name.toLowerCase();
                     const isImg = supportedExts.some(ext => nameLower.endsWith(ext));
                     if (isImg) {
+                        fileEntries.push(entry);
+                    }
+                }
+            }
+
+            // Cargar metadatos por lotes paralelos
+            const batchSize = 35;
+            for (let i = 0; i < fileEntries.length; i += batchSize) {
+                const batch = fileEntries.slice(i, i + batchSize);
+                await Promise.all(batch.map(async (entry) => {
+                    try {
                         const file = await entry.getFile();
-                        const url = URL.createObjectURL(file);
                         items.push({
                             name: entry.name,
                             path: node.path === '.' ? entry.name : `${node.path}/${entry.name}`,
-                            url: url,
+                            url: null, // No crear ObjectURL todavía
                             size: file.size,
                             mtime: file.lastModified / 1000,
-                            handle: entry
+                            handle: entry,
+                            file: file
+                        });
+                    } catch (e) {
+                        console.error('Error al obtener metadatos de la imagen:', e);
+                        items.push({
+                            name: entry.name,
+                            path: node.path === '.' ? entry.name : `${node.path}/${entry.name}`,
+                            url: null,
+                            size: 0,
+                            mtime: 0,
+                            handle: entry,
+                            file: null
                         });
                     }
-                }
+                }));
             }
 
             state.images = items;
@@ -628,7 +702,7 @@
             });
 
             const imageEl = document.createElement('img');
-            imageEl.dataset.src = img.url;
+            imageEl.dataset.path = img.path;
             imageEl.alt = img.name;
             imageEl.loading = 'lazy';
 
@@ -692,19 +766,29 @@
         });
 
         state.observer = new IntersectionObserver((entries) => {
-            entries.forEach((entry) => {
+            entries.forEach(async (entry) => {
                 if (!entry.isIntersecting) return;
-                const img = entry.target.querySelector('img[data-src]');
-                if (!img) return;
-                img.src = img.dataset.src;
-                img.removeAttribute('data-src');
-                img.addEventListener('load', () => img.classList.add('loaded'), { once: true });
-                img.addEventListener('error', () => {
-                    img.style.opacity = '0.3';
-                }, { once: true });
-                state.observer.unobserve(entry.target);
+                const card = entry.target;
+                const imgEl = card.querySelector('img');
+                if (!imgEl) return;
+
+                const imgPath = card.dataset.path;
+                const imgData = state.images.find(i => i.path === imgPath);
+                if (imgData) {
+                    try {
+                        const url = await getOrLoadImageUrl(imgData);
+                        if (url) imgEl.src = url;
+                    } catch (err) {
+                        console.error('Error al cargar la miniatura:', err);
+                    }
+                }
+                state.observer.unobserve(card);
             });
-        }, { rootMargin: '300px' });
+        }, {
+            root: gallery,
+            rootMargin: '200px 0px',
+            threshold: 0.01
+        });
 
         gallery.querySelectorAll('.ip-thumb').forEach((t) => state.observer.observe(t));
     }
@@ -767,12 +851,23 @@
         }
     }
 
-    function renderLightbox() {
+    async function renderLightbox() {
         const img = state.filtered[state.lbIndex];
         if (!img) return;
 
         q('ip-lb-title').textContent = img.name;
         q('ip-lb-counter').textContent = `${state.lbIndex + 1} / ${state.filtered.length}`;
+
+        // Cargar metadatos si no están disponibles
+        if (!img.size || !img.mtime) {
+            try {
+                if (!img.file) img.file = await img.handle.getFile();
+                img.size = img.file.size;
+                img.mtime = img.file.lastModified / 1000;
+            } catch (e) {
+                console.error('Error al obtener metadatos para el visor:', e);
+            }
+        }
 
         const sizeMb = (Number(img.size || 0) / 1048576).toFixed(2);
         const date = new Date(Number(img.mtime || 0) * 1000).toLocaleDateString('es', {
@@ -784,14 +879,22 @@
 
         const el = q('ip-lb-img');
         el.style.opacity = '0';
-        el.src = img.url;
-        el.onload = () => {
-            el.style.opacity = '1';
-            state.zoom = 1;
-            state.panX = 0;
-            state.panY = 0;
-            applyTransform();
-        };
+        
+        try {
+            const url = await getOrLoadImageUrl(img);
+            if (url) {
+                el.src = url;
+                el.onload = () => {
+                    el.style.opacity = '1';
+                    state.zoom = 1;
+                    state.panX = 0;
+                    state.panY = 0;
+                    applyTransform();
+                };
+            }
+        } catch (e) {
+            console.error('Error al renderizar imagen en el visor:', e);
+        }
 
         q('ip-lb-prev').disabled = state.lbIndex === 0;
         q('ip-lb-next').disabled = state.lbIndex === state.filtered.length - 1;
@@ -807,11 +910,18 @@
 
     function buildFilmstrip() {
         const strip = q('ip-lb-filmstrip');
+        if (!strip) return;
         strip.innerHTML = '';
         state.filtered.forEach((img, i) => {
             const t = document.createElement('div');
             t.className = `ip-lb-thumb${i === state.lbIndex ? ' active' : ''}`;
-            t.innerHTML = `<img src="${img.url}" alt="${img.name}" loading="lazy">`;
+            t.dataset.path = img.path;
+            
+            const thumbImg = document.createElement('img');
+            thumbImg.alt = img.name;
+            thumbImg.loading = 'lazy';
+            
+            t.appendChild(thumbImg);
             t.addEventListener('click', () => {
                 state.lbIndex = i;
                 state.zoom = 1;
@@ -821,6 +931,34 @@
             });
             strip.appendChild(t);
         });
+
+        // Crear observador para el filmstrip
+        const stripObserver = new IntersectionObserver((entries) => {
+            entries.forEach(async (entry) => {
+                if (!entry.isIntersecting) return;
+                const thumbDiv = entry.target;
+                const imgEl = thumbDiv.querySelector('img');
+                if (!imgEl) return;
+
+                const imgPath = thumbDiv.dataset.path;
+                const img = state.filtered.find(i => i.path === imgPath);
+                if (img) {
+                    try {
+                        const url = await getOrLoadImageUrl(img);
+                        if (url) imgEl.src = url;
+                    } catch (e) {
+                        console.error('Error al cargar imagen en el filmstrip:', e);
+                    }
+                }
+                stripObserver.unobserve(thumbDiv);
+            });
+        }, {
+            root: strip,
+            rootMargin: '150px',
+            threshold: 0.01
+        });
+
+        strip.querySelectorAll('.ip-lb-thumb').forEach(t => stripObserver.observe(t));
     }
 
     function zoomBy(delta, cx, cy) {
@@ -885,7 +1023,7 @@
 
                 for (const img of selected) {
                     await parentHandle.removeEntry(img.name);
-                    URL.revokeObjectURL(img.url);
+                    if (img.url) URL.revokeObjectURL(img.url);
                     deleted += 1;
                     removeImageFromState(img.path);
                 }
@@ -1047,7 +1185,7 @@
 
                 q('ip-move-modal').classList.remove('active');
                 removeImageFromState(moveImg.path);
-                URL.revokeObjectURL(moveImg.url);
+                if (moveImg.url) URL.revokeObjectURL(moveImg.url);
 
                 if (moveCard) {
                     moveCard.style.transition = 'opacity 0.2s, transform 0.2s';
@@ -1081,7 +1219,7 @@
             try {
                 const parentHandle = state.directoryHandles.get(state.currentPath);
                 await parentHandle.removeEntry(img.name);
-                URL.revokeObjectURL(img.url);
+                if (img.url) URL.revokeObjectURL(img.url);
 
                 q('ip-confirm-modal').classList.remove('active');
                 removeImageFromState(img.path);
@@ -1269,6 +1407,37 @@
         });
 
         q('ip-lb-close').addEventListener('click', closeLightbox);
+
+        const btnScreenshot = q('ip-lb-screenshot');
+        if (btnScreenshot) {
+            btnScreenshot.addEventListener('click', async () => {
+                const img = state.filtered[state.lbIndex];
+                if (!img || !state.screenshotExtId) return;
+
+                try {
+                    showNotification('Abriendo en Mk ScreenShot...', 'info', false);
+
+                    if (!img.file) {
+                        img.file = await img.handle.getFile();
+                    }
+
+                    const dataUrl = await fileToDataUrl(img.file);
+
+                    chrome.runtime.sendMessage(state.screenshotExtId, {
+                        action: "open_image_in_editor",
+                        tempScreenshot: dataUrl
+                    }, (response) => {
+                        if (chrome.runtime.lastError) {
+                            console.error(chrome.runtime.lastError);
+                            showNotification('Error al abrir en Mk ScreenShot', 'error');
+                        }
+                    });
+                } catch (e) {
+                    console.error(e);
+                    showNotification('Error al leer el archivo', 'error');
+                }
+            });
+        }
         q('ip-lb-prev').addEventListener('click', () => {
             if (state.lbIndex > 0) {
                 state.lbIndex -= 1;

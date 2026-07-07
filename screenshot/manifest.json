@@ -19,6 +19,9 @@
     "48": "icon48.png",
     "128": "icon128.png"
   },
+  "externally_connectable": {
+    "ids": ["*"]
+  },
   "browser_specific_settings": {
     "gecko": {
       "id": "screenshot@merke.net",
