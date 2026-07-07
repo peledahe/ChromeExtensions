@@ -59,14 +59,31 @@ def main():
         
     # 2. Generar el archivo de manifiesto del host com.merke.twoxscreen.json
     helper_path = os.path.join(native_dir, "twoxscreen_helper.py")
+    
+    allowed_origins = [
+        f"chrome-extension://{extension_id}/",
+        "chrome-extension://gnjddnfmlhjmmglbhalfcckcplmcdkaf/",
+        "chrome-extension://ihbfgcligcckngjlbjccjjojmpepajin/"
+    ]
+    
+    allowed_ids_path = os.path.join(native_dir, "allowed_ids.json")
+    if os.path.exists(allowed_ids_path):
+        try:
+            with open(allowed_ids_path, "r", encoding="utf-8") as f:
+                config_data = json.load(f)
+                for aid in config_data.get("allowed_ids", []):
+                    origin = f"chrome-extension://{aid}/"
+                    if origin not in allowed_origins:
+                        allowed_origins.append(origin)
+        except Exception as e:
+            print(f"Error leyendo allowed_ids.json: {e}")
+
     host_manifest = {
         "name": "com.merke.twoxscreen",
         "description": "Helper nativo de 2xScreen para quitar bordes de ventana",
         "path": helper_path,
         "type": "stdio",
-        "allowed_origins": [
-            f"chrome-extension://{extension_id}/"
-        ]
+        "allowed_origins": allowed_origins
     }
     
     manifest_host_path = os.path.join(native_dir, "com.merke.twoxscreen.json")

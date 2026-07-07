@@ -4,6 +4,8 @@
   "path": "/home/perry/Desarrollo/ChromeExtensions/2xScreen/native/twoxscreen_helper.py",
   "type": "stdio",
   "allowed_origins": [
-    "chrome-extension://gnjddnfmlhjmmglbhalfcckcplmcdkaf/"
+    "chrome-extension://diibpdddgojdojdcnlfidealnehghpap/",
+    "chrome-extension://gnjddnfmlhjmmglbhalfcckcplmcdkaf/",
+    "chrome-extension://ihbfgcligcckngjlbjccjjojmpepajin/"
   ]
 }

@@ -10,8 +10,9 @@ set "JSON_PATH=%DIR%\com.merke.twoxscreen.json"
 :: Reemplazar contrabarras simples por contrabarras dobles para el formato JSON
 set "JSON_PATH_ESC=%JSON_PATH:\=\\%"
 
-:: Crear registro para Google Chrome
+:: Crear registro para Google Chrome y Microsoft Edge
 REG ADD "HKCU\Software\Google\Chrome\NativeMessagingHosts\com.merke.twoxscreen" /ve /t REG_SZ /d "%JSON_PATH%" /f
+REG ADD "HKCU\Software\Microsoft\Edge\NativeMessagingHosts\com.merke.twoxscreen" /ve /t REG_SZ /d "%JSON_PATH%" /f
 
-echo Host nativo registrado con exito en el Registro de Windows.
+echo Host nativo registrado con exito para Chrome y Edge en el Registro de Windows.
 pause

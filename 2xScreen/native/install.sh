@@ -10,9 +10,12 @@ HELPER_PY="$DIR/twoxscreen_helper.py"
 chmod +x "$HELPER_PY"
 chmod +x "${BASH_SOURCE[0]}"
 
-# 2. Rutas de instalación de Chrome/Chromium para Native Messaging
+# 2. Rutas de instalación de navegadores para Native Messaging
 CHROME_TARGET_DIR="$HOME/.config/google-chrome/NativeMessagingHosts"
 CHROMIUM_TARGET_DIR="$HOME/.config/chromium/NativeMessagingHosts"
+EDGE_TARGET_DIR="$HOME/.config/microsoft-edge/NativeMessagingHosts"
+EDGE_BETA_TARGET_DIR="$HOME/.config/microsoft-edge-beta/NativeMessagingHosts"
+EDGE_DEV_TARGET_DIR="$HOME/.config/microsoft-edge-dev/NativeMessagingHosts"
 
 install_host() {
     local target_dir="$1"
@@ -36,6 +39,21 @@ fi
 # Instalar para Chromium
 if [ -d "$HOME/.config/chromium" ]; then
     install_host "$CHROMIUM_TARGET_DIR" "Chromium"
+fi
+
+# Instalar para Microsoft Edge
+if [ -d "$HOME/.config/microsoft-edge" ]; then
+    install_host "$EDGE_TARGET_DIR" "Microsoft Edge"
+fi
+
+# Instalar para Microsoft Edge Beta
+if [ -d "$HOME/.config/microsoft-edge-beta" ]; then
+    install_host "$EDGE_BETA_TARGET_DIR" "Microsoft Edge Beta"
+fi
+
+# Instalar para Microsoft Edge Dev
+if [ -d "$HOME/.config/microsoft-edge-dev" ]; then
+    install_host "$EDGE_DEV_TARGET_DIR" "Microsoft Edge Dev"
 fi
 
 echo "Instalación de Native Messaging Host completada con éxito."

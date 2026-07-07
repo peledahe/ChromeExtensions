@@ -215,6 +215,13 @@ async function initUI(alignRightScreen, isCollapsed) {
         </svg>
       </button>
 
+      <button class="mc-btn" id="mc-config" title="Configurar comunicación nativa" style="display: flex; align-items: center; justify-content: center;">
+        <svg viewBox="0 0 24 24" style="width:14px; height:14px; fill:none; stroke:currentColor; stroke-width:2.2; stroke-linecap:round; stroke-linejoin:round;">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+      </button>
+
       <button class="mc-btn-2x" id="mc-2x" title="Salir de pantalla doble (Esc)">2x</button>
 
       <button class="mc-btn" id="mc-close-window" title="Cerrar ventana" style="display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 16px; margin-left: 2px; color: rgba(255, 107, 107, 0.9);">
@@ -243,6 +250,7 @@ async function initUI(alignRightScreen, isCollapsed) {
   const btnVideoPlayer = shadow.querySelector("#mc-videoplayer");
   const btnImagePlayer = shadow.querySelector("#mc-imageplayer");
   const btnArcade = shadow.querySelector("#mc-arcade");
+  const btnConfig = shadow.querySelector("#mc-config");
   const btnRestore = shadow.querySelector("#mc-2x");
   const btnCloseWindow = shadow.querySelector("#mc-close-window");
 
@@ -501,6 +509,14 @@ async function initUI(alignRightScreen, isCollapsed) {
     });
   }
 
+  // Configuración de Native Host
+  if (btnConfig) {
+    btnConfig.addEventListener("click", () => {
+      if (!isContextValid()) return destroyUI();
+      showConfigModal();
+    });
+  }
+
   // Cerrar Ventana actual
   if (btnCloseWindow) {
     btnCloseWindow.addEventListener("click", () => {
@@ -533,6 +549,9 @@ async function initUI(alignRightScreen, isCollapsed) {
     startLoadingState();
     window.addEventListener("load", stopLoadingState, { once: true });
   }
+
+  // Validar conexión del host nativo y alertar si es necesario
+  checkAndAlertNativeConnection();
 }
 
 // Función para actualizar la URL del input y el estado de HTTPS
@@ -880,6 +899,327 @@ function handleKeyDown(e) {
         destroyUI();
       }
     }
+  }
+}
+
+// --- Modal de Configuración Nativa de 2xScreen ---
+function showConfigModal() {
+  if (!shadow) return;
+
+  const containerEl = shadow.querySelector(".mc-container");
+  let leftStyle = "";
+  if (containerEl) {
+    const rect = containerEl.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    leftStyle = `left: ${centerX}px;`;
+  }
+
+  const overlay = document.createElement("div");
+  overlay.className = "mc-modal-overlay mc-config-overlay";
+
+  overlay.innerHTML = `
+    <div class="mc-modal-box mc-config-box" style="${leftStyle}">
+      <h3 class="mc-modal-title">Configuración de Pantalla Doble</h3>
+      <div class="mc-config-content">
+        <div class="mc-status-row">
+          <span class="mc-status-label">Comunicación con el sistema:</span>
+          <span class="mc-status-badge mc-status-loading">Verificando...</span>
+        </div>
+        <p class="mc-config-desc" id="mc-config-text">Por favor, espera un momento mientras validamos la conexión nativa.</p>
+        <div class="mc-config-actions" id="mc-config-actions">
+          <!-- Dinámico -->
+        </div>
+      </div>
+      <button class="mc-config-close" id="mc-config-close">&times;</button>
+    </div>
+  `;
+
+  shadow.appendChild(overlay);
+  
+  // Forzar reflow
+  overlay.offsetHeight;
+  overlay.classList.add("show");
+
+  const btnClose = overlay.querySelector("#mc-config-close");
+  const closeModal = () => {
+    overlay.classList.remove("show");
+    setTimeout(() => overlay.remove(), 250);
+  };
+  btnClose.addEventListener("click", closeModal);
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) closeModal();
+  });
+
+  const updateStatus = () => {
+    const badge = overlay.querySelector(".mc-status-badge");
+    const desc = overlay.querySelector("#mc-config-text");
+    const actions = overlay.querySelector("#mc-config-actions");
+
+    chrome.runtime.sendMessage({ action: "check_native_status" }, (res) => {
+      const isConnected = !!(res && res.connected);
+
+      if (isConnected) {
+        badge.className = "mc-status-badge mc-status-ok";
+        badge.textContent = "Conectado y Listo";
+        desc.textContent = "La comunicación nativa está funcionando de manera óptima en tu sistema operativo. El modo de ocultación de barras nativas está activo.";
+        actions.innerHTML = `
+          <button class="mc-modal-btn mc-modal-btn-confirm" id="mc-btn-sync" style="background-color: rgba(60, 207, 137, 0.9);">Sincronizar Navegadores</button>
+        `;
+
+        const btnSync = actions.querySelector("#mc-btn-sync");
+        btnSync.addEventListener("click", () => {
+          btnSync.disabled = true;
+          btnSync.textContent = "Sincronizando...";
+          chrome.runtime.sendMessage({ action: "register_id_manually" }, (regRes) => {
+            if (regRes && regRes.success) {
+              showToast("Sincronización Completa", "El ID de la extensión ha sido inyectado en Chrome y Edge con éxito.");
+              btnSync.textContent = "Sincronizado";
+              setTimeout(() => {
+                btnSync.disabled = false;
+                btnSync.textContent = "Sincronizar Navegadores";
+              }, 2000);
+            } else {
+              showToast("Error", "No se pudo sincronizar automáticamente.");
+              btnSync.disabled = false;
+              btnSync.textContent = "Sincronizar Navegadores";
+            }
+          });
+        });
+
+      } else {
+        badge.className = "mc-status-badge mc-status-err";
+        badge.textContent = "Requiere Configuración";
+        desc.textContent = "Para permitir que la extensión oculte la barra de título nativa del sistema operativo, es necesario realizar una configuración automática de una sola vez.";
+        actions.innerHTML = `
+          <button class="mc-modal-btn mc-modal-btn-confirm mc-btn-primary" id="mc-btn-install" style="background-color: rgba(90, 107, 255, 0.9); font-size: 13px; padding: 11px;">Configurar en 1 Clic</button>
+          
+          <div class="mc-steps-container" style="display: none; margin-top: 18px; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 15px;">
+            <div class="mc-step-item" id="step-1" style="display: flex; align-items: flex-start; gap: 12px; margin-bottom: 12px; font-size: 12px; color: rgba(255,255,255,0.65); transition: color 0.3s;">
+              <span class="mc-step-num" style="display: flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; background: rgba(255,255,255,0.1); color: #fff; font-size: 10px; font-weight: bold; flex-shrink: 0; transition: all 0.3s;">1</span>
+              <div>
+                <p style="margin: 0; font-weight: 600; color: #fff; font-size: 12px;">Descargar Configurador Seguro</p>
+                <p style="margin: 3px 0 0 0; font-size: 11px; opacity: 0.8; line-height: 1.4;">Se ha guardado un script seguro de automatización local en tu carpeta de descargas.</p>
+              </div>
+            </div>
+
+            <div class="mc-step-item" id="step-2" style="display: flex; align-items: flex-start; gap: 12px; margin-bottom: 12px; font-size: 12px; color: rgba(255,255,255,0.65); transition: color 0.3s;">
+              <span class="mc-step-num" style="display: flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; background: rgba(255,255,255,0.1); color: #fff; font-size: 10px; font-weight: bold; flex-shrink: 0; transition: all 0.3s;">2</span>
+              <div>
+                <p style="margin: 0; font-weight: 600; color: #fff; font-size: 12px;">Ejecutar Configurador</p>
+                <p style="margin: 3px 0 0 0; font-size: 11px; opacity: 0.8; line-height: 1.4;">Haz clic en el archivo descargado (<code style="background: rgba(255,255,255,0.08); padding: 2px 5px; border-radius: 4px; font-family: monospace; font-size: 10.5px; color: #51a2ff;" id="mc-script-name">install_2xscreen</code>) para habilitar el modo de pantalla completa.</p>
+              </div>
+            </div>
+
+            <div class="mc-step-item" id="step-3" style="display: flex; align-items: flex-start; gap: 12px; font-size: 12px; color: rgba(255,255,255,0.65); transition: color 0.3s;">
+              <span class="mc-step-num" style="display: flex; align-items: center; justify-content: center; width: 20px; height: 20px; border-radius: 50%; background: rgba(255,255,255,0.1); color: #fff; font-size: 10px; font-weight: bold; flex-shrink: 0; transition: all 0.3s;">3</span>
+              <div>
+                <p style="margin: 0; font-weight: 600; color: #fff; font-size: 12px;">Validación Automática</p>
+                <p style="margin: 3px 0 0 0; font-size: 11px; opacity: 0.8; line-height: 1.4;" id="mc-step-3-text">Esperando la activación del sistema...</p>
+              </div>
+            </div>
+          </div>
+        `;
+
+        const btnInstall = actions.querySelector("#mc-btn-install");
+        const stepsContainer = actions.querySelector(".mc-steps-container");
+
+        btnInstall.addEventListener("click", () => {
+          btnInstall.disabled = true;
+          btnInstall.textContent = "Preparando conector...";
+          stepsContainer.style.display = "block";
+
+          chrome.runtime.sendMessage({ action: "get_installer_data" }, (installRes) => {
+            if (installRes && installRes.success) {
+              try {
+                // Descarga HTML5 Blob
+                const blob = new Blob([installRes.fileContent], { type: "application/octet-stream" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = installRes.filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+                // Actualizar UI del paso 1 a completado
+                const s1Num = stepsContainer.querySelector("#step-1 .mc-step-num");
+                s1Num.style.background = "#3ccf89";
+                s1Num.style.borderColor = "#3ccf89";
+                s1Num.innerHTML = "✓";
+                stepsContainer.querySelector("#step-1").style.color = "rgba(255,255,255,0.9)";
+                
+                // Actualizar UI del paso 2 a activo
+                const s2Num = stepsContainer.querySelector("#step-2 .mc-step-num");
+                s2Num.style.background = "#297ad7";
+                s2Num.style.boxShadow = "0 0 8px rgba(81, 162, 255, 0.4)";
+                stepsContainer.querySelector("#step-2").style.color = "#fff";
+                
+                // Actualizar nombre de script
+                const scriptName = stepsContainer.querySelector("#mc-script-name");
+                if (scriptName) scriptName.textContent = installRes.filename;
+                
+                btnInstall.textContent = "Esperando ejecución...";
+                showToast("Descarga Exitosa", "Por favor, abre el instalador descargado para activar la extensión.");
+              } catch (e) {
+                console.error("Error al descargar instalador nativo:", e);
+                showToast("Error de Descarga", "No se pudo descargar automáticamente.");
+                btnInstall.disabled = false;
+                btnInstall.textContent = "Configurar en 1 Clic";
+                stepsContainer.style.display = "none";
+                return;
+              }
+              
+              let attempts = 0;
+              const interval = setInterval(() => {
+                chrome.runtime.sendMessage({ action: "check_native_status" }, (checkRes) => {
+                  attempts++;
+                  
+                  // Microanimación en el paso 3 (espera)
+                  const step3Text = stepsContainer.querySelector("#mc-step-3-text");
+                  if (step3Text) {
+                    const dots = ".".repeat((attempts % 3) + 1);
+                    step3Text.textContent = `Validando activación local${dots}`;
+                  }
+                  
+                  if (checkRes && checkRes.connected) {
+                    clearInterval(interval);
+                    
+                    // Marcar pasos 2 y 3 como completados
+                    const s2Num = stepsContainer.querySelector("#step-2 .mc-step-num");
+                    s2Num.style.background = "#3ccf89";
+                    s2Num.style.boxShadow = "none";
+                    s2Num.innerHTML = "✓";
+                    
+                    const s3Num = stepsContainer.querySelector("#step-3 .mc-step-num");
+                    s3Num.style.background = "#3ccf89";
+                    s3Num.innerHTML = "✓";
+                    stepsContainer.querySelector("#step-3").style.color = "rgba(255,255,255,0.9)";
+                    
+                    const s3Text = stepsContainer.querySelector("#mc-step-3-text");
+                    if (s3Text) s3Text.textContent = "¡Activación completada con éxito!";
+                    
+                    showToast("Configuración Completada", "La comunicación nativa se ha activado correctamente.");
+                    setTimeout(() => {
+                      updateStatus();
+                    }, 1000);
+                  } else if (attempts > 90) { // Timeout de 45 segundos
+                    clearInterval(interval);
+                    btnInstall.disabled = false;
+                    btnInstall.textContent = "Intentar de nuevo";
+                    const s3Text = stepsContainer.querySelector("#mc-step-3-text");
+                    if (s3Text) s3Text.textContent = "No se detectó la ejecución. Inténtalo de nuevo.";
+                  }
+                });
+              }, 500);
+            } else {
+              showToast("Error de Configuración", "No se pudieron obtener los datos de instalación.");
+              btnInstall.disabled = false;
+              btnInstall.textContent = "Configurar en 1 Clic";
+              stepsContainer.style.display = "none";
+            }
+          });
+        });
+      }
+    });
+  };
+
+  updateStatus();
+}
+
+// --- Modal de Advertencia de Conexión Nativa ---
+function showNativeWarningModal() {
+  if (!shadow) return;
+
+  const containerEl = shadow.querySelector(".mc-container");
+  let leftStyle = "";
+  if (containerEl) {
+    const rect = containerEl.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    leftStyle = `left: ${centerX}px;`;
+  }
+
+  const overlay = document.createElement("div");
+  overlay.className = "mc-modal-overlay mc-warning-overlay";
+
+  overlay.innerHTML = `
+    <div class="mc-modal-box mc-warning-box" style="${leftStyle}">
+      <h3 class="mc-modal-title" style="color: #ff6b6b; font-size: 14px;">¿Deseas ocultar la barra de título?</h3>
+      <p class="mc-modal-text" style="margin-bottom: 15px;">Hemos detectado que la barra de título de la ventana sigue visible porque falta realizar la configuración nativa en tu sistema.</p>
+      
+      <div style="margin-bottom: 20px; display: flex; align-items: center; justify-content: center; gap: 8px;">
+        <input type="checkbox" id="mc-warning-ignore" style="cursor: pointer; margin: 0;" />
+        <label for="mc-warning-ignore" style="font-size: 11px; color: rgba(255, 255, 255, 0.7); cursor: pointer; user-select: none;">No volver a mostrar este aviso</label>
+      </div>
+
+      <div class="mc-modal-buttons">
+        <button class="mc-modal-btn mc-modal-btn-cancel" id="mc-warning-close">Cerrar</button>
+        <button class="mc-modal-btn mc-modal-btn-confirm" id="mc-warning-setup" style="background-color: rgba(90, 107, 255, 0.9);">Configurar ahora</button>
+      </div>
+    </div>
+  `;
+
+  shadow.appendChild(overlay);
+  
+  // Forzar reflow
+  overlay.offsetHeight;
+  overlay.classList.add("show");
+
+  const btnClose = overlay.querySelector("#mc-warning-close");
+  const btnSetup = overlay.querySelector("#mc-warning-setup");
+  const chkIgnore = overlay.querySelector("#mc-warning-ignore");
+
+  const saveIgnoreState = async () => {
+    if (chkIgnore.checked) {
+      try {
+        await chrome.storage.local.set({ ignoreNativeWarning: true });
+        showToast("Preferencia Guardada", "No volveremos a mostrarte este aviso.");
+      } catch (e) {
+        console.debug("Error guardando ignoreNativeWarning:", e);
+      }
+    }
+  };
+
+  const closeModal = async () => {
+    await saveIgnoreState();
+    overlay.classList.remove("show");
+    setTimeout(() => overlay.remove(), 250);
+  };
+
+  btnClose.addEventListener("click", closeModal);
+  btnSetup.addEventListener("click", async () => {
+    await saveIgnoreState();
+    overlay.classList.remove("show");
+    setTimeout(() => {
+      overlay.remove();
+      showConfigModal();
+    }, 250);
+  });
+
+  overlay.addEventListener("click", (e) => {
+    if (e.target === overlay) {
+      closeModal();
+    }
+  });
+}
+
+async function checkAndAlertNativeConnection() {
+  if (!isContextValid()) return;
+  try {
+    const storage = await chrome.storage.local.get("ignoreNativeWarning");
+    if (storage.ignoreNativeWarning) {
+      return; // El usuario eligió no ver el aviso
+    }
+    chrome.runtime.sendMessage({ action: "check_native_status" }, (res) => {
+      if (!res || !res.connected) {
+        // No está conectado, mostrar la modal de advertencia después de un breve delay
+        setTimeout(() => {
+          showNativeWarningModal();
+        }, 1200);
+      }
+    });
+  } catch (err) {
+    console.debug("Error en checkAndAlertNativeConnection:", err);
   }
 }
 

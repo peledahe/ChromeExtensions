@@ -1,7 +1,32 @@
 // Background Service Worker para la extensión 2xScreen
 
+// Variables de caché global para evitar esperas asíncronas lentas que rompen el token de User Gesture
+let activeTabsMemory = {};
+let cachedDisplays = [];
+
+// Inicializar caché de pestañas activas
+chrome.storage.local.get("active2xTabs", (data) => {
+  activeTabsMemory = data.active2xTabs || {};
+});
+
+// Inicializar y escuchar cambios en la configuración de pantallas
+async function updateDisplaysCache() {
+  if (chrome.system.display && chrome.system.display.getInfo) {
+    try {
+      cachedDisplays = await chrome.system.display.getInfo();
+    } catch (e) {
+      console.debug("Error caching displays:", e);
+    }
+  }
+}
+if (chrome.system.display && chrome.system.display.onDisplayChanged) {
+  chrome.system.display.onDisplayChanged.addListener(updateDisplaysCache);
+}
+updateDisplaysCache();
+
 // Limpieza de estados huérfanos al iniciar
 chrome.runtime.onInstalled.addListener(async () => {
+  activeTabsMemory = {};
   await chrome.storage.local.set({ active2xTabs: {} });
 });
 
@@ -16,170 +41,194 @@ chrome.action.onClicked.addListener(async (tab) => {
 
 // Escucha la eliminación de pestañas para mantener limpio el almacenamiento local
 chrome.tabs.onRemoved.addListener(async (tabId) => {
-  const data = await chrome.storage.local.get("active2xTabs");
-  const active2xTabs = data.active2xTabs || {};
-  if (active2xTabs[tabId]) {
-    delete active2xTabs[tabId];
-    await chrome.storage.local.set({ active2xTabs });
+  if (activeTabsMemory[tabId]) {
+    delete activeTabsMemory[tabId];
+    await chrome.storage.local.set({ active2xTabs: activeTabsMemory });
   }
 });
 
 // Función para alternar el modo 2x
 async function toggle2xMode(tab) {
-  const data = await chrome.storage.local.get("active2xTabs");
-  const active2xTabs = data.active2xTabs || {};
-  const tabData = active2xTabs[tab.id];
+  const tabData = activeTabsMemory[tab.id];
 
-  let isCurrentlyActive = false;
   if (tabData) {
-    // Verificar si la ventana registrada realmente sigue existiendo
+    // Si ya está activa, verificar si la ventana popup realmente sigue existiendo
     try {
       await chrome.windows.get(tabData.popupWindowId);
-      isCurrentlyActive = true;
+      await restoreWindow(tab.id);
     } catch (e) {
-      // Si la ventana ya no existe, reparamos el registro obsoleto
-      delete active2xTabs[tab.id];
-      await chrome.storage.local.set({ active2xTabs });
-    }
-  }
-
-  if (!isCurrentlyActive) {
-    // ACTIVAR MODO 2x
-    try {
-      let left = 0;
-      let top = 0;
-      let width = 2560;
-      let height = 800;
-      let displays = null;
-
-      if (chrome.system.display && chrome.system.display.getInfo) {
-        displays = await chrome.system.display.getInfo();
-        if (displays && displays.length > 0) {
-          const ordered = [...displays].sort((a, b) => a.workArea.left - b.workArea.left);
-          const d1 = ordered[0];
-          left = d1.workArea.left;
-          top = d1.workArea.top;
-          width = d1.workArea.width * 2;
-          height = d1.workArea.height;
-        }
-      } else {
-        // Fallback para navegadores que no soportan system.display (como Firefox)
-        try {
-          const currentWin = await chrome.windows.getCurrent();
-          left = currentWin.left || 0;
-          top = currentWin.top || 0;
-          width = (currentWin.width || 1280) * 2;
-          height = currentWin.height || 800;
-        } catch (e) {
-          // Valores por defecto seguros si todo falla
-          left = 0;
-          top = 0;
-          width = 2560;
-          height = 800;
-        }
-      }
-
-      // Guardamos la ventana original y su estado antes de mover la pestaña
-      const originalWindow = await chrome.windows.get(tab.windowId);
-      const originalState = originalWindow.state;
-
-      const targetLeft = Math.round(left);
-      const targetTop = Math.round(top);
-      const targetWidth = Math.round(width);
-      const targetHeight = Math.round(height);
-
-      // 3. Crear una nueva ventana tipo 'popup' moviendo la pestaña activa con las dimensiones 2x iniciales
-      const popupWindow = await chrome.windows.create({
-        tabId: tab.id,
-        type: "popup",
-        left: targetLeft,
-        top: targetTop,
-        width: targetWidth,
-        height: targetHeight
-      });
-
-      const hasMultipleDisplays = displays && displays.length > 1;
-
-      // 4. Registrar en storage INMEDIATAMENTE para evitar condiciones de carrera al recargar el content script
-      active2xTabs[tab.id] = {
-        originalWindowId: tab.windowId,
-        popupWindowId: popupWindow.id,
-        originalState: originalState,
-        alignRightScreen: hasMultipleDisplays
-      };
-      await chrome.storage.local.set({ active2xTabs });
-
-      // 5. Aplicar un segundo redimensionamiento diferido y desdecoración a los 300ms.
-      // En Linux, esto fuerza a GNOME Mutter a consolidar la geometría de doble pantalla de la ventana una vez mapeada.
-      setTimeout(async () => {
-        try {
-          // Cambiar el título a una firma única
-          const tempTitle = `Mk2xScreen_${Date.now()}`;
-          try {
-            await chrome.scripting.executeScript({
-              target: { tabId: tab.id },
-              func: (title) => { document.title = title; },
-              args: [tempTitle]
-            });
-          } catch (e) {
-            console.debug("No se pudo cambiar el titulo con executeScript:", e);
-          }
-
-          // Esperar un instante para que Chrome procese el cambio de título en el OS
-          await new Promise(r => setTimeout(r, 60));
-
-          // Enviar señal al helper nativo para quitar la decoración de la ventana
-          try {
-            const port = chrome.runtime.connectNative("com.merke.twoxscreen");
-            port.postMessage({ action: "undecorate", title: tempTitle });
-            port.onMessage.addListener((res) => {
-              console.debug("Native helper response:", res);
-              port.disconnect();
-            });
-            port.onDisconnect.addListener(() => {
-              if (chrome.runtime.lastError) {
-                console.debug("Native messaging not available:", chrome.runtime.lastError.message);
-              }
-            });
-          } catch (e) {
-            console.debug("Native messaging connect error:", e);
-          }
-
-          // Aplicar redimensionamiento final
-          await chrome.windows.update(popupWindow.id, {
-            left: targetLeft,
-            top: targetTop,
-            width: targetWidth,
-            height: targetHeight,
-            focused: true
-          });
-
-          // Finalmente, recargar la pestaña (restaurará el título original e inicializará el viewport)
-          setTimeout(async () => {
-            try {
-              await chrome.tabs.reload(tab.id);
-            } catch (e) {
-              console.error("Error al recargar la pestaña:", e);
-            }
-          }, 150);
-
-        } catch (e) {
-          console.debug("Error aplicando redimensionamiento y desdecoracion:", e);
-        }
-      }, 300);
-
-    } catch (err) {
-      console.error("Error al activar modo 2x:", err);
+      // Si la ventana ya no existe, reparamos el registro de la caché y de storage
+      delete activeTabsMemory[tab.id];
+      await chrome.storage.local.set({ active2xTabs: activeTabsMemory });
+      // E iniciamos el popup
+      create2xWindow(tab);
     }
   } else {
-    // DESACTIVAR MODO 2x
-    await restoreWindow(tab.id, active2xTabs);
+    // Si no está registrada en memoria, procedemos directamente
+    create2xWindow(tab);
+  }
+}
+
+// Función síncrona para iniciar la ventana popup preservando el gesto de usuario (User Gesture)
+function create2xWindow(tab) {
+  let left = 0;
+  let top = 0;
+  let width = 2560;
+  let height = 800;
+  let hasMultipleDisplays = false;
+
+  if (cachedDisplays && cachedDisplays.length > 0) {
+    const ordered = [...cachedDisplays].sort((a, b) => a.workArea.left - b.workArea.left);
+    const d1 = ordered[0];
+    left = d1.workArea.left;
+    top = d1.workArea.top;
+    height = d1.workArea.height;
+    
+    if (ordered.length > 1) {
+      const d2 = ordered[1];
+      width = d1.workArea.width + d2.workArea.width;
+      height = Math.min(d1.workArea.height, d2.workArea.height);
+      hasMultipleDisplays = true;
+    } else {
+      width = d1.workArea.width * 2;
+    }
+  } else {
+    // Fallback por defecto si la caché de pantallas fallase o estuviese vacía
+    left = 0;
+    top = 0;
+    width = 2560;
+    height = 800;
+  }
+
+  const targetLeft = Math.round(left);
+  const targetTop = Math.round(top);
+  const targetWidth = Math.round(width);
+  const targetHeight = Math.round(height);
+
+  try {
+    // Llamar a chrome.windows.create de forma DIRECTA y síncrona para conservar el token de User Gesture
+    chrome.windows.create({
+      tabId: tab.id,
+      type: "popup",
+      left: targetLeft,
+      top: targetTop,
+      width: targetWidth,
+      height: targetHeight
+    }, (popupWindow) => {
+      if (chrome.runtime.lastError) {
+        console.error("Error al crear la ventana popup con gesto de usuario:", chrome.runtime.lastError.message);
+        return;
+      }
+
+      // Ahora que la ventana popup se ha creado, obtenemos de forma segura el estado de la ventana original en segundo plano
+      chrome.windows.get(tab.windowId, (originalWindow) => {
+        const originalState = originalWindow ? originalWindow.state : "normal";
+
+        // Registrar en memoria y en el almacenamiento
+        activeTabsMemory[tab.id] = {
+          originalWindowId: tab.windowId,
+          popupWindowId: popupWindow.id,
+          originalState: originalState,
+          alignRightScreen: hasMultipleDisplays
+        };
+        chrome.storage.local.set({ active2xTabs: activeTabsMemory });
+
+        // Aplicar segundo redimensionamiento diferido y desdecoración
+        setTimeout(async () => {
+          try {
+            // Cambiar el título a una firma única
+            const tempTitle = `Mk2xScreen_${Date.now()}`;
+            try {
+              await chrome.scripting.executeScript({
+                target: { tabId: tab.id },
+                func: (title) => { document.title = title; },
+                args: [tempTitle]
+              });
+            } catch (e) {
+              console.debug("No se pudo cambiar el titulo con executeScript:", e);
+            }
+
+            // Esperar un instante para que Chrome procese el cambio de título en el OS
+            await new Promise(r => setTimeout(r, 60));
+
+            // Enviar señal al helper nativo para quitar la decoración de la ventana
+            const applyGeometry = async () => {
+              try {
+                await chrome.windows.update(popupWindow.id, {
+                  left: targetLeft,
+                  top: targetTop,
+                  width: targetWidth,
+                  height: targetHeight,
+                  focused: true
+                });
+                
+                setTimeout(async () => {
+                  try {
+                    await chrome.tabs.reload(tab.id);
+                  } catch (e) {
+                    console.error("Error al recargar la pestaña:", e);
+                  }
+                }, 150);
+              } catch (e) {
+                console.debug("Error aplicando geometria final:", e);
+              }
+            };
+
+            try {
+              const port = chrome.runtime.connectNative("com.merke.twoxscreen");
+              let geomApplied = false;
+
+              port.postMessage({ action: "undecorate", title: tempTitle });
+
+              port.onMessage.addListener(async (res) => {
+                console.debug("Native helper response:", res);
+                port.disconnect();
+                if (!geomApplied) {
+                  geomApplied = true;
+                  // Esperar un instante para que el OS procese el cambio de decoración
+                  await new Promise(r => setTimeout(r, 100));
+                  await applyGeometry();
+                }
+              });
+
+              port.onDisconnect.addListener(async () => {
+                if (chrome.runtime.lastError) {
+                  console.debug("Native messaging not available:", chrome.runtime.lastError.message);
+                }
+                if (!geomApplied) {
+                  geomApplied = true;
+                  await applyGeometry();
+                }
+              });
+
+              // Timeout de seguridad de 600ms por si el helper tarda demasiado o falla
+              setTimeout(async () => {
+                if (!geomApplied) {
+                  geomApplied = true;
+                  try { port.disconnect(); } catch (e) {}
+                  await applyGeometry();
+                }
+              }, 600);
+
+            } catch (e) {
+              console.debug("Native messaging connect error:", e);
+              await applyGeometry();
+            }
+
+          } catch (e) {
+            console.debug("Error aplicando redimensionamiento y desdecoracion:", e);
+          }
+        }, 300);
+      });
+    });
+  } catch (err) {
+    console.error("Error síncrono al iniciar ventana popup:", err);
   }
 }
 
 // Función para restaurar la pestaña a una ventana normal
-async function restoreWindow(tabId, active2xTabs) {
-  const tabData = active2xTabs[tabId];
+async function restoreWindow(tabId) {
+  const tabData = activeTabsMemory[tabId];
   if (!tabData) return;
 
   const originalWindowId = tabData.originalWindowId;
@@ -217,8 +266,8 @@ async function restoreWindow(tabId, active2xTabs) {
     console.error("Error al restaurar ventana normal:", err);
   } finally {
     // Limpiar del registro
-    delete active2xTabs[tabId];
-    await chrome.storage.local.set({ active2xTabs });
+    delete activeTabsMemory[tabId];
+    await chrome.storage.local.set({ active2xTabs: activeTabsMemory });
 
     // Recargar la pestaña al volver a su posición normal para eliminar la UI limpia y nativamente
     try {
@@ -402,6 +451,24 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           }
           break;
 
+        case "check_native_status":
+          checkNativeConnection().then(isConnected => {
+            sendResponse({ connected: isConnected });
+          });
+          break;
+
+        case "register_id_manually":
+          registerCurrentExtensionId().then(regSuccess => {
+            sendResponse({ success: regSuccess });
+          });
+          break;
+
+        case "get_installer_data":
+          getInstallerScriptData().then(result => {
+            sendResponse(result);
+          });
+          break;
+
         default:
           sendResponse({ error: "Acción no reconocida" });
       }
@@ -412,4 +479,319 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   })();
 
   return true; // Mantiene el canal abierto para responder de forma asíncrona
+});
+
+// === LOGICA DE INSTALACION Y SOPORTE DE NATIVE HOST ===
+
+const HELPER_PY_CONTENT = `#!/usr/bin/env python3
+import sys
+import json
+import struct
+import subprocess
+import platform
+import os
+
+def log_debug(msg):
+    try:
+        log_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "helper_debug.log")
+        lines = []
+        if os.path.exists(log_path):
+            with open(log_path, "r", encoding="utf-8", errors="ignore") as f:
+                lines = f.readlines()
+        lines.append(msg + "\\n")
+        if len(lines) > 100:
+            lines = lines[-100:]
+        with open(log_path, "w", encoding="utf-8") as f:
+            f.writelines(lines)
+    except Exception as e:
+        sys.stderr.write(f"Error escribiendo log: {e}\\n")
+
+def send_message(message):
+    try:
+        encoded = json.dumps(message).encode('utf-8')
+        sys.stdout.buffer.write(struct.pack('I', len(encoded)))
+        sys.stdout.buffer.write(encoded)
+        sys.stdout.flush()
+    except Exception as e:
+        log_debug(f"Error enviando mensaje: {e}")
+
+def read_message():
+    try:
+        raw_length = sys.stdin.buffer.read(4)
+        if not raw_length:
+            return None
+        length = struct.unpack('I', raw_length)[0]
+        message = sys.stdin.buffer.read(length).decode('utf-8')
+        return json.loads(message)
+    except Exception as e:
+        log_debug(f"Error leyendo mensaje: {e}")
+        return None
+
+def undecorate_linux(window_title):
+    try:
+        import re
+        res = subprocess.run(["xprop", "-root", "_NET_CLIENT_LIST"], capture_output=True, text=True)
+        if res.returncode != 0:
+            return False
+        window_ids = re.findall(r"0x[0-9a-fA-F]+", res.stdout)
+        success = False
+        for win_id in window_ids:
+            for prop in ["WM_NAME", "_NET_WM_NAME"]:
+                prop_res = subprocess.run(["xprop", "-id", win_id, prop], capture_output=True, text=True)
+                if prop_res.returncode == 0:
+                    title_content = prop_res.stdout.strip()
+                    if window_title in title_content:
+                        xprop_cmd = ["xprop", "-f", "_MOTIF_WM_HINTS", "32c", "-set", "_MOTIF_WM_HINTS", "2,0,0,0,0", "-id", win_id]
+                        sub_res = subprocess.run(xprop_cmd, capture_output=True, text=True)
+                        if sub_res.returncode == 0:
+                            success = True
+                        break
+        return success
+    except Exception as e:
+        log_debug(f"Error en undecorate Linux: {e}")
+    return False
+
+def undecorate_windows(window_title):
+    try:
+        import ctypes
+        hwnd = ctypes.windll.user32.FindWindowW(None, window_title)
+        if hwnd:
+            style = ctypes.windll.user32.GetWindowLongW(hwnd, -16)
+            style &= ~0x00C00000  # WS_CAPTION
+            style &= ~0x00040000  # WS_THICKFRAME
+            ctypes.windll.user32.SetWindowLongW(hwnd, -16, style)
+            ctypes.windll.user32.SetWindowPos(hwnd, 0, 0, 0, 0, 0, 0, 0x0027)
+            return True
+    except Exception as e:
+        log_debug(f"Error en undecorate Windows: {e}")
+    return False
+
+def register_extension_id(ext_id):
+    if not ext_id or not isinstance(ext_id, str) or not ext_id.isalnum():
+        return False
+    
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    local_json = os.path.join(script_dir, "com.merke.twoxscreen.json")
+    paths = [local_json]
+    
+    if "linux" in platform.system().lower():
+        home = os.path.expanduser("~")
+        linux_paths = [
+            os.path.join(home, ".config/google-chrome/NativeMessagingHosts/com.merke.twoxscreen.json"),
+            os.path.join(home, ".config/chromium/NativeMessagingHosts/com.merke.twoxscreen.json"),
+            os.path.join(home, ".config/microsoft-edge/NativeMessagingHosts/com.merke.twoxscreen.json"),
+            os.path.join(home, ".config/microsoft-edge-beta/NativeMessagingHosts/com.merke.twoxscreen.json"),
+            os.path.join(home, ".config/microsoft-edge-dev/NativeMessagingHosts/com.merke.twoxscreen.json"),
+        ]
+        paths.extend(linux_paths)
+        
+    success = False
+    for path in paths:
+        if os.path.exists(path):
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                allowed = data.get("allowed_origins", [])
+                origin = f"chrome-extension://{ext_id}/"
+                if origin not in allowed:
+                    allowed.append(origin)
+                    data["allowed_origins"] = allowed
+                    with open(path, "w", encoding="utf-8") as f:
+                        json.dump(data, f, indent=2)
+                    success = True
+                else:
+                    success = True
+            except Exception as e:
+                log_debug(f"Error registrando en {path}: {e}")
+    return success
+
+def main():
+    while True:
+        msg = read_message()
+        if msg is None:
+            break
+        action = msg.get("action")
+        success = False
+        if action == "ping":
+            success = True
+        elif action == "register_id":
+            success = register_extension_id(msg.get("id"))
+        elif action == "undecorate":
+            window_title = msg.get("title")
+            if window_title:
+                current_os = platform.system().lower()
+                if "linux" in current_os:
+                    success = undecorate_linux(window_title)
+                elif "windows" in current_os:
+                    success = undecorate_windows(window_title)
+        send_message({"success": success})
+
+if __name__ == "__main__":
+    main()
+`;
+
+async function checkNativeConnection() {
+  return new Promise((resolve) => {
+    try {
+      const port = chrome.runtime.connectNative("com.merke.twoxscreen");
+      let resolved = false;
+      port.onMessage.addListener((msg) => {
+        if (!resolved) {
+          resolved = true;
+          try { port.disconnect(); } catch(e) {}
+          resolve(true);
+        }
+      });
+      port.onDisconnect.addListener(() => {
+        if (!resolved) {
+          resolved = true;
+          resolve(false);
+        }
+      });
+      port.postMessage({ action: "ping" });
+      setTimeout(() => {
+        if (!resolved) {
+          resolved = true;
+          try { port.disconnect(); } catch(e) {}
+          resolve(false);
+        }
+      }, 400);
+    } catch (e) {
+      resolve(false);
+    }
+  });
+}
+
+async function registerCurrentExtensionId() {
+  return new Promise((resolve) => {
+    try {
+      const port = chrome.runtime.connectNative("com.merke.twoxscreen");
+      let resolved = false;
+      port.onMessage.addListener((msg) => {
+        if (!resolved) {
+          resolved = true;
+          try { port.disconnect(); } catch(e) {}
+          resolve(!!(msg && msg.success));
+        }
+      });
+      port.onDisconnect.addListener(() => {
+        if (!resolved) {
+          resolved = true;
+          resolve(false);
+        }
+      });
+      port.postMessage({ action: "register_id", id: chrome.runtime.id });
+      setTimeout(() => {
+        if (!resolved) {
+          resolved = true;
+          try { port.disconnect(); } catch(e) {}
+          resolve(false);
+        }
+      }, 800);
+    } catch (e) {
+      resolve(false);
+    }
+  });
+}
+
+async function getInstallerScriptData() {
+  try {
+    const platformInfo = await chrome.runtime.getPlatformInfo();
+    const os = platformInfo.os;
+    let fileContent = "";
+    let filename = "";
+
+    if (os === "win") {
+      filename = "install_2xscreen.bat";
+      const base64Helper = btoa(unescape(encodeURIComponent(HELPER_PY_CONTENT)));
+      const chunks = [];
+      for (let i = 0; i < base64Helper.length; i += 70) {
+        chunks.push(base64Helper.substring(i, i + 70));
+      }
+      const b64Formatted = chunks.map(line => `echo ${line} >> "%INSTALL_DIR%\\helper.b64"`).join("\r\n");
+
+      fileContent = `@echo off
+set "INSTALL_DIR=%USERPROFILE%\\AppData\\Local\\2xscreen"
+if not exist "%INSTALL_DIR%" mkdir "%INSTALL_DIR%"
+
+echo -----BEGIN CERTIFICATE----- > "%INSTALL_DIR%\\helper.b64"
+${b64Formatted}
+echo -----END CERTIFICATE----- >> "%INSTALL_DIR%\\helper.b64"
+
+certutil -decode "%INSTALL_DIR%\\helper.b64" "%INSTALL_DIR%\\twoxscreen_helper.py" >nul
+del "%INSTALL_DIR%\\helper.b64"
+
+powershell -Command "$path = '%INSTALL_DIR%\\twoxscreen_helper.py'.Replace('\\', '\\\\'); $json = @{ name = 'com.merke.twoxscreen'; description = 'Helper nativo de 2xScreen para quitar bordes de ventana'; path = $path; type = 'stdio'; allowed_origins = @('chrome-extension://gnjddnfmlhjmmglbhalfcckcplmcdkaf/', 'chrome-extension://ihbfgcligcckngjlbjccjjojmpepajin/', 'chrome-extension://${chrome.runtime.id}/') } | ConvertTo-Json; [IO.File]::WriteAllText('%INSTALL_DIR%\\com.merke.twoxscreen.json', $json)"
+
+REG ADD "HKCU\\Software\\Google\\Chrome\\NativeMessagingHosts\\com.merke.twoxscreen" /ve /t REG_SZ /d "%INSTALL_DIR%\\com.merke.twoxscreen.json" /f >nul
+REG ADD "HKCU\\Software\\Microsoft\\Edge\\NativeMessagingHosts\\com.merke.twoxscreen" /ve /t REG_SZ /d "%INSTALL_DIR%\\com.merke.twoxscreen.json" /f >nul
+
+echo 2xScreen configurado con exito.
+pause
+`;
+    } else {
+      filename = "install_2xscreen.sh";
+      fileContent = `#!/bin/bash
+INSTALL_DIR="$HOME/.local/share/2xscreen"
+mkdir -p "$INSTALL_DIR"
+
+cat << 'EOF' > "$INSTALL_DIR/twoxscreen_helper.py"
+${HELPER_PY_CONTENT}
+EOF
+chmod +x "$INSTALL_DIR/twoxscreen_helper.py"
+
+cat << 'EOF' > "$INSTALL_DIR/com.merke.twoxscreen.json"
+{
+  "name": "com.merke.twoxscreen",
+  "description": "Helper nativo de 2xScreen para quitar bordes de ventana",
+  "path": "INSTALL_DIR_PLACEHOLDER/twoxscreen_helper.py",
+  "type": "stdio",
+  "allowed_origins": [
+    "chrome-extension://gnjddnfmlhjmmglbhalfcckcplmcdkaf/",
+    "chrome-extension://ihbfgcligcckngjlbjccjjojmpepajin/",
+    "chrome-extension://${chrome.runtime.id}/"
+  ]
+}
+EOF
+
+sed -i "s|INSTALL_DIR_PLACEHOLDER|$INSTALL_DIR|g" "$INSTALL_DIR/com.merke.twoxscreen.json"
+
+CHROME_DIR="$HOME/.config/google-chrome/NativeMessagingHosts"
+CHROMIUM_DIR="$HOME/.config/chromium/NativeMessagingHosts"
+EDGE_DIR="$HOME/.config/microsoft-edge/NativeMessagingHosts"
+EDGE_BETA_DIR="$HOME/.config/microsoft-edge-beta/NativeMessagingHosts"
+EDGE_DEV_DIR="$HOME/.config/microsoft-edge-dev/NativeMessagingHosts"
+
+for d in "$CHROME_DIR" "$CHROMIUM_DIR" "$EDGE_DIR" "$EDGE_BETA_DIR" "$EDGE_DEV_DIR"; do
+    mkdir -p "$d"
+    cp "$INSTALL_DIR/com.merke.twoxscreen.json" "$d/com.merke.twoxscreen.json"
+    chmod 644 "$d/com.merke.twoxscreen.json"
+done
+
+echo "Instalación completada con éxito."
+`;
+    }
+
+    return { success: true, filename, fileContent };
+
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+}
+
+// Registro automático al iniciar/instalar la extensión
+chrome.runtime.onInstalled.addListener(() => {
+  setTimeout(() => {
+    registerCurrentExtensionId().then(success => {
+      console.log("Registro automático al instalar:", success);
+    });
+  }, 1000);
+});
+
+chrome.runtime.onStartup.addListener(() => {
+  setTimeout(() => {
+    registerCurrentExtensionId().then(success => {
+      console.log("Registro automático al arrancar:", success);
+    });
+  }, 1000);
 });
