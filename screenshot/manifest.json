@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Mk ScreenShot",
   "short_name": "mk-screenshot",
-  "version": "1.1",
+  "version": "1.2",
   "description": "Captura y anota la pantalla de manera fácil y rápida (multiplataforma).",
   "permissions": [
     "activeTab",
