@@ -1,9 +1,17 @@
 // background.js - Service Worker para Mk Organizer
 
 // Al hacer clic en el icono de la extensión, se abre la pestaña de organizer.html
+// Si ya está abierta en alguna pestaña, la enfoca y la activa en lugar de abrir una duplicada
 chrome.action.onClicked.addListener((tab) => {
-  chrome.tabs.create({
-    url: chrome.runtime.getURL('organizer.html')
+  const targetUrl = chrome.runtime.getURL('organizer.html');
+  chrome.tabs.query({ url: targetUrl }, (tabs) => {
+    if (tabs && tabs.length > 0) {
+      const existingTab = tabs[0];
+      chrome.tabs.update(existingTab.id, { active: true });
+      chrome.windows.update(existingTab.windowId, { focused: true });
+    } else {
+      chrome.tabs.create({ url: targetUrl });
+    }
   });
 });
 

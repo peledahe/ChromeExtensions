@@ -3660,7 +3660,25 @@ function checkCapturedCredentials() {
                 container.innerHTML = '';
                 return;
             }
-            renderCapturedCredentials(list);
+
+            // Filtrar las que ya están almacenadas en state.passwords para no mostrarlas
+            const filteredList = list.filter(cred => {
+                const alreadyStored = (state.passwords || []).some(p => {
+                    const matchUser = p.username === cred.username;
+                    const matchPass = p.password === cred.password;
+                    const cleanDomain = (cred.domain || '').toLowerCase().trim();
+                    const matchSite = (p.site || '').toLowerCase().includes(cleanDomain) ||
+                                      (p.url || '').toLowerCase().includes(cleanDomain);
+                    return matchUser && matchPass && matchSite;
+                });
+                return !alreadyStored;
+            });
+
+            if (filteredList.length === 0) {
+                container.innerHTML = '';
+            } else {
+                renderCapturedCredentials(filteredList);
+            }
         });
     }
 }
