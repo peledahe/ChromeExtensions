@@ -1,4 +1,4 @@
-// debts.js - Planificador de Deudas con simulación Bola de Nieve / Avalancha y gráfica SVG
+// debts.js - Planificador de Deudas con soporte Multi-moneda y simulación Bola de Nieve / Avalancha
 
 const debtsState = {
     debts: [],
@@ -6,12 +6,38 @@ const debtsState = {
     method: localStorage.getItem('debtsMethod') || 'snowball' // 'snowball' | 'avalanche'
 };
 
-function fmtNum(n) {
+function debtFmtNum(n) {
     return Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-function getCurrencySymbol() {
+function debtGetSymbol(currency) {
+    if (currency === 'second') return window.currencyState?.secondSymbol || 'US$';
     return window.currencyState?.symbol || 'Q';
+}
+
+function debtGetRate() {
+    return Number(window.currencyState?.exchangeRate) || 7.8;
+}
+
+function debtToLocal(amount, currency) {
+    if (currency === 'second') return amount * debtGetRate();
+    return amount;
+}
+
+function debtFromLocal(amount, currency) {
+    if (currency === 'second') return amount / debtGetRate();
+    return amount;
+}
+
+function debtConversionLabel(amount, currency) {
+    const rate = debtGetRate();
+    const secondEnabled = window.currencyState?.secondEnabled;
+    if (currency === 'second') {
+        return `(${window.currencyState?.symbol || 'Q'} ${debtFmtNum(amount * rate)})`;
+    } else {
+        if (!secondEnabled) return '';
+        return `(${window.currencyState?.secondSymbol || 'US$'} ${debtFmtNum(amount / rate)})`;
+    }
 }
 
 // ── Fetch ───────────────────────────────────────────────────────────────────
@@ -30,7 +56,7 @@ async function fetchDebts() {
         const budgetInput = document.getElementById('debts-budget-input');
         if (budgetInput) budgetInput.value = debtsState.budget || '';
 
-        const sym = getCurrencySymbol();
+        const sym = debtGetSymbol('local');
         const budgetSym = document.getElementById('debts-budget-symbol');
         if (budgetSym) budgetSym.textContent = sym;
 
@@ -57,10 +83,10 @@ function renderDebtsSummaryCards() {
     const container = document.getElementById('debts-summary-cards');
     if (!container) return;
 
-    const sym = getCurrencySymbol();
-    const totalDebt = debtsState.debts.reduce((s, d) => s + d.balance, 0);
-    const totalMin = debtsState.debts.reduce((s, d) => s + d.minPayment, 0);
-    const extra = Math.max(0, debtsState.budget - totalMin);
+    const sym = debtGetSymbol('local');
+    const totalDebtLocal = debtsState.debts.reduce((s, d) => s + debtToLocal(d.balance, d.currency), 0);
+    const totalMinLocal = debtsState.debts.reduce((s, d) => s + debtToLocal(d.minPayment, d.currency), 0);
+    const extraLocal = Math.max(0, debtsState.budget - totalMinLocal);
 
     let monthsEst = 0;
     if (debtsState.debts.length > 0) {
@@ -72,9 +98,9 @@ function renderDebtsSummaryCards() {
     const timeLabel = monthsEst === 0 ? '—' : (yearsEst > 0 ? `${yearsEst}a ${moEst}m` : `${moEst} mes${moEst !== 1 ? 'es' : ''}`);
 
     const cards = [
-        { label: 'Total Adeudado', value: `${sym} ${fmtNum(totalDebt)}`, color: '#ff7675', icon: '💳', bg: 'rgba(255,118,117,0.06)', border: 'rgba(255,118,117,0.2)' },
-        { label: 'Pagos Mínimos', value: `${sym} ${fmtNum(totalMin)}`, color: '#fdcb6e', icon: '📋', bg: 'rgba(253,203,110,0.06)', border: 'rgba(253,203,110,0.2)' },
-        { label: 'Extra Bola de Nieve', value: `${sym} ${fmtNum(extra)}`, color: '#a29bfe', icon: '❄️', bg: 'rgba(108,92,231,0.06)', border: 'rgba(108,92,231,0.2)' },
+        { label: 'Total Adeudado', value: `${sym} ${debtFmtNum(totalDebtLocal)}`, color: '#ff7675', icon: '💳', bg: 'rgba(255,118,117,0.06)', border: 'rgba(255,118,117,0.2)' },
+        { label: 'Pagos Mínimos Total', value: `${sym} ${debtFmtNum(totalMinLocal)}`, color: '#fdcb6e', icon: '📋', bg: 'rgba(253,203,110,0.06)', border: 'rgba(253,203,110,0.2)' },
+        { label: 'Extra Bola de Nieve', value: `${sym} ${debtFmtNum(extraLocal)}`, color: '#a29bfe', icon: '❄️', bg: 'rgba(108,92,231,0.06)', border: 'rgba(108,92,231,0.2)' },
         { label: 'Libre de Deuda en', value: timeLabel, color: '#2ed573', icon: '🏆', bg: 'rgba(46,213,115,0.06)', border: 'rgba(46,213,115,0.2)' }
     ];
 
@@ -104,19 +130,22 @@ function renderDebtsList() {
 
     if (badge) badge.textContent = debtsState.debts.length;
 
-    const sym = getCurrencySymbol();
     const sortedDebts = sortDebtsForMethod(debtsState.debts);
-    const maxBalance = Math.max(...sortedDebts.map(d => d.balance), 1);
+    const maxBalanceLocal = Math.max(...sortedDebts.map(d => debtToLocal(d.balance, d.currency)), 1);
     const effectivePayments = computeEffectivePayments();
-    const totalMin = sortedDebts.reduce((s, d) => s + d.minPayment, 0);
-    const hasExtra = debtsState.budget > totalMin;
+    const totalMinLocal = sortedDebts.reduce((s, d) => s + debtToLocal(d.minPayment, d.currency), 0);
+    const hasExtra = debtsState.budget > totalMinLocal;
 
     container.innerHTML = sortedDebts.map((d, index) => {
-        const pct = Math.min(100, (d.balance / maxBalance) * 100);
+        const dSym = debtGetSymbol(d.currency);
+        const balLocal = debtToLocal(d.balance, d.currency);
+        const pct = Math.min(100, (balLocal / maxBalanceLocal) * 100);
         const isTarget = index === 0;
         const color = isTarget ? '#a29bfe' : '#ff7675';
         const effective = effectivePayments.get(d.id) || d.minPayment;
         const showExtra = isTarget && hasExtra && debtsState.budget > 0;
+        const convBal = debtConversionLabel(d.balance, d.currency);
+
         return `
         <div class="ag-item debt-item-card" style="background:var(--ag-card-bg); border:1px solid var(--ag-border); border-radius:10px; padding:12px 14px; display:flex; flex-direction:column; gap:8px; transition:transform 0.15s;" onmouseover="this.style.transform='translateX(2px)'" onmouseout="this.style.transform=''">
             <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -125,18 +154,18 @@ function renderDebtsList() {
                     <div>
                         <div style="font-weight:700; font-size:0.88rem; color:var(--ag-text);">${escapeHtml(d.name)}</div>
                         <div style="font-size:0.73rem; color:var(--ag-text-muted); display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
-                            <span>Mínimo: <strong style="color:var(--ag-text);">${sym} ${fmtNum(d.minPayment)}</strong></span>
-                            ${showExtra ? `<span style="color:#a29bfe; font-weight:700; background:rgba(108,92,231,0.1); padding:1px 6px; border-radius:4px;">→ Abono: ${sym} ${fmtNum(effective)} ❄️</span>` : ''}
+                            <span>Mínimo: <strong style="color:var(--ag-text);">${dSym} ${debtFmtNum(d.minPayment)}</strong></span>
+                            ${showExtra ? `<span style="color:#a29bfe; font-weight:700; background:rgba(108,92,231,0.1); padding:1px 6px; border-radius:4px;">→ Abono: ${dSym} ${debtFmtNum(effective)} ❄️</span>` : ''}
                         </div>
                     </div>
                 </div>
                 <div style="text-align:right; display:flex; align-items:center; gap:8px;">
                     <div>
-                        <div style="font-weight:800; color:#ff7675; font-size:0.98rem;">${sym} ${fmtNum(d.balance)}</div>
-                        <div style="font-size:0.7rem; color:var(--ag-text-muted);">saldo</div>
+                        <div style="font-weight:800; color:#ff7675; font-size:0.98rem;">${dSym} ${debtFmtNum(d.balance)}</div>
+                        <div style="font-size:0.7rem; color:var(--ag-text-muted);">${convBal ? convBal : 'saldo'}</div>
                     </div>
                     <div style="display:flex; gap:3px;">
-                        <button class="ag-btn debt-pay-btn" data-id="${d.id}" title="Registrar abono de ${sym} ${fmtNum(effective)}"
+                        <button class="ag-btn debt-pay-btn" data-id="${d.id}" title="Registrar abono de ${dSym} ${debtFmtNum(effective)}"
                             style="padding:3px 8px; font-size:0.72rem; background:rgba(46,213,115,0.12); border:1px solid #2ed573; color:#2ed573; font-weight:700; cursor:pointer; border-radius:5px;">Abonar</button>
                         <button class="ag-edit-btn debt-edit-btn" data-id="${d.id}" style="background:none; border:none; cursor:pointer; font-size:0.82rem; padding:2px 4px;">✏️</button>
                         <button class="ag-delete-btn debt-delete-btn" data-id="${d.id}" style="background:none; border:none; cursor:pointer; font-size:0.82rem; padding:2px 4px;">🗑️</button>
@@ -155,26 +184,30 @@ function renderDebtsList() {
 function sortDebtsForMethod(debts) {
     const copy = [...debts];
     if (debtsState.method === 'avalanche') {
-        return copy.sort((a, b) => b.minPayment - a.minPayment);
+        // Ordenar por pago mínimo local equivalente (avalancha) desc
+        return copy.sort((a, b) => debtToLocal(b.minPayment, b.currency) - debtToLocal(a.minPayment, a.currency));
     }
-    return copy.sort((a, b) => a.balance - b.balance);
+    // Ordenar por saldo local equivalente desc (bola de nieve) asc
+    return copy.sort((a, b) => debtToLocal(a.balance, a.currency) - debtToLocal(b.balance, b.currency));
 }
 
-/**
- * Calcula el abono efectivo (mínimo + extra bola de nieve) para cada deuda
- * según el presupuesto mensual actual.
- * Retorna un Map { debtId -> effectivePayment }
- */
 function computeEffectivePayments() {
     const sorted = sortDebtsForMethod(debtsState.debts);
-    const totalMin = sorted.reduce((s, d) => s + d.minPayment, 0);
-    const extra = debtsState.budget > 0 ? Math.max(0, debtsState.budget - totalMin) : 0;
+    const totalMinLocal = sorted.reduce((s, d) => s + debtToLocal(d.minPayment, d.currency), 0);
+    const extraLocal = debtsState.budget > 0 ? Math.max(0, debtsState.budget - totalMinLocal) : 0;
 
     const result = new Map();
     sorted.forEach((d, i) => {
-        const base = Math.min(d.balance, d.minPayment);
-        const bonus = (i === 0 && extra > 0) ? Math.min(d.balance - base, extra) : 0;
-        result.set(d.id, Math.min(d.balance, base + bonus));
+        const balLocal = debtToLocal(d.balance, d.currency);
+        const minLocal = debtToLocal(d.minPayment, d.currency);
+
+        const baseLocal = Math.min(balLocal, minLocal);
+        const bonusLocal = (i === 0 && extraLocal > 0) ? Math.min(balLocal - baseLocal, extraLocal) : 0;
+
+        const totalLocal = baseLocal + bonusLocal;
+        const totalOriginal = debtFromLocal(totalLocal, d.currency);
+
+        result.set(d.id, totalOriginal);
     });
     return result;
 }
@@ -183,31 +216,36 @@ function runSimulation() {
     if (debtsState.debts.length === 0) return [];
 
     const sortedDebts = sortDebtsForMethod(debtsState.debts);
-    const totalMin = sortedDebts.reduce((s, d) => s + d.minPayment, 0);
+    const totalMinLocal = sortedDebts.reduce((s, d) => s + debtToLocal(d.minPayment, d.currency), 0);
 
-    const sim = sortedDebts.map(d => ({ ...d }));
+    const sim = sortedDebts.map(d => ({
+        ...d,
+        balance: debtToLocal(d.balance, d.currency),
+        minPayment: debtToLocal(d.minPayment, d.currency)
+    }));
+
     let month = 0;
     const maxMonths = 120;
     const history = [{ month: 0, total: sim.reduce((s, d) => s + d.balance, 0) }];
 
     while (sim.some(d => d.balance > 0) && month < maxMonths) {
         month++;
-        let available = debtsState.budget > 0 ? debtsState.budget : totalMin;
+        let availableLocal = debtsState.budget > 0 ? debtsState.budget : totalMinLocal;
 
         const active = sim.filter(d => d.balance > 0);
 
         active.forEach(d => {
-            const pay = Math.min(d.balance, d.minPayment);
-            d.balance -= pay;
-            available -= pay;
+            const payLocal = Math.min(d.balance, d.minPayment);
+            d.balance -= payLocal;
+            availableLocal -= payLocal;
         });
 
-        if (available > 0) {
+        if (availableLocal > 0) {
             const target = sim.find(d => d.balance > 0);
             if (target) {
-                const extra = Math.min(target.balance, available);
-                target.balance -= extra;
-                available -= extra;
+                const extraLocal = Math.min(target.balance, availableLocal);
+                target.balance -= extraLocal;
+                availableLocal -= extraLocal;
             }
         }
 
@@ -238,7 +276,7 @@ function renderDebtChart(history) {
     const H = 150;
     svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
 
-    const sym = getCurrencySymbol();
+    const sym = debtGetSymbol('local');
     const maxVal = history[0].total || 1;
     const months = history.length - 1;
     const padL = 52, padR = 12, padT = 10, padB = 28;
@@ -251,7 +289,7 @@ function renderDebtChart(history) {
     const gridLines = [0, 0.25, 0.5, 0.75, 1].map(f => {
         const y = padT + h - f * h;
         const val = f * maxVal;
-        const label = val >= 1000 ? `${(val/1000).toFixed(0)}k` : fmtNum(val);
+        const label = val >= 1000 ? `${(val/1000).toFixed(0)}k` : debtFmtNum(val);
         return `<line x1="${padL}" y1="${y.toFixed(1)}" x2="${padL + w}" y2="${y.toFixed(1)}" stroke="rgba(255,255,255,0.04)" stroke-width="1"/>
                 <text x="${padL - 4}" y="${(y + 4).toFixed(1)}" text-anchor="end" fill="rgba(255,255,255,0.3)" font-size="9">${sym}${label}</text>`;
     }).join('');
@@ -280,7 +318,7 @@ function renderDebtChart(history) {
                 debtMarkers += `
                     <line x1="${cx}" y1="${cy}" x2="${cx}" y2="${padT + h}" stroke="${c}" stroke-width="1" stroke-dasharray="2,3" opacity="0.5"/>
                     <circle cx="${cx}" cy="${cy}" r="5" fill="${c}" stroke="#1a1a2e" stroke-width="1.5" opacity="0.95"
-                        class="debt-chart-marker" data-month="${d.monthsToClear}" data-name="${safeName}" data-total="${fmtNum(p.total)}" data-sym="${sym}"/>`;
+                        class="debt-chart-marker" data-month="${d.monthsToClear}" data-name="${safeName}" data-total="${debtFmtNum(p.total)}" data-sym="${sym}"/>`;
             }
         });
     }
@@ -289,7 +327,7 @@ function renderDebtChart(history) {
         const cx = xScale(i).toFixed(2);
         const cy = yScale(p.total).toFixed(2);
         return `<circle cx="${cx}" cy="${cy}" r="8" fill="transparent" class="debt-chart-hover"
-            data-month="${p.month}" data-total="${fmtNum(p.total)}" data-sym="${sym}"/>`;
+            data-month="${p.month}" data-total="${debtFmtNum(p.total)}" data-sym="${sym}"/>`;
     }).join('');
 
     svg.innerHTML = `
@@ -304,7 +342,6 @@ function renderDebtChart(history) {
         <path d="${linePath}" fill="none" stroke="#a29bfe" stroke-width="2" stroke-linejoin="round"/>
         ${debtMarkers}${hoverPts}`;
 
-    // Remover listeners viejos clonando
     const newSvg = svg.cloneNode(true);
     svg.parentNode.replaceChild(newSvg, svg);
 
@@ -339,17 +376,17 @@ function renderSnowballProjection() {
         return;
     }
 
-    const sym = getCurrencySymbol();
+    const sym = debtGetSymbol('local');
     const sortedDebts = sortDebtsForMethod(debtsState.debts);
-    const totalMinPayment = sortedDebts.reduce((s, d) => s + d.minPayment, 0);
+    const totalMinPaymentLocal = sortedDebts.reduce((s, d) => s + debtToLocal(d.minPayment, d.currency), 0);
 
-    if (debtsState.budget > 0 && debtsState.budget < totalMinPayment) {
+    if (debtsState.budget > 0 && debtsState.budget < totalMinPaymentLocal) {
         container.innerHTML = `
             <div style="background:rgba(255,118,117,0.08); border:1px solid rgba(255,118,117,0.3); border-radius:8px; padding:14px; color:#ff7675; font-size:0.86rem; display:flex; align-items:flex-start; gap:10px;">
                 <span style="font-size:1.2rem; flex-shrink:0;">⚠️</span>
                 <div>
                     <strong>Presupuesto insuficiente:</strong><br>
-                    Tu presupuesto <em>(${sym} ${fmtNum(debtsState.budget)})</em> no cubre los pagos mínimos <em>(${sym} ${fmtNum(totalMinPayment)})</em>.<br>
+                    Tu presupuesto <em>(${sym} ${debtFmtNum(debtsState.budget)})</em> no cubre los pagos mínimos <em>(${sym} ${debtFmtNum(totalMinPaymentLocal)})</em>.<br>
                     Aumenta el presupuesto mensual para activar el simulador.
                 </div>
             </div>`;
@@ -365,6 +402,7 @@ function renderSnowballProjection() {
 
     const colors = ['#2ed573','#fdcb6e','#a29bfe','#74b9ff','#ff7675','#fd79a8'];
     const rows = simDebts.map((d, i) => {
+        const dSym = debtGetSymbol(d.currency);
         const mo = d.monthsToClear || totalMonths;
         const yr = Math.floor(mo / 12);
         const rem = mo % 12;
@@ -375,7 +413,7 @@ function renderSnowballProjection() {
             <span style="width:10px; height:10px; background:${c}; border-radius:50%; flex-shrink:0;"></span>
             <div style="flex:1; min-width:0;">
                 <div style="font-weight:700; font-size:0.84rem; color:var(--ag-text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(d.name)}</div>
-                <div style="font-size:0.73rem; color:var(--ag-text-muted);">Mínimo: ${sym} ${fmtNum(d.minPayment)}</div>
+                <div style="font-size:0.73rem; color:var(--ag-text-muted);">Mínimo: ${dSym} ${debtFmtNum(d.minPayment)}</div>
             </div>
             <div style="text-align:right; flex-shrink:0;">
                 <div style="font-weight:800; color:${c}; font-size:0.9rem;">${timeStr}</div>
@@ -399,6 +437,7 @@ function openDebtModal(id = null) {
     const balanceInput = document.getElementById('debt-balance-input');
     const minPayInput = document.getElementById('debt-minpay-input');
     const idInput = document.getElementById('debt-id-hidden');
+    const currencySelect = document.getElementById('debt-currency-select');
 
     if (id) {
         const debt = debtsState.debts.find(d => d.id === id);
@@ -408,12 +447,14 @@ function openDebtModal(id = null) {
         balanceInput.value = debt.balance;
         minPayInput.value = debt.minPayment;
         idInput.value = debt.id;
+        if (currencySelect) currencySelect.value = debt.currency || 'local';
     } else {
         title.textContent = 'Nueva Deuda';
         nameInput.value = '';
         balanceInput.value = '';
         minPayInput.value = '';
         idInput.value = '';
+        if (currencySelect) currencySelect.value = 'local';
     }
 
     modal.classList.add('active');
@@ -423,6 +464,7 @@ async function saveDebt() {
     const name = (document.getElementById('debt-name-input')?.value || '').trim();
     const balance = parseFloat(document.getElementById('debt-balance-input')?.value || '0');
     const minPayment = parseFloat(document.getElementById('debt-minpay-input')?.value || '0');
+    const currency = document.getElementById('debt-currency-select')?.value || 'local';
     const id = document.getElementById('debt-id-hidden')?.value;
 
     if (!name || Number.isNaN(balance) || Number.isNaN(minPayment) || balance < 0 || minPayment < 0) {
@@ -432,10 +474,15 @@ async function saveDebt() {
 
     if (id) {
         const debt = debtsState.debts.find(d => d.id === Number(id));
-        if (debt) { debt.name = name; debt.balance = balance; debt.minPayment = minPayment; }
+        if (debt) {
+            debt.name = name;
+            debt.balance = balance;
+            debt.minPayment = minPayment;
+            debt.currency = currency;
+        }
     } else {
         const newId = debtsState.debts.length > 0 ? Math.max(...debtsState.debts.map(d => d.id)) + 1 : 1;
-        debtsState.debts.push({ id: newId, name, balance, minPayment });
+        debtsState.debts.push({ id: newId, name, balance, minPayment, currency });
     }
 
     await saveDebtsState();
@@ -459,29 +506,26 @@ async function payDebtQuota(id) {
     if (debtIndex === -1) return;
 
     const debt = debtsState.debts[debtIndex];
-    // Usar el mismo cálculo que muestra la UI para coherencia
     const effectivePayments = computeEffectivePayments();
     const finalPayment = effectivePayments.get(id) || Math.min(debt.balance, debt.minPayment);
-    const sym = getCurrencySymbol();
+    const dSym = debtGetSymbol(debt.currency);
 
-    window.showConfirm(`¿Registrar abono de ${sym} ${fmtNum(finalPayment)} a "${debt.name}"?`, async (ok) => {
+    window.showConfirm(`¿Registrar abono de ${dSym} ${debtFmtNum(finalPayment)} a "${debt.name}"?`, async (ok) => {
         if (!ok) return;
         debt.balance = Math.max(0, debt.balance - finalPayment);
 
         if (py?.add_shopping) {
-            await py.add_shopping(`Abono: ${debt.name}`, finalPayment, 'local',
+            await py.add_shopping(`Abono: ${debt.name}`, finalPayment, debt.currency || 'local',
                 new Date().toISOString().split('T')[0], '', 'Deudas');
         }
 
-        // Si la deuda quedó en cero, marcarla como liquidada con notificación
         if (debt.balance === 0) {
             window.showToast(`🎉 ¡"${debt.name}" liquidada! El presupuesto extra ahora se aplica a la siguiente deuda.`, 'success');
         } else {
-            window.showToast(`Abono de ${sym} ${fmtNum(finalPayment)} registrado exitosamente`, 'success');
+            window.showToast(`Abono de ${dSym} ${debtFmtNum(finalPayment)} registrado exitosamente`, 'success');
         }
 
         await saveDebtsState();
-        // fetchDebts recalcula computeEffectivePayments con el nuevo estado
         fetchDebts();
         if (document.getElementById('view-budget')?.classList.contains('active')) {
             if (window.fetchBudget) window.fetchBudget();

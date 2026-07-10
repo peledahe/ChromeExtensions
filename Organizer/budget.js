@@ -490,6 +490,7 @@ async function fetchBudget() {
         budgetState.incomeTargets = parseJSON(targetsRaw, defaultTargets);
 
         budgetState.debtAllocation = Number(debtAllocRaw) || 0;
+        budgetState.limits['Deudas'] = budgetState.debtAllocation;
 
         renderBudgetDashboard();
         renderBudgetTransactions();
@@ -703,9 +704,14 @@ function renderBudgetTransactions() {
 // Actualizar asignación de deudas desde el input
 async function updateDebtAllocation(val) {
     budgetState.debtAllocation = Number(val) || 0;
+    budgetState.limits['Deudas'] = budgetState.debtAllocation;
     if (py) {
-        await py.save_debts_budget(budgetState.debtAllocation);
+        await Promise.all([
+            py.save_debts_budget(budgetState.debtAllocation),
+            py.set_config('budget_limits', JSON.stringify(budgetState.limits))
+        ]);
         if (window.fetchDebts) window.fetchDebts();
+        renderBudgetDashboard();
     }
 }
 
@@ -799,10 +805,21 @@ async function saveBudgetLimits() {
     const ok = await saveBudgetCurrencyConfig();
     if (!ok) return;
 
+    // Sincronizar asignación de deudas si se editó desde el modal de límites
+    if (budgetState.limits['Deudas'] !== undefined) {
+        budgetState.debtAllocation = budgetState.limits['Deudas'];
+        const debtInput = document.getElementById('budget-debt-allocation');
+        if (debtInput) {
+            debtInput.value = budgetState.debtAllocation;
+        }
+        if (window.fetchDebts) window.fetchDebts(); // Actualiza el modulo de deudas con el nuevo presupuesto
+    }
+
     if (py) {
         await Promise.all([
             py.set_config('budget_limits', JSON.stringify(budgetState.limits)),
-            py.set_config('budget_income_targets', JSON.stringify(budgetState.incomeTargets))
+            py.set_config('budget_income_targets', JSON.stringify(budgetState.incomeTargets)),
+            py.save_debts_budget(budgetState.debtAllocation)
         ]);
         window.showToast('Límites, estimados y monedas actualizados exitosamente', 'success');
         document.getElementById('budget-limits-modal')?.classList.remove('active');
