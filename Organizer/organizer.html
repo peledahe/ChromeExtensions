@@ -127,6 +127,13 @@
                 </div>
             </div>
 
+            <!-- Selector de Mes (Filtro de Período) -->
+            <div id="budget-month-filter" style="display:flex; align-items:center; gap:8px; margin-bottom:16px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); padding: 8px 14px; border-radius: 8px; font-size:0.8rem; font-weight:600; color:var(--ag-text-muted); width:fit-content;">
+                <span style="white-space:nowrap;">📅 Período:</span>
+                <select id="budget-month-select" class="ag-input" style="margin:0; padding:4px 8px; height:auto; font-size:0.8rem; min-width:120px;"></select>
+                <select id="budget-year-select" class="ag-input" style="margin:0; padding:4px 8px; height:auto; font-size:0.8rem; width:82px;"></select>
+            </div>
+
             <!-- Dashboard Superior (Tarjetas Premium) -->
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-bottom: 20px;">
                 <!-- Tarjeta Ingresos -->
@@ -197,71 +204,123 @@
 
         <!-- ===== DEBTS VIEW ===== -->
         <div id="view-debts" class="ag-view">
-            <div class="section-header" style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:16px;">
+            <!-- Header -->
+            <div class="section-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:12px;">
                 <div>
                     <h1>💸 Planificador de Deudas</h1>
-                    <p>Proyección interactiva y estrategia de pago mediante el método Bola de Nieve</p>
+                    <p>Estrategia Bola de Nieve o Avalancha con proyección gráfica interactiva</p>
                 </div>
-                <div style="display:flex; flex-direction:column; gap:4px; font-size:0.8rem; background: rgba(255,255,255,0.04); padding: 6px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.06);">
-                    <span style="color:var(--ag-text-muted);">Presupuesto Mensual Deudas</span>
-                    <div style="display:flex; align-items:center; gap:4px;">
-                        <span style="color:var(--ag-text-muted); font-size:0.8rem;">Q</span>
-                        <input type="number" id="debts-budget-input" style="background:transparent; border:none; color:var(--ag-text); font-weight:700; width:70px; outline:none; font-size:0.85rem;">
+                <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                    <!-- Selector de método -->
+                    <div style="display:flex; gap:4px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06); padding:4px; border-radius:8px;">
+                        <button id="debt-method-snowball" class="ag-btn debt-method-btn active" data-method="snowball"
+                            style="padding:4px 10px; font-size:0.74rem; font-weight:700; cursor:pointer; border-radius:5px; background:rgba(108,92,231,0.2); border:1px solid rgba(108,92,231,0.4); color:#a29bfe; white-space:nowrap;">❄️ Bola de Nieve</button>
+                        <button id="debt-method-avalanche" class="ag-btn debt-method-btn" data-method="avalanche"
+                            style="padding:4px 10px; font-size:0.74rem; font-weight:700; cursor:pointer; border-radius:5px; background:none; border:1px solid transparent; color:var(--ag-text-muted); white-space:nowrap;">🔥 Avalancha</button>
                     </div>
+                    <!-- Presupuesto -->
+                    <div style="display:flex; flex-direction:column; gap:2px; font-size:0.8rem; background:rgba(255,255,255,0.03); padding:6px 12px; border-radius:8px; border:1px solid rgba(255,255,255,0.06);">
+                        <span style="color:var(--ag-text-muted); font-size:0.72rem; font-weight:600;">💰 Presupuesto Mensual</span>
+                        <div style="display:flex; align-items:center; gap:4px;">
+                            <span id="debts-budget-symbol" style="color:var(--ag-text-muted); font-size:0.8rem; font-weight:700;">Q</span>
+                            <input type="number" id="debts-budget-input" style="background:transparent; border:none; color:var(--ag-text); font-weight:700; width:80px; outline:none; font-size:0.9rem;" placeholder="0">
+                            <button id="save-debts-budget-btn" class="ag-btn" style="padding:2px 8px; font-size:0.72rem; cursor:pointer; background:rgba(108,92,231,0.15); border:1px solid rgba(108,92,231,0.3); color:#a29bfe; font-weight:600;">✔</button>
+                        </div>
+                    </div>
+                    <button class="ag-btn ag-btn-primary" id="btn-add-debt-dialog" style="padding:8px 14px; font-size:0.82rem; font-weight:700; cursor:pointer;">+ Nueva Deuda</button>
                 </div>
             </div>
 
-            <!-- Layout Principal de Deudas -->
-            <div style="display:grid; grid-template-columns: 1.2fr 1fr; gap:20px; height: calc(100vh - 180px); overflow:hidden;">
-                <!-- Columna Izquierda: Mis Deudas -->
-                <div style="display:flex; flex-direction:column; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.04); border-radius:10px; padding:16px; height:100%;">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-                        <h2 style="font-size:1.1rem; color:#ff7675;">Deudas Pendientes</h2>
-                        <button class="ag-btn ag-btn-primary" id="btn-add-debt-dialog" style="padding: 6px 12px; font-size:0.8rem;">+ Agregar Deuda</button>
-                    </div>
-                    <div id="debts-list" style="flex:1; overflow-y:auto; padding-right:4px;">
+            <!-- Tarjetas resumen hero -->
+            <div id="debts-summary-cards" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(160px,1fr)); gap:12px; margin-bottom:16px;"></div>
+
+            <!-- Layout Principal -->
+            <div style="display:grid; grid-template-columns: 1fr 1.6fr; gap:16px; height:calc(100vh - 300px); min-height:380px; overflow:hidden;">
+
+                <!-- Columna Izquierda: Lista de Deudas -->
+                <div style="display:flex; flex-direction:column; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.05); border-radius:12px; padding:16px; overflow:hidden;">
+                    <h2 style="font-size:0.95rem; color:#ff7675; margin-bottom:12px; font-weight:700; display:flex; align-items:center; gap:6px;">🧾 Deudas Pendientes
+                        <span id="debts-count-badge" style="font-size:0.72rem; background:rgba(255,118,117,0.15); border:1px solid rgba(255,118,117,0.3); color:#ff7675; padding:1px 8px; border-radius:99px; font-weight:700;"></span>
+                    </h2>
+                    <div id="debts-list" style="flex:1; overflow-y:auto; padding-right:4px; display:flex; flex-direction:column; gap:8px;">
                         <div class="ag-empty">Cargando deudas...</div>
                     </div>
                 </div>
 
-                <!-- Columna Derecha: Simulación Bola de Nieve -->
-                <div style="display:flex; flex-direction:column; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.04); border-radius:10px; padding:16px; height:100%;">
-                    <h2 style="font-size:1.1rem; color:#2ed573; margin-bottom:12px;">Plan de Liquidación (Bola de Nieve)</h2>
+                <!-- Columna Derecha: Simulación + Gráfica -->
+                <div style="display:flex; flex-direction:column; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.05); border-radius:12px; padding:16px; overflow:hidden; gap:12px;">
+                    <h2 style="font-size:0.95rem; color:#2ed573; font-weight:700; display:flex; align-items:center; gap:6px; flex-shrink:0;">
+                        📈 Proyección de Liquidación
+                        <span id="debts-sim-label" style="font-size:0.72rem; background:rgba(46,213,117,0.12); border:1px solid rgba(46,213,117,0.25); color:#2ed573; padding:1px 8px; border-radius:99px; font-weight:700;">Bola de Nieve</span>
+                    </h2>
+                    <!-- Gráfica SVG -->
+                    <div style="flex:0 0 auto; position:relative; background:rgba(0,0,0,0.15); border-radius:10px; border:1px solid rgba(255,255,255,0.04); padding:10px 6px 4px 6px; min-height:160px;">
+                        <svg id="debts-chart-svg" width="100%" height="160" style="display:block; overflow:visible;"></svg>
+                        <div id="debts-chart-tooltip" style="display:none; position:absolute; background:rgba(20,20,30,0.95); border:1px solid rgba(255,255,255,0.1); border-radius:6px; padding:6px 10px; font-size:0.74rem; color:var(--ag-text); pointer-events:none; z-index:10; white-space:nowrap;"></div>
+                    </div>
+                    <!-- Tabla / línea de tiempo -->
                     <div id="debts-projection-timeline" style="flex:1; overflow-y:auto; padding-right:4px;">
                         <div class="ag-empty">Calculando proyección...</div>
                     </div>
                 </div>
+
             </div>
         </div>
 
+
         <!-- ===== SAVINGS VIEW ===== -->
         <div id="view-savings" class="ag-view">
-            <div class="section-header" style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:16px;">
+            <!-- Header -->
+            <div class="section-header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:12px;">
                 <div>
                     <h1>🎯 Objetivos de Ahorro</h1>
-                    <p>Planifica y monitorea tus metas financieras a corto, mediano y largo plazo</p>
+                    <p>Planifica y monitorea tus metas financieras con proyección inteligente</p>
                 </div>
-                <button class="ag-btn ag-btn-primary" id="open-new-saving-btn" style="padding: 8px 16px; font-weight: 600; border-radius: 8px;">Nuevo Objetivo +</button>
+                <button class="ag-btn ag-btn-primary" id="open-new-saving-btn" style="padding:8px 16px; font-weight:700; border-radius:8px; cursor:pointer;">+ Nuevo Objetivo</button>
             </div>
 
-            <div style="display:grid; grid-template-columns: 1.2fr 1fr; gap:20px; height: calc(100vh - 180px); overflow:hidden;">
-                <!-- Columna Izquierda: Mis Objetivos -->
-                <div style="display:flex; flex-direction:column; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.04); border-radius:10px; padding:16px; height:100%;">
-                    <h2 style="font-size:1.1rem; color:#a29bfe; margin-bottom:12px;">Objetivos Activos</h2>
-                    <div id="savings-goals-list" style="flex:1; overflow-y:auto; padding-right:4px; display:flex; flex-direction:column; gap:12px;">
+            <!-- Tarjetas hero -->
+            <div id="savings-hero-cards" style="display:grid; grid-template-columns:repeat(auto-fit,minmax(155px,1fr)); gap:12px; margin-bottom:16px;"></div>
+
+            <!-- Layout Principal -->
+            <div style="display:grid; grid-template-columns: 1fr 1.6fr; gap:16px; height:calc(100vh - 300px); min-height:380px; overflow:hidden;">
+
+                <!-- Columna Izquierda: Objetivos -->
+                <div style="display:flex; flex-direction:column; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.05); border-radius:12px; padding:16px; overflow:hidden;">
+                    <h2 style="font-size:0.95rem; color:#a29bfe; margin-bottom:12px; font-weight:700; display:flex; align-items:center; gap:6px;">
+                        🎯 Mis Objetivos
+                        <span id="savings-count-badge" style="font-size:0.72rem; background:rgba(162,155,254,0.15); border:1px solid rgba(162,155,254,0.3); color:#a29bfe; padding:1px 8px; border-radius:99px; font-weight:700;"></span>
+                    </h2>
+                    <div id="savings-goals-list" style="flex:1; overflow-y:auto; padding-right:4px; display:flex; flex-direction:column; gap:10px;">
                         <div class="ag-empty">Cargando objetivos...</div>
                     </div>
                 </div>
 
-                <!-- Columna Derecha: Resumen de Ahorros -->
-                <div style="display:flex; flex-direction:column; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.04); border-radius:10px; padding:16px; height:100%;">
-                    <h2 style="font-size:1.1rem; color:#2ed573; margin-bottom:12px;">Resumen e Impacto</h2>
-                    <div id="savings-summary-panel" style="flex:1; overflow-y:auto; padding-right:4px;">
-                        <div class="ag-empty">Cargando resumen...</div>
+                <!-- Columna Derecha: Gráficas y Proyección -->
+                <div style="display:flex; flex-direction:column; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.05); border-radius:12px; padding:16px; overflow:hidden; gap:12px;">
+
+                    <!-- Tabs de visualización -->
+                    <div style="display:flex; align-items:center; justify-content:space-between; flex-shrink:0;">
+                        <h2 style="font-size:0.95rem; color:#2ed573; font-weight:700; margin:0;">📊 Análisis y Proyección</h2>
+                        <div style="display:flex; gap:4px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06); padding:3px; border-radius:7px;">
+                            <button class="savings-tab-btn active" data-tab="projection"
+                                style="padding:3px 10px; font-size:0.73rem; font-weight:700; cursor:pointer; border-radius:5px; background:rgba(46,213,115,0.2); border:1px solid rgba(46,213,115,0.4); color:#2ed573; white-space:nowrap;">📈 Proyección</button>
+                            <button class="savings-tab-btn" data-tab="currency"
+                                style="padding:3px 10px; font-size:0.73rem; font-weight:700; cursor:pointer; border-radius:5px; background:none; border:1px solid transparent; color:var(--ag-text-muted); white-space:nowrap;">🪙 Por Moneda</button>
+                            <button class="savings-tab-btn" data-tab="compare"
+                                style="padding:3px 10px; font-size:0.73rem; font-weight:700; cursor:pointer; border-radius:5px; background:none; border:1px solid transparent; color:var(--ag-text-muted); white-space:nowrap;">📊 Comparar</button>
+                        </div>
+                    </div>
+
+                    <!-- Panel de contenido de gráficas (cambia con tabs) -->
+                    <div id="savings-chart-panel" style="flex:1; overflow-y:auto; overflow-x:hidden; padding-right:2px;">
+                        <div class="ag-empty">Cargando gráficas...</div>
                     </div>
                 </div>
+
             </div>
         </div>
+
 
         <!-- ===== KANBAN VIEW ===== -->
         <div id="view-kanban" class="ag-view">

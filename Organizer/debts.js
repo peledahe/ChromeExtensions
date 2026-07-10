@@ -1,22 +1,20 @@
-// debts.js - Lógica y UI para el planificador de deudas (Bola de Nieve)
+// debts.js - Planificador de Deudas con simulación Bola de Nieve / Avalancha y gráfica SVG
 
 const debtsState = {
     debts: [],
-    budget: 0 // Presupuesto mensual asignado a deudas
+    budget: 0,
+    method: localStorage.getItem('debtsMethod') || 'snowball' // 'snowball' | 'avalanche'
 };
 
 function fmtNum(n) {
-    return Number(n || 0).toLocaleString('en-US', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2
-    });
+    return Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 function getCurrencySymbol() {
     return window.currencyState?.symbol || 'Q';
 }
 
-// Cargar deudas y presupuesto
+// ── Fetch ───────────────────────────────────────────────────────────────────
 async function fetchDebts() {
     try {
         if (!py) return;
@@ -29,24 +27,23 @@ async function fetchDebts() {
         debtsState.debts = Array.isArray(debtsList) ? debtsList : [];
         debtsState.budget = Number(budgetVal) || 0;
 
-        // Sincronizar presupuesto de deudas en el input
         const budgetInput = document.getElementById('debts-budget-input');
-        if (budgetInput) {
-            budgetInput.value = debtsState.budget;
-        }
+        if (budgetInput) budgetInput.value = debtsState.budget || '';
 
+        const sym = getCurrencySymbol();
+        const budgetSym = document.getElementById('debts-budget-symbol');
+        if (budgetSym) budgetSym.textContent = sym;
+
+        renderDebtsSummaryCards();
         renderDebtsList();
         renderSnowballProjection();
     } catch (err) {
         console.error('Error fetching debts:', err);
         const container = document.getElementById('debts-list');
-        if (container) {
-            container.innerHTML = '<div class="ag-empty">Error al cargar las deudas</div>';
-        }
+        if (container) container.innerHTML = '<div class="ag-empty">Error al cargar las deudas</div>';
     }
 }
 
-// Guardar deudas y presupuesto
 async function saveDebtsState() {
     if (!py) return;
     await Promise.all([
@@ -55,169 +52,344 @@ async function saveDebtsState() {
     ]);
 }
 
-// Renderizar la lista de deudas en la UI
-function renderDebtsList() {
-    const container = document.getElementById('debts-list');
+// ── Tarjetas Hero ────────────────────────────────────────────────────────────
+function renderDebtsSummaryCards() {
+    const container = document.getElementById('debts-summary-cards');
     if (!container) return;
 
-    if (debtsState.debts.length === 0) {
-        container.innerHTML = '<div class="ag-empty">No tienes deudas registradas 🎉</div>';
-        return;
-    }
-
     const sym = getCurrencySymbol();
+    const totalDebt = debtsState.debts.reduce((s, d) => s + d.balance, 0);
+    const totalMin = debtsState.debts.reduce((s, d) => s + d.minPayment, 0);
+    const extra = Math.max(0, debtsState.budget - totalMin);
 
-    // Ordenar deudas por saldo de menor a mayor (orden de la Bola de Nieve)
-    const sortedDebts = [...debtsState.debts].sort((a, b) => a.balance - b.balance);
+    let monthsEst = 0;
+    if (debtsState.debts.length > 0) {
+        const sim = runSimulation();
+        monthsEst = sim.length > 0 ? sim.length - 1 : 0;
+    }
+    const yearsEst = Math.floor(monthsEst / 12);
+    const moEst = monthsEst % 12;
+    const timeLabel = monthsEst === 0 ? '—' : (yearsEst > 0 ? `${yearsEst}a ${moEst}m` : `${moEst} mes${moEst !== 1 ? 'es' : ''}`);
 
-    container.innerHTML = sortedDebts.map((d, index) => `
-        <div class="ag-item debt-item-card" style="background: var(--ag-card-bg); border: 1px solid var(--ag-border); border-radius: 8px; padding: 14px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
-            <div style="display: flex; align-items: center; gap: 12px;">
-                <span class="debt-order-badge" style="background: var(--ag-accent); color: #fff; width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: 700;">${index + 1}</span>
-                <div>
-                    <div style="font-weight: 600; font-size: 0.92rem; color: var(--ag-text);">${escapeHtml(d.name)}</div>
-                    <div style="font-size: 0.78rem; color: var(--ag-text-muted);">Pago Mínimo: ${sym} ${fmtNum(d.minPayment)}</div>
-                </div>
-            </div>
-            <div style="text-align: right; display: flex; align-items: center; gap: 16px;">
-                <div>
-                    <div style="font-weight: 700; color: #ff7675; font-size: 1rem;">${sym} ${fmtNum(d.balance)}</div>
-                    <div style="font-size: 0.75rem; color: var(--ag-text-muted);">Saldo Pendiente</div>
-                </div>
-                <div style="display: flex; gap: 4px;">
-                    <button class="ag-btn debt-pay-btn" data-id="${d.id}" style="padding: 4px 8px; font-size: 0.78rem; background: rgba(46, 213, 115, 0.15); border: 1px solid #2ed573; color: #2ed573; font-weight: 600; cursor: pointer;" title="Registrar pago mensual">Abonar</button>
-                    <button class="ag-edit-btn debt-edit-btn" data-id="${d.id}" style="background:none; border:none; cursor:pointer; font-size:0.85rem;">✏️</button>
-                    <button class="ag-delete-btn debt-delete-btn" data-id="${d.id}" style="background:none; border:none; cursor:pointer; font-size:0.85rem;">🗑️</button>
-                </div>
+    const cards = [
+        { label: 'Total Adeudado', value: `${sym} ${fmtNum(totalDebt)}`, color: '#ff7675', icon: '💳', bg: 'rgba(255,118,117,0.06)', border: 'rgba(255,118,117,0.2)' },
+        { label: 'Pagos Mínimos', value: `${sym} ${fmtNum(totalMin)}`, color: '#fdcb6e', icon: '📋', bg: 'rgba(253,203,110,0.06)', border: 'rgba(253,203,110,0.2)' },
+        { label: 'Extra Bola de Nieve', value: `${sym} ${fmtNum(extra)}`, color: '#a29bfe', icon: '❄️', bg: 'rgba(108,92,231,0.06)', border: 'rgba(108,92,231,0.2)' },
+        { label: 'Libre de Deuda en', value: timeLabel, color: '#2ed573', icon: '🏆', bg: 'rgba(46,213,115,0.06)', border: 'rgba(46,213,115,0.2)' }
+    ];
+
+    container.innerHTML = cards.map(c => `
+        <div style="background:${c.bg}; border:1px solid ${c.border}; border-radius:10px; padding:12px 14px; display:flex; align-items:center; gap:12px; transition:transform 0.15s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform=''">
+            <span style="font-size:1.5rem; flex-shrink:0;">${c.icon}</span>
+            <div>
+                <div style="font-size:0.72rem; color:var(--ag-text-muted); font-weight:600;">${c.label}</div>
+                <div style="font-size:1.05rem; font-weight:800; color:${c.color}; margin-top:2px;">${c.value}</div>
             </div>
         </div>
     `).join('');
 }
 
-// Motor del simulador Bola de Nieve y renderizado de la proyección
+// ── Lista de Deudas ──────────────────────────────────────────────────────────
+function renderDebtsList() {
+    const container = document.getElementById('debts-list');
+    if (!container) return;
+
+    const badge = document.getElementById('debts-count-badge');
+
+    if (debtsState.debts.length === 0) {
+        container.innerHTML = '<div class="ag-empty">No tienes deudas registradas 🎉</div>';
+        if (badge) badge.textContent = '';
+        return;
+    }
+
+    if (badge) badge.textContent = debtsState.debts.length;
+
+    const sym = getCurrencySymbol();
+    const sortedDebts = sortDebtsForMethod(debtsState.debts);
+    const maxBalance = Math.max(...sortedDebts.map(d => d.balance), 1);
+    const effectivePayments = computeEffectivePayments();
+    const totalMin = sortedDebts.reduce((s, d) => s + d.minPayment, 0);
+    const hasExtra = debtsState.budget > totalMin;
+
+    container.innerHTML = sortedDebts.map((d, index) => {
+        const pct = Math.min(100, (d.balance / maxBalance) * 100);
+        const isTarget = index === 0;
+        const color = isTarget ? '#a29bfe' : '#ff7675';
+        const effective = effectivePayments.get(d.id) || d.minPayment;
+        const showExtra = isTarget && hasExtra && debtsState.budget > 0;
+        return `
+        <div class="ag-item debt-item-card" style="background:var(--ag-card-bg); border:1px solid var(--ag-border); border-radius:10px; padding:12px 14px; display:flex; flex-direction:column; gap:8px; transition:transform 0.15s;" onmouseover="this.style.transform='translateX(2px)'" onmouseout="this.style.transform=''">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <span style="background:${color}; color:#fff; width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:0.74rem; font-weight:800; flex-shrink:0;">${index + 1}</span>
+                    <div>
+                        <div style="font-weight:700; font-size:0.88rem; color:var(--ag-text);">${escapeHtml(d.name)}</div>
+                        <div style="font-size:0.73rem; color:var(--ag-text-muted); display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                            <span>Mínimo: <strong style="color:var(--ag-text);">${sym} ${fmtNum(d.minPayment)}</strong></span>
+                            ${showExtra ? `<span style="color:#a29bfe; font-weight:700; background:rgba(108,92,231,0.1); padding:1px 6px; border-radius:4px;">→ Abono: ${sym} ${fmtNum(effective)} ❄️</span>` : ''}
+                        </div>
+                    </div>
+                </div>
+                <div style="text-align:right; display:flex; align-items:center; gap:8px;">
+                    <div>
+                        <div style="font-weight:800; color:#ff7675; font-size:0.98rem;">${sym} ${fmtNum(d.balance)}</div>
+                        <div style="font-size:0.7rem; color:var(--ag-text-muted);">saldo</div>
+                    </div>
+                    <div style="display:flex; gap:3px;">
+                        <button class="ag-btn debt-pay-btn" data-id="${d.id}" title="Registrar abono de ${sym} ${fmtNum(effective)}"
+                            style="padding:3px 8px; font-size:0.72rem; background:rgba(46,213,115,0.12); border:1px solid #2ed573; color:#2ed573; font-weight:700; cursor:pointer; border-radius:5px;">Abonar</button>
+                        <button class="ag-edit-btn debt-edit-btn" data-id="${d.id}" style="background:none; border:none; cursor:pointer; font-size:0.82rem; padding:2px 4px;">✏️</button>
+                        <button class="ag-delete-btn debt-delete-btn" data-id="${d.id}" style="background:none; border:none; cursor:pointer; font-size:0.82rem; padding:2px 4px;">🗑️</button>
+                    </div>
+                </div>
+            </div>
+            <div style="height:4px; background:rgba(255,255,255,0.06); border-radius:2px; overflow:hidden;">
+                <div style="height:100%; width:${pct.toFixed(1)}%; background:${color}; border-radius:2px; transition:width 0.4s;"></div>
+            </div>
+        </div>
+        `;
+    }).join('');
+}
+
+// ── Motor de Simulación ─────────────────────────────────────────────────────
+function sortDebtsForMethod(debts) {
+    const copy = [...debts];
+    if (debtsState.method === 'avalanche') {
+        return copy.sort((a, b) => b.minPayment - a.minPayment);
+    }
+    return copy.sort((a, b) => a.balance - b.balance);
+}
+
+/**
+ * Calcula el abono efectivo (mínimo + extra bola de nieve) para cada deuda
+ * según el presupuesto mensual actual.
+ * Retorna un Map { debtId -> effectivePayment }
+ */
+function computeEffectivePayments() {
+    const sorted = sortDebtsForMethod(debtsState.debts);
+    const totalMin = sorted.reduce((s, d) => s + d.minPayment, 0);
+    const extra = debtsState.budget > 0 ? Math.max(0, debtsState.budget - totalMin) : 0;
+
+    const result = new Map();
+    sorted.forEach((d, i) => {
+        const base = Math.min(d.balance, d.minPayment);
+        const bonus = (i === 0 && extra > 0) ? Math.min(d.balance - base, extra) : 0;
+        result.set(d.id, Math.min(d.balance, base + bonus));
+    });
+    return result;
+}
+
+function runSimulation() {
+    if (debtsState.debts.length === 0) return [];
+
+    const sortedDebts = sortDebtsForMethod(debtsState.debts);
+    const totalMin = sortedDebts.reduce((s, d) => s + d.minPayment, 0);
+
+    const sim = sortedDebts.map(d => ({ ...d }));
+    let month = 0;
+    const maxMonths = 120;
+    const history = [{ month: 0, total: sim.reduce((s, d) => s + d.balance, 0) }];
+
+    while (sim.some(d => d.balance > 0) && month < maxMonths) {
+        month++;
+        let available = debtsState.budget > 0 ? debtsState.budget : totalMin;
+
+        const active = sim.filter(d => d.balance > 0);
+
+        active.forEach(d => {
+            const pay = Math.min(d.balance, d.minPayment);
+            d.balance -= pay;
+            available -= pay;
+        });
+
+        if (available > 0) {
+            const target = sim.find(d => d.balance > 0);
+            if (target) {
+                const extra = Math.min(target.balance, available);
+                target.balance -= extra;
+                available -= extra;
+            }
+        }
+
+        const total = sim.reduce((s, d) => s + Math.max(0, d.balance), 0);
+        history.push({ month, total });
+
+        sim.forEach(d => {
+            if (d.balance <= 0 && !d.monthsToClear) d.monthsToClear = month;
+        });
+    }
+
+    history._debts = sim;
+    return history;
+}
+
+// ── Gráfica SVG ─────────────────────────────────────────────────────────────
+function renderDebtChart(history) {
+    const svg = document.getElementById('debts-chart-svg');
+    const tooltip = document.getElementById('debts-chart-tooltip');
+    if (!svg) return;
+
+    if (!history || history.length < 2) {
+        svg.innerHTML = '<text x="50%" y="50%" text-anchor="middle" fill="rgba(255,255,255,0.2)" font-size="13" dominant-baseline="middle">Sin datos suficientes</text>';
+        return;
+    }
+
+    const W = Math.max(200, svg.parentElement.clientWidth - 12);
+    const H = 150;
+    svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+
+    const sym = getCurrencySymbol();
+    const maxVal = history[0].total || 1;
+    const months = history.length - 1;
+    const padL = 52, padR = 12, padT = 10, padB = 28;
+    const w = W - padL - padR;
+    const h = H - padT - padB;
+
+    const xScale = i => padL + (months > 0 ? (i / months) : 0) * w;
+    const yScale = v => padT + h - (v / maxVal) * h;
+
+    const gridLines = [0, 0.25, 0.5, 0.75, 1].map(f => {
+        const y = padT + h - f * h;
+        const val = f * maxVal;
+        const label = val >= 1000 ? `${(val/1000).toFixed(0)}k` : fmtNum(val);
+        return `<line x1="${padL}" y1="${y.toFixed(1)}" x2="${padL + w}" y2="${y.toFixed(1)}" stroke="rgba(255,255,255,0.04)" stroke-width="1"/>
+                <text x="${padL - 4}" y="${(y + 4).toFixed(1)}" text-anchor="end" fill="rgba(255,255,255,0.3)" font-size="9">${sym}${label}</text>`;
+    }).join('');
+
+    const step = Math.max(1, Math.ceil(months / 5));
+    let xLabels = '';
+    for (let i = 0; i <= months; i += step) {
+        xLabels += `<text x="${xScale(i).toFixed(1)}" y="${padT + h + 16}" text-anchor="middle" fill="rgba(255,255,255,0.3)" font-size="9">M${i}</text>`;
+    }
+
+    const pts = history.map((p, i) => `${xScale(i).toFixed(2)},${yScale(p.total).toFixed(2)}`);
+    const linePath = `M ${pts.join(' L ')}`;
+    const areaPath = `M ${padL},${padT + h} L ${pts.join(' L ')} L ${xScale(months).toFixed(2)},${padT + h} Z`;
+
+    const colors = ['#2ed573','#fdcb6e','#a29bfe','#74b9ff','#ff7675','#fd79a8'];
+    let debtMarkers = '';
+    if (history._debts) {
+        history._debts.forEach((d, di) => {
+            if (d.monthsToClear && d.monthsToClear <= months) {
+                const p = history[d.monthsToClear];
+                if (!p) return;
+                const cx = xScale(d.monthsToClear).toFixed(2);
+                const cy = yScale(p.total).toFixed(2);
+                const c = colors[di % colors.length];
+                const safeName = (d.name || '').replace(/"/g, '&quot;');
+                debtMarkers += `
+                    <line x1="${cx}" y1="${cy}" x2="${cx}" y2="${padT + h}" stroke="${c}" stroke-width="1" stroke-dasharray="2,3" opacity="0.5"/>
+                    <circle cx="${cx}" cy="${cy}" r="5" fill="${c}" stroke="#1a1a2e" stroke-width="1.5" opacity="0.95"
+                        class="debt-chart-marker" data-month="${d.monthsToClear}" data-name="${safeName}" data-total="${fmtNum(p.total)}" data-sym="${sym}"/>`;
+            }
+        });
+    }
+
+    const hoverPts = history.map((p, i) => {
+        const cx = xScale(i).toFixed(2);
+        const cy = yScale(p.total).toFixed(2);
+        return `<circle cx="${cx}" cy="${cy}" r="8" fill="transparent" class="debt-chart-hover"
+            data-month="${p.month}" data-total="${fmtNum(p.total)}" data-sym="${sym}"/>`;
+    }).join('');
+
+    svg.innerHTML = `
+        <defs>
+            <linearGradient id="debtChartGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#a29bfe" stop-opacity="0.3"/>
+                <stop offset="100%" stop-color="#a29bfe" stop-opacity="0.01"/>
+            </linearGradient>
+        </defs>
+        ${gridLines}${xLabels}
+        <path d="${areaPath}" fill="url(#debtChartGrad)"/>
+        <path d="${linePath}" fill="none" stroke="#a29bfe" stroke-width="2" stroke-linejoin="round"/>
+        ${debtMarkers}${hoverPts}`;
+
+    // Remover listeners viejos clonando
+    const newSvg = svg.cloneNode(true);
+    svg.parentNode.replaceChild(newSvg, svg);
+
+    newSvg.addEventListener('mousemove', (e) => {
+        const t = e.target;
+        if (t.classList.contains('debt-chart-hover')) {
+            tooltip.textContent = `Mes ${t.dataset.month}: ${t.dataset.sym} ${t.dataset.total}`;
+            tooltip.style.display = 'block';
+        } else if (t.classList.contains('debt-chart-marker')) {
+            tooltip.textContent = `✅ ${t.dataset.name} — Mes ${t.dataset.month}`;
+            tooltip.style.display = 'block';
+        } else {
+            tooltip.style.display = 'none';
+        }
+        if (tooltip.style.display !== 'none') {
+            const rect = newSvg.parentElement.getBoundingClientRect();
+            tooltip.style.left = (e.clientX - rect.left + 10) + 'px';
+            tooltip.style.top = (e.clientY - rect.top - 32) + 'px';
+        }
+    });
+    newSvg.addEventListener('mouseleave', () => { tooltip.style.display = 'none'; });
+}
+
+// ── Proyección / Timeline ────────────────────────────────────────────────────
 function renderSnowballProjection() {
     const container = document.getElementById('debts-projection-timeline');
     if (!container) return;
 
     if (debtsState.debts.length === 0) {
         container.innerHTML = '<div class="ag-empty">Agrega deudas para ver la proyección</div>';
+        renderDebtChart(null);
         return;
     }
 
     const sym = getCurrencySymbol();
-    const sortedDebts = [...debtsState.debts].sort((a, b) => a.balance - b.balance);
-    const totalMinPayment = sortedDebts.reduce((sum, d) => sum + d.minPayment, 0);
+    const sortedDebts = sortDebtsForMethod(debtsState.debts);
+    const totalMinPayment = sortedDebts.reduce((s, d) => s + d.minPayment, 0);
 
-    // Si hay un presupuesto establecido, validar si cubre el pago mínimo
     if (debtsState.budget > 0 && debtsState.budget < totalMinPayment) {
         container.innerHTML = `
-            <div style="background: rgba(255, 118, 117, 0.12); border: 1px solid #ff7675; border-radius: 8px; padding: 14px; color: #ff7675; font-size: 0.88rem; display: flex; align-items: center; gap: 10px;">
-                <span>⚠️</span>
+            <div style="background:rgba(255,118,117,0.08); border:1px solid rgba(255,118,117,0.3); border-radius:8px; padding:14px; color:#ff7675; font-size:0.86rem; display:flex; align-items:flex-start; gap:10px;">
+                <span style="font-size:1.2rem; flex-shrink:0;">⚠️</span>
                 <div>
-                    <strong>Presupuesto insuficiente:</strong> Tu presupuesto de deudas (${sym} ${fmtNum(debtsState.budget)}) es menor que la suma de los pagos mínimos obligatorios (${sym} ${fmtNum(totalMinPayment)}). Por favor incrementa el presupuesto.
+                    <strong>Presupuesto insuficiente:</strong><br>
+                    Tu presupuesto <em>(${sym} ${fmtNum(debtsState.budget)})</em> no cubre los pagos mínimos <em>(${sym} ${fmtNum(totalMinPayment)})</em>.<br>
+                    Aumenta el presupuesto mensual para activar el simulador.
                 </div>
-            </div>
-        `;
+            </div>`;
+        renderDebtChart(null);
         return;
     }
 
-    // Inicializar simulación
-    const simulationDebts = sortedDebts.map(d => ({
-        id: d.id,
-        name: d.name,
-        balance: d.balance,
-        minPayment: d.minPayment,
-        monthsToClear: 0,
-        paymentsHistory: []
-    }));
+    const history = runSimulation();
+    const simDebts = history._debts || [];
+    const totalMonths = history.length - 1;
 
-    let month = 0;
-    const maxMonths = 120; // Límite de 10 años para evitar loops infinitos
+    renderDebtChart(history);
 
-    while (simulationDebts.some(d => d.balance > 0) && month < maxMonths) {
-        month++;
-
-        // Dinero mensual disponible total para deudas en este mes
-        let monthlyAvailable = debtsState.budget > 0 ? debtsState.budget : simulationDebts.filter(d => d.balance > 0).reduce((sum, d) => sum + d.minPayment, 0);
-
-        // 1. Asignar pagos mínimos a todas las deudas activas
-        const activeDebts = simulationDebts.filter(d => d.balance > 0);
-        
-        // Pagar los mínimos
-        activeDebts.forEach(d => {
-            const payment = Math.min(d.balance, d.minPayment);
-            d.balance -= payment;
-            monthlyAvailable -= payment;
-            d.paymentsHistory.push({ month, amount: payment });
-        });
-
-        // 2. Si sobra presupuesto (bola de nieve), inyectarlo en la deuda activa más baja
-        if (monthlyAvailable > 0 && activeDebts.length > 0) {
-            const targetDebt = activeDebts[0];
-            const extraPayment = Math.min(targetDebt.balance, monthlyAvailable);
-            targetDebt.balance -= extraPayment;
-            
-            const lastPaymentIdx = targetDebt.paymentsHistory.length - 1;
-            if (lastPaymentIdx >= 0) {
-                targetDebt.paymentsHistory[lastPaymentIdx].amount += extraPayment;
-            }
-            
-            monthlyAvailable -= extraPayment;
-        }
-
-        // Registrar los meses transcurridos para cada deuda liquidada
-        simulationDebts.forEach(d => {
-            if (d.balance <= 0 && d.monthsToClear === 0) {
-                d.monthsToClear = month;
-            }
-        });
-    }
-
-    // Calcular resumen
-    const totalDebtAmount = debtsState.debts.reduce((sum, d) => sum + d.balance, 0);
-    const monthsRequired = Math.max(...simulationDebts.map(d => d.monthsToClear));
-
-    let summaryHtml = `
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px;">
-            <div style="background: rgba(108, 92, 231, 0.04); border: 1px solid rgba(108, 92, 231, 0.1); padding: 12px; border-radius: 8px; text-align: center;">
-                <div style="font-size: 0.8rem; color: var(--ag-text-muted);">Monto Total Adeudado</div>
-                <div style="font-size: 1.25rem; font-weight: 700; color: #ff7675; margin-top: 4px;">${sym} ${fmtNum(totalDebtAmount)}</div>
+    const colors = ['#2ed573','#fdcb6e','#a29bfe','#74b9ff','#ff7675','#fd79a8'];
+    const rows = simDebts.map((d, i) => {
+        const mo = d.monthsToClear || totalMonths;
+        const yr = Math.floor(mo / 12);
+        const rem = mo % 12;
+        const timeStr = yr > 0 ? `${yr}a ${rem}m` : `${rem} mes${rem !== 1 ? 'es' : ''}`;
+        const c = colors[i % colors.length];
+        return `
+        <div style="display:flex; align-items:center; gap:10px; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.04); border-radius:8px; padding:10px 12px;">
+            <span style="width:10px; height:10px; background:${c}; border-radius:50%; flex-shrink:0;"></span>
+            <div style="flex:1; min-width:0;">
+                <div style="font-weight:700; font-size:0.84rem; color:var(--ag-text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(d.name)}</div>
+                <div style="font-size:0.73rem; color:var(--ag-text-muted);">Mínimo: ${sym} ${fmtNum(d.minPayment)}</div>
             </div>
-            <div style="background: rgba(46, 213, 115, 0.04); border: 1px solid rgba(46, 213, 115, 0.1); padding: 12px; border-radius: 8px; text-align: center;">
-                <div style="font-size: 0.8rem; color: var(--ag-text-muted);">Tiempo Estimado Libre de Deuda</div>
-                <div style="font-size: 1.25rem; font-weight: 700; color: #2ed573; margin-top: 4px;">${monthsRequired} ${monthsRequired === 1 ? 'Mes' : 'Meses'}</div>
+            <div style="text-align:right; flex-shrink:0;">
+                <div style="font-weight:800; color:${c}; font-size:0.9rem;">${timeStr}</div>
+                <div style="font-size:0.7rem; color:var(--ag-text-muted);">Mes ${mo}</div>
             </div>
-        </div>
-    `;
+        </div>`;
+    }).join('');
 
-    // Renderizar tabla/línea temporal de liquidación
-    let timelineHtml = `
-        <div style="margin-top: 10px;">
-            <h3 style="font-size: 0.95rem; font-weight: 600; margin-bottom: 12px; color: var(--ag-text);">Calendario de Liquidación (Bola de Nieve)</h3>
-            <div style="display: flex; flex-direction: column; gap: 8px;">
-                ${simulationDebts.map(d => {
-                    const finalPaymentMonth = d.monthsToClear;
-                    return `
-                        <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.04); border-radius: 8px; padding: 10px 14px; display: flex; flex-direction: column; gap: 6px;">
-                            <div style="display: flex; justify-content: space-between; align-items: center;">
-                                <span style="font-weight: 600; font-size: 0.88rem; color: var(--ag-text);">${escapeHtml(d.name)}</span>
-                                <span style="font-size: 0.82rem; font-weight: 700; color: #2ed573; background: rgba(46, 213, 115, 0.1); padding: 2px 8px; border-radius: 99px;">Liquidada en Mes ${finalPaymentMonth}</span>
-                            </div>
-                            <div style="font-size: 0.76rem; color: var(--ag-text-muted); display: flex; justify-content: space-between;">
-                                <span>Cuotas proyectadas: ${finalPaymentMonth} meses</span>
-                                <span>Abono final acumulado: ${sym} ${fmtNum(d.paymentsHistory[d.paymentsHistory.length - 1]?.amount || 0)} / mes</span>
-                            </div>
-                        </div>
-                    `;
-                }).join('')}
-            </div>
-        </div>
-    `;
-
-    container.innerHTML = summaryHtml + timelineHtml;
+    container.innerHTML = `
+        <div style="font-size:0.75rem; color:var(--ag-text-muted); font-weight:700; margin-bottom:8px; text-transform:uppercase; letter-spacing:0.05em;">Orden de liquidación</div>
+        <div style="display:flex; flex-direction:column; gap:6px;">${rows}</div>`;
 }
 
-// Abrir modal de deuda (para agregar o editar)
+// ── Modal ─────────────────────────────────────────────────────────────────────
 function openDebtModal(id = null) {
     const modal = document.getElementById('debt-editor-modal');
     if (!modal) return;
@@ -231,7 +403,6 @@ function openDebtModal(id = null) {
     if (id) {
         const debt = debtsState.debts.find(d => d.id === id);
         if (!debt) return;
-
         title.textContent = 'Editar Deuda';
         nameInput.value = debt.name;
         balanceInput.value = debt.balance;
@@ -248,7 +419,6 @@ function openDebtModal(id = null) {
     modal.classList.add('active');
 }
 
-// Guardar los datos de una deuda
 async function saveDebt() {
     const name = (document.getElementById('debt-name-input')?.value || '').trim();
     const balance = parseFloat(document.getElementById('debt-balance-input')?.value || '0');
@@ -261,15 +431,9 @@ async function saveDebt() {
     }
 
     if (id) {
-        // Modo Edición
         const debt = debtsState.debts.find(d => d.id === Number(id));
-        if (debt) {
-            debt.name = name;
-            debt.balance = balance;
-            debt.minPayment = minPayment;
-        }
+        if (debt) { debt.name = name; debt.balance = balance; debt.minPayment = minPayment; }
     } else {
-        // Modo Creación
         const newId = debtsState.debts.length > 0 ? Math.max(...debtsState.debts.map(d => d.id)) + 1 : 1;
         debtsState.debts.push({ id: newId, name, balance, minPayment });
     }
@@ -280,9 +444,8 @@ async function saveDebt() {
     fetchDebts();
 }
 
-// Eliminar deuda
 async function deleteDebt(id) {
-    window.showConfirm('¿Borrar esta deuda?', async (ok) => {
+    window.showConfirm('¿Borrar esta deuda permanentemente?', async (ok) => {
         if (!ok) return;
         debtsState.debts = debtsState.debts.filter(d => d.id !== id);
         await saveDebtsState();
@@ -291,128 +454,107 @@ async function deleteDebt(id) {
     });
 }
 
-// Abonar / Registrar el pago mensual a una deuda
 async function payDebtQuota(id) {
     const debtIndex = debtsState.debts.findIndex(d => d.id === id);
     if (debtIndex === -1) return;
 
     const debt = debtsState.debts[debtIndex];
-    
-    let paymentAmount = debt.minPayment;
-    const sorted = [...debtsState.debts].sort((a, b) => a.balance - b.balance);
-    const totalMin = sorted.reduce((sum, d) => sum + d.minPayment, 0);
-    
-    if (debtsState.budget >= totalMin) {
-        let extra = debtsState.budget - totalMin;
-        const targetDebt = sorted[0]; 
-        if (targetDebt.id === id) {
-            paymentAmount += extra;
-        }
-    }
-
-    const finalPayment = Math.min(debt.balance, paymentAmount);
+    // Usar el mismo cálculo que muestra la UI para coherencia
+    const effectivePayments = computeEffectivePayments();
+    const finalPayment = effectivePayments.get(id) || Math.min(debt.balance, debt.minPayment);
     const sym = getCurrencySymbol();
 
     window.showConfirm(`¿Registrar abono de ${sym} ${fmtNum(finalPayment)} a "${debt.name}"?`, async (ok) => {
         if (!ok) return;
-
         debt.balance = Math.max(0, debt.balance - finalPayment);
-        
-        // Registrar abono como Gasto en el presupuesto general
-        if (py && py.add_shopping) {
-            await py.add_shopping(
-                `Abono de deuda: ${debt.name}`, 
-                finalPayment, 
-                'local', // Moneda local por defecto
-                new Date().toISOString().split('T')[0], 
-                '', 
-                'Deudas'
-            );
+
+        if (py?.add_shopping) {
+            await py.add_shopping(`Abono: ${debt.name}`, finalPayment, 'local',
+                new Date().toISOString().split('T')[0], '', 'Deudas');
+        }
+
+        // Si la deuda quedó en cero, marcarla como liquidada con notificación
+        if (debt.balance === 0) {
+            window.showToast(`🎉 ¡"${debt.name}" liquidada! El presupuesto extra ahora se aplica a la siguiente deuda.`, 'success');
+        } else {
+            window.showToast(`Abono de ${sym} ${fmtNum(finalPayment)} registrado exitosamente`, 'success');
         }
 
         await saveDebtsState();
-        window.showToast(`Abono de ${sym} ${fmtNum(finalPayment)} registrado exitosamente`, 'success');
+        // fetchDebts recalcula computeEffectivePayments con el nuevo estado
         fetchDebts();
-        
-        // Recargar presupuesto si está activo
         if (document.getElementById('view-budget')?.classList.contains('active')) {
             if (window.fetchBudget) window.fetchBudget();
         }
     });
 }
 
-// Inicializar escuchas del planificador de deudas (programático)
+// ── Listeners ─────────────────────────────────────────────────────────────────
 function initDebtsListeners() {
-    const addDebtDialogBtn = document.getElementById('btn-add-debt-dialog');
-    if (addDebtDialogBtn) {
-        addDebtDialogBtn.addEventListener('click', () => {
-            openDebtModal();
-        });
-    }
+    document.getElementById('btn-add-debt-dialog')?.addEventListener('click', () => openDebtModal());
 
-    const debtsList = document.getElementById('debts-list');
-    if (debtsList) {
-        debtsList.addEventListener('click', (e) => {
-            const payBtn = e.target.closest('.debt-pay-btn');
-            if (payBtn) {
-                payDebtQuota(Number(payBtn.getAttribute('data-id')));
-                return;
-            }
-            const editBtn = e.target.closest('.debt-edit-btn');
-            if (editBtn) {
-                openDebtModal(Number(editBtn.getAttribute('data-id')));
-                return;
-            }
-            const deleteBtn = e.target.closest('.debt-delete-btn');
-            if (deleteBtn) {
-                deleteDebt(Number(deleteBtn.getAttribute('data-id')));
-                return;
-            }
-        });
-    }
+    document.getElementById('debts-list')?.addEventListener('click', (e) => {
+        const payBtn = e.target.closest('.debt-pay-btn');
+        if (payBtn) { payDebtQuota(Number(payBtn.getAttribute('data-id'))); return; }
+        const editBtn = e.target.closest('.debt-edit-btn');
+        if (editBtn) { openDebtModal(Number(editBtn.getAttribute('data-id'))); return; }
+        const deleteBtn = e.target.closest('.debt-delete-btn');
+        if (deleteBtn) { deleteDebt(Number(deleteBtn.getAttribute('data-id'))); return; }
+    });
 
-    const saveBudgetBtn = document.getElementById('save-debts-budget-btn');
-    if (saveBudgetBtn) {
-        saveBudgetBtn.addEventListener('click', () => {
-            const input = document.getElementById('debts-budget-input');
-            if (input) {
-                debtsState.budget = Number(input.value) || 0;
-                saveDebtsState();
-                window.showToast('Presupuesto de deudas actualizado', 'success');
-                fetchDebts();
-                if (window.fetchBudget) window.fetchBudget();
-            }
-        });
-    }
+    document.getElementById('save-debts-budget-btn')?.addEventListener('click', () => {
+        const input = document.getElementById('debts-budget-input');
+        if (input) {
+            debtsState.budget = Number(input.value) || 0;
+            saveDebtsState();
+            window.showToast('Presupuesto de deudas actualizado', 'success');
+            fetchDebts();
+            if (window.fetchBudget) window.fetchBudget();
+        }
+    });
 
-    const saveDebtBtn = document.getElementById('save-debt-modal-btn');
-    if (saveDebtBtn) {
-        saveDebtBtn.addEventListener('click', saveDebt);
-    }
+    // Selector de método
+    document.addEventListener('click', (e) => {
+        const btn = e.target.closest('.debt-method-btn');
+        if (!btn) return;
+        const method = btn.getAttribute('data-method');
+        debtsState.method = method;
+        localStorage.setItem('debtsMethod', method);
 
-    const closeCancelBtn = document.getElementById('close-debt-modal-cancel');
-    if (closeCancelBtn) {
-        closeCancelBtn.addEventListener('click', () => {
-            document.getElementById('debt-editor-modal')?.classList.remove('active');
+        document.querySelectorAll('.debt-method-btn').forEach(b => {
+            const isActive = b.getAttribute('data-method') === method;
+            b.style.background = isActive ? 'rgba(108,92,231,0.2)' : 'none';
+            b.style.border = isActive ? '1px solid rgba(108,92,231,0.4)' : '1px solid transparent';
+            b.style.color = isActive ? '#a29bfe' : 'var(--ag-text-muted)';
         });
-    }
 
-    const closeXBtn = document.getElementById('close-debt-modal-x');
-    if (closeXBtn) {
-        closeXBtn.addEventListener('click', () => {
-            document.getElementById('debt-editor-modal')?.classList.remove('active');
-        });
-    }
+        const label = document.getElementById('debts-sim-label');
+        if (label) label.textContent = method === 'snowball' ? 'Bola de Nieve' : 'Avalancha';
+
+        renderDebtsSummaryCards();
+        renderDebtsList();
+        renderSnowballProjection();
+    });
+
+    document.getElementById('save-debt-modal-btn')?.addEventListener('click', saveDebt);
+    document.getElementById('close-debt-modal-cancel')?.addEventListener('click', () => {
+        document.getElementById('debt-editor-modal')?.classList.remove('active');
+    });
+    document.getElementById('close-debt-modal-x')?.addEventListener('click', () => {
+        document.getElementById('debt-editor-modal')?.classList.remove('active');
+    });
+
+    window.addEventListener('resize', () => {
+        if (debtsState.debts.length > 0) renderDebtChart(runSimulation());
+    });
 }
 
-// Ejecutar al cargar la página
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initDebtsListeners);
 } else {
     initDebtsListeners();
 }
 
-// Exponer funciones necesarias globalmente
 window.fetchDebts = fetchDebts;
 window.openDebtModal = openDebtModal;
 window.saveDebt = saveDebt;

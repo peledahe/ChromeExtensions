@@ -15,7 +15,9 @@ const budgetState = {
     expense: [],
     limits: {}, // Límites de gasto mensual por categoría
     incomeTargets: {}, // Metas de ingresos mensuales por categoría
-    debtAllocation: 0 // Monto asignado a deudas
+    debtAllocation: 0, // Monto asignado a deudas
+    selectedMonth: new Date().getMonth(), // 0-11
+    selectedYear: new Date().getFullYear()
 };
 
 const currencyState = {
@@ -373,6 +375,83 @@ function populateCategorySelects() {
 }
 
 // Cargar datos de presupuesto
+// Poblar los selects de mes y año del filtro de presupuesto
+function initBudgetMonthFilter() {
+    const monthSel = document.getElementById('budget-month-select');
+    const yearSel = document.getElementById('budget-year-select');
+    if (!monthSel || !yearSel) return;
+
+    const months = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+    monthSel.innerHTML = months.map((m, i) =>
+        `<option value="${i}" ${i === budgetState.selectedMonth ? 'selected' : ''}>${m}</option>`
+    ).join('');
+
+    const currentYear = new Date().getFullYear();
+    yearSel.innerHTML = '';
+    for (let y = currentYear; y >= currentYear - 2; y--) {
+        const opt = document.createElement('option');
+        opt.value = y;
+        opt.textContent = y;
+        if (y === budgetState.selectedYear) opt.selected = true;
+        yearSel.appendChild(opt);
+    }
+
+    monthSel.addEventListener('change', () => {
+        budgetState.selectedMonth = Number(monthSel.value);
+        fetchBudget();
+    });
+    yearSel.addEventListener('change', () => {
+        budgetState.selectedYear = Number(yearSel.value);
+        fetchBudget();
+    });
+}
+
+// Eliminar del storage income y shopping con año anterior al año actual
+async function purgeOldBudgetData() {
+    try {
+        if (!py) return;
+        const currentYear = new Date().getFullYear();
+
+        const allIncome = await py.get_income();
+        const cleanIncome = allIncome.filter(i => {
+            const y = parseInt((i.dueDate || '').substring(0, 4));
+            return isNaN(y) || y >= currentYear;
+        });
+        if (cleanIncome.length !== allIncome.length) {
+            // Guardar directamente en storage (acceso interno)
+            const removed = allIncome.length - cleanIncome.length;
+            // Borrar uno a uno usando delete_income para respetar el bridge
+            const toDeleteIncome = allIncome.filter(i => {
+                const y = parseInt((i.dueDate || '').substring(0, 4));
+                return !isNaN(y) && y < currentYear;
+            });
+            for (const item of toDeleteIncome) {
+                await py.delete_income(item.id);
+            }
+            console.log(`[Budget] Purga: ${removed} ingreso(s) de años anteriores eliminados.`);
+        }
+
+        const allExpense = await py.get_shopping();
+        const cleanExpense = allExpense.filter(e => {
+            const y = parseInt((e.dueDate || '').substring(0, 4));
+            return isNaN(y) || y >= currentYear;
+        });
+        if (cleanExpense.length !== allExpense.length) {
+            const removed = allExpense.length - cleanExpense.length;
+            const toDeleteExpense = allExpense.filter(e => {
+                const y = parseInt((e.dueDate || '').substring(0, 4));
+                return !isNaN(y) && y < currentYear;
+            });
+            for (const item of toDeleteExpense) {
+                await py.delete_shopping(item.id);
+            }
+            console.log(`[Budget] Purga: ${removed} gasto(s) de años anteriores eliminados.`);
+        }
+    } catch (err) {
+        console.warn('[Budget] Error en purga de datos antiguos:', err);
+    }
+}
+
 async function fetchBudget() {
     try {
         if (!py) return;
@@ -390,9 +469,12 @@ async function fetchBudget() {
             py.get_debts_budget()
         ]);
 
-        budgetState.income = incomeData || [];
-        budgetState.expense = expenseData || [];
-        
+        // Filtrar al mes/año seleccionado
+        const monthStr = String(budgetState.selectedMonth + 1).padStart(2, '0');
+        const prefix = `${budgetState.selectedYear}-${monthStr}`;
+        budgetState.income = (incomeData || []).filter(i => (i.dueDate || '').startsWith(prefix));
+        budgetState.expense = (expenseData || []).filter(e => (e.dueDate || '').startsWith(prefix));
+
         // Cargar límites por defecto si no existen (Gastos)
         const defaultLimits = {};
         BUDGET_CATEGORIES.expense.forEach(cat => {
@@ -778,6 +860,10 @@ function updateBudgetGridTemplate() {
 // Inicializar escuchas de eventos de la pestaña de presupuesto de forma programática y robusta (CSP y delegación)
 function initBudgetListeners() {
     console.log("Budget dynamic listeners initialized");
+
+    // Inicializar selector de mes/año y ejecutar purga de datos viejos
+    initBudgetMonthFilter();
+    purgeOldBudgetData();
 
     // Delegación de eventos click a nivel de document
     document.addEventListener('click', (e) => {
