@@ -47,7 +47,13 @@ function signInGDrive() {
             const errObj = chrome.runtime.lastError;
             const errMsg = errObj ? (errObj.message || JSON.stringify(errObj)) : 'Token no recibido';
             console.error('Google Auth error object:', errObj);
-            window.showToast(`Error al conectar con Google Drive: ${errMsg}. Operando localmente.`, 'info');
+            
+            if (errMsg.includes('Microsoft Edge') || errMsg.includes('Edge')) {
+                window.showToast('La conexión nativa con Google Drive no está soportada en Microsoft Edge. Operando localmente de forma persistente.', 'info');
+            } else {
+                window.showToast(`Error al conectar con Google Drive: ${errMsg}. Operando localmente.`, 'info');
+            }
+            
             syncState.connected = false;
             updateSyncUI();
             return;
@@ -156,7 +162,14 @@ async function applyDownloadedData(remoteData) {
                 cleanData[k] = remoteData[k];
             }
         });
-        chrome.storage.local.set(cleanData, resolve);
+        
+        chrome.storage.local.set(cleanData, () => {
+            if (cleanData.app_config && typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
+                chrome.storage.sync.set({ app_config: cleanData.app_config }, resolve);
+            } else {
+                resolve();
+            }
+        });
     });
 }
 

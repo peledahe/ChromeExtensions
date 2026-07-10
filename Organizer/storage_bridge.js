@@ -9,11 +9,66 @@
     webChannelTransport: {}
   };
 
-  // Helper para interactuar con chrome.storage.local de forma asíncrona
+  // Helper para interactuar con chrome.storage.local/sync de forma asíncrona
   const storage = {
     get: function(key, defaultValue) {
       return new Promise((resolve) => {
         try {
+          const useSync = (key === 'app_config');
+          if (useSync) {
+            // Estrategia híbrida: Intentar primero sync, si no hay datos o falla, hacer fallback a local
+            const getFromSync = () => {
+              return new Promise((resSync) => {
+                if (typeof browser !== 'undefined' && browser.storage && browser.storage.sync) {
+                  browser.storage.sync.get(key)
+                    .then(res => resSync(res && res[key] !== undefined ? res[key] : null))
+                    .catch(() => resSync(null));
+                } else if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
+                  chrome.storage.sync.get([key], (res) => {
+                    if (chrome.runtime.lastError || !res || res[key] === undefined) {
+                      resSync(null);
+                    } else {
+                      resSync(res[key]);
+                    }
+                  });
+                } else {
+                  resSync(null);
+                }
+              });
+            };
+
+            const getFromLocal = () => {
+              return new Promise((resLocal) => {
+                if (typeof browser !== 'undefined' && browser.storage && browser.storage.local) {
+                  browser.storage.local.get(key)
+                    .then(res => resLocal(res && res[key] !== undefined ? res[key] : null))
+                    .catch(() => resLocal(null));
+                } else if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+                  chrome.storage.local.get([key], (res) => {
+                    if (chrome.runtime.lastError || !res || res[key] === undefined) {
+                      resLocal(null);
+                    } else {
+                      resLocal(res[key]);
+                    }
+                  });
+                } else {
+                  resLocal(null);
+                }
+              });
+            };
+
+            getFromSync().then((syncVal) => {
+              if (syncVal !== null) {
+                resolve(syncVal);
+              } else {
+                getFromLocal().then((localVal) => {
+                  resolve(localVal !== null ? localVal : defaultValue);
+                });
+              }
+            });
+            return;
+          }
+
           if (typeof browser !== 'undefined' && browser.storage && browser.storage.local) {
             browser.storage.local.get(key)
               .then((result) => {
@@ -61,6 +116,32 @@
     set: function(key, value) {
       return new Promise((resolve) => {
         try {
+          const useSync = (key === 'app_config');
+          if (useSync) {
+            // Guardamos concurrentemente en sync y local (si están disponibles) para tener siempre respaldo local
+            const promises = [];
+            if (typeof browser !== 'undefined' && browser.storage) {
+              if (browser.storage.sync) {
+                promises.push(browser.storage.sync.set({ [key]: value }).catch(e => console.error("browser.storage.sync.set error:", e)));
+              }
+              if (browser.storage.local) {
+                promises.push(browser.storage.local.set({ [key]: value }).catch(e => console.error("browser.storage.local.set error:", e)));
+              }
+            } else if (typeof chrome !== 'undefined' && chrome.storage) {
+              if (chrome.storage.sync) {
+                promises.push(new Promise(r => chrome.storage.sync.set({ [key]: value }, r)));
+              }
+              if (chrome.storage.local) {
+                promises.push(new Promise(r => chrome.storage.local.set({ [key]: value }, r)));
+              }
+            }
+            
+            if (promises.length > 0) {
+              Promise.all(promises).then(() => resolve());
+              return;
+            }
+          }
+
           if (typeof browser !== 'undefined' && browser.storage && browser.storage.local) {
             browser.storage.local.set({ [key]: value })
               .then(() => resolve())
@@ -239,6 +320,8 @@
     if (!items || items.length === 0) return 1;
     return Math.max(...items.map(item => Number(item.id) || 0)) + 1;
   }
+
+  let configQueue = Promise.resolve();
 
   // --- MOCK DE PY (AgendaBridge) ---
   const mockPy = {
@@ -568,10 +651,17 @@
       };
       return config[key] !== undefined ? config[key] : (defaults[key] || '');
     },
-    set_config: async function(key, val) {
-      const config = await storage.get('app_config', {});
-      config[key] = String(val);
-      await storage.set('app_config', config);
+    set_config: function(key, val) {
+      configQueue = configQueue.then(async () => {
+        try {
+          const config = await storage.get('app_config', {});
+          config[key] = String(val);
+          await storage.set('app_config', config);
+        } catch (err) {
+          console.error("Error setting config:", err);
+        }
+      });
+      return configQueue;
     },
 
     // Stubs para el reproductor de videos e imágenes

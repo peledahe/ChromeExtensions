@@ -127,6 +127,7 @@ function bindStaticEvents() {
     if (cfgBtn) cfgBtn.onclick = () => activateTab('config');
 
     const openNewModalBtn = document.getElementById('open-new-reminder-modal-btn');
+    const agendaClearDoneBtn = document.getElementById('agenda-clear-done-btn');
     const newModal = document.getElementById('new-reminder-modal');
     if (openNewModalBtn && newModal) {
         openNewModalBtn.onclick = () => {
@@ -139,6 +140,9 @@ function bindStaticEvents() {
             renderNewReminderTagHelper();
             newModal.classList.add('active');
         };
+    }
+    if (agendaClearDoneBtn) {
+        agendaClearDoneBtn.onclick = clearDoneAgendaReminders;
     }
 
     const cancelNewModalBtn = document.getElementById('new-reminder-cancel-btn');
@@ -484,6 +488,11 @@ function bindKanbanEvents() {
             state.kanbanSearch = (e.target.value || '').toLowerCase();
             await fetchKanban();
         });
+    }
+
+    const kbCleanDoneBtn = document.getElementById('kb-clean-done-btn');
+    if (kbCleanDoneBtn) {
+        kbCleanDoneBtn.onclick = clearDoneKanbanCards;
     }
 
     document.querySelectorAll('.kb-col-add').forEach((btn) => {
@@ -1415,6 +1424,28 @@ async function deleteReminder(id) {
         if (!ok) return;
         await py.delete_agenda(id);
         fetchReminders(false);
+    });
+}
+
+async function clearDoneAgendaReminders() {
+    window.showConfirm('¿Estás seguro de que deseas eliminar todas las tareas completadas de la Agenda? Esta acción no se puede deshacer.', async (ok) => {
+        if (!ok) return;
+        try {
+            const doneReminders = state.reminders.filter(r => r.done == 1 || r.done == true);
+            if (!doneReminders || doneReminders.length === 0) {
+                notify('No hay tareas completadas para limpiar', 'info');
+                return;
+            }
+
+            const deletes = doneReminders.map(r => py.delete_agenda(r.id));
+            await Promise.all(deletes);
+
+            await fetchReminders();
+            notify('Tareas completadas eliminadas de la Agenda', 'success');
+        } catch (err) {
+            console.error('Error al limpiar tareas de la agenda:', err);
+            notify('No se pudieron limpiar las tareas completadas', 'info');
+        }
     });
 }
 
@@ -2552,6 +2583,28 @@ async function deleteKanbanCard(id) {
         if (!ok) return;
         await py.delete_kanban_card(id);
         await fetchKanban();
+    });
+}
+
+async function clearDoneKanbanCards() {
+    window.showConfirm('¿Estás seguro de que deseas eliminar todas las tareas de la columna "Hechos"? Esta acción no se puede deshacer.', async (ok) => {
+        if (!ok) return;
+        try {
+            const cards = await py.get_kanban_cards(4);
+            if (!cards || cards.length === 0) {
+                notify('No hay tareas para limpiar en la columna Hechos', 'info');
+                return;
+            }
+            
+            const deletes = cards.map(card => py.delete_kanban_card(card.id));
+            await Promise.all(deletes);
+            
+            await fetchKanban();
+            notify('Tareas de la columna Hechos eliminadas', 'success');
+        } catch (err) {
+            console.error('Error al limpiar tareas hechas:', err);
+            notify('No se pudieron limpiar las tareas hechas', 'info');
+        }
     });
 }
 

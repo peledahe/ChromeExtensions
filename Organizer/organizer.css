@@ -935,6 +935,20 @@
             transition: color 0.15s, background 0.15s;
         }
         .kb-col-add:hover { color: #fff; background: rgba(255,255,255,0.08); }
+        .kb-col-clean {
+            background: none;
+            border: none;
+            color: rgba(255,255,255,0.3);
+            cursor: pointer;
+            line-height: 1;
+            padding: 4px;
+            border-radius: 5px;
+            transition: color 0.15s, background 0.15s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .kb-col-clean:hover { color: #ff7675; background: rgba(255,255,255,0.08); }
 
         .kb-cards {
             flex: 1;
