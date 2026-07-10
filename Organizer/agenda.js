@@ -29,6 +29,10 @@ const state = {
         shopping: 1,
         income: 1
     },
+    agendaView: 'list',
+    calShowKanban: false,
+    kanbanCards: [],
+    calendarDate: new Date(),
     cfg: {
         videoEnabled: true,
         imagesEnabled: true,
@@ -114,8 +118,18 @@ async function initApp() {
 
     if (window.initGDriveSync) window.initGDriveSync();
 
+    const preferredView = localStorage.getItem('lastAgendaView') || 'list';
+    switchAgendaView(preferredView);
+
     const preferredTab = localStorage.getItem('lastAgendaTab') || 'notes';
     activateTab(preferredTab);
+
+    // Ajustar número de tareas visibles en el calendario al redimensionar la pantalla
+    window.addEventListener('resize', () => {
+        if (state.agendaView === 'calendar' && document.getElementById('view-agenda').classList.contains('active')) {
+            renderCalendar();
+        }
+    });
 }
 
 function bindStaticEvents() {
@@ -164,8 +178,52 @@ function bindStaticEvents() {
         reminderTagFilter.addEventListener('change', (e) => {
             state.reminderTagFilter = e.target.value || REMINDER_TAG_ALL;
             state.page.reminders = 1;
-            renderReminders();
+            if (state.agendaView === 'calendar') {
+                renderCalendar();
+            } else {
+                renderReminders();
+            }
         });
+    }
+
+    // Bindings de la vista de Calendario en Agenda
+    const btnListView = document.getElementById('btn-agenda-list-view');
+    const btnCalView = document.getElementById('btn-agenda-cal-view');
+    if (btnListView) btnListView.onclick = () => switchAgendaView('list');
+    if (btnCalView) btnCalView.onclick = () => switchAgendaView('calendar');
+
+    const calShowKanbanCheckbox = document.getElementById('cal-show-kanban-checkbox');
+    if (calShowKanbanCheckbox) {
+        const preferredShow = localStorage.getItem('lastCalShowKanban') === 'true';
+        calShowKanbanCheckbox.checked = preferredShow;
+        state.calShowKanban = preferredShow;
+        calShowKanbanCheckbox.onchange = (e) => {
+            state.calShowKanban = e.target.checked;
+            localStorage.setItem('lastCalShowKanban', e.target.checked);
+            renderCalendar();
+        };
+    }
+
+    const calPrevBtn = document.getElementById('cal-prev-btn');
+    const calNextBtn = document.getElementById('cal-next-btn');
+    const calTodayBtn = document.getElementById('cal-today-btn');
+    if (calPrevBtn) calPrevBtn.onclick = () => navigateCalendar('prev');
+    if (calNextBtn) calNextBtn.onclick = () => navigateCalendar('next');
+    if (calTodayBtn) calTodayBtn.onclick = () => navigateCalendar('today');
+
+    const calMonthSelect = document.getElementById('cal-month-select');
+    const calYearSelect = document.getElementById('cal-year-select');
+    if (calMonthSelect) {
+        calMonthSelect.onchange = (e) => navigateCalendar('month', e.target.value);
+    }
+    if (calYearSelect) {
+        calYearSelect.onchange = (e) => navigateCalendar('year', e.target.value);
+    }
+
+    const calDayModalCloseBtn = document.getElementById('cal-day-modal-close-btn');
+    const calDayModal = document.getElementById('calendar-day-details-modal');
+    if (calDayModalCloseBtn && calDayModal) {
+        calDayModalCloseBtn.onclick = () => calDayModal.classList.remove('active');
     }
 
     const addShopBtn = document.getElementById('add-shop-btn');
@@ -1272,11 +1330,24 @@ async function fetchReminders(resetPage = true) {
     if (resetPage) state.page.reminders = 1;
 
     try {
-        state.reminders = await py.get_agenda();
+        const [agenda, kanbanCards] = await Promise.all([
+            py.get_agenda(),
+            py.get_kanban_cards()
+        ]);
+        state.reminders = agenda;
+        state.kanbanCards = kanbanCards || [];
+        
         renderReminders();
+        renderCalendar();
+        
+        const calDayModal = document.getElementById('calendar-day-details-modal');
+        if (calDayModal) {
+            calDayModal.classList.remove('active');
+        }
     } catch (err) {
         console.error('Error fetching reminders:', err);
-        document.getElementById('reminders-list').innerHTML = '<div class="ag-empty">Error al cargar tareas</div>';
+        const listEl = document.getElementById('reminders-list');
+        if (listEl) listEl.innerHTML = '<div class="ag-empty">Error al cargar tareas</div>';
     }
 }
 
@@ -1437,8 +1508,8 @@ async function clearDoneAgendaReminders() {
                 return;
             }
 
-            const deletes = doneReminders.map(r => py.delete_agenda(r.id));
-            await Promise.all(deletes);
+            const idsToDelete = doneReminders.map(r => r.id);
+            await py.delete_agenda_batch(idsToDelete);
 
             await fetchReminders();
             notify('Tareas completadas eliminadas de la Agenda', 'success');
@@ -1447,6 +1518,389 @@ async function clearDoneAgendaReminders() {
             notify('No se pudieron limpiar las tareas completadas', 'info');
         }
     });
+}
+
+function switchAgendaView(view) {
+    state.agendaView = view;
+    localStorage.setItem('lastAgendaView', view);
+    
+    const listBtn = document.getElementById('btn-agenda-list-view');
+    const calBtn = document.getElementById('btn-agenda-cal-view');
+    const listContainer = document.getElementById('agenda-list-container');
+    const calContainer = document.getElementById('agenda-calendar-container');
+    const filterRow = document.getElementById('agenda-filter-row-container');
+
+    const calKanbanToggleWrapper = document.getElementById('cal-kanban-toggle-wrapper');
+
+    if (view === 'list') {
+        if (listBtn) listBtn.classList.add('active');
+        if (calBtn) calBtn.classList.remove('active');
+        if (listContainer) listContainer.style.display = 'block';
+        if (calContainer) calContainer.style.display = 'none';
+        if (filterRow) filterRow.style.display = 'flex';
+        if (calKanbanToggleWrapper) calKanbanToggleWrapper.style.display = 'none';
+        renderReminders();
+    } else {
+        if (listBtn) listBtn.classList.remove('active');
+        if (calBtn) calBtn.classList.add('active');
+        if (listContainer) listContainer.style.display = 'none';
+        if (calContainer) calContainer.style.display = 'flex';
+        if (filterRow) filterRow.style.display = 'flex';
+        if (calKanbanToggleWrapper) calKanbanToggleWrapper.style.display = 'flex';
+        renderCalendar();
+    }
+}
+
+function populateCalendarDropdowns() {
+    const monthSelect = document.getElementById('cal-month-select');
+    const yearSelect = document.getElementById('cal-year-select');
+    if (!monthSelect || !yearSelect) return;
+
+    if (monthSelect.options.length === 0) {
+        const months = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+        months.forEach((m, idx) => {
+            const opt = document.createElement('option');
+            opt.value = idx;
+            opt.textContent = m;
+            monthSelect.appendChild(opt);
+        });
+    }
+
+    const calendarYear = state.calendarDate.getFullYear();
+    let needsRegen = yearSelect.options.length === 0;
+    if (!needsRegen) {
+        const firstOpt = parseInt(yearSelect.options[0].value);
+        const lastOpt = parseInt(yearSelect.options[yearSelect.options.length - 1].value);
+        if (calendarYear < firstOpt || calendarYear > lastOpt) {
+            needsRegen = true;
+        }
+    }
+
+    if (needsRegen) {
+        yearSelect.innerHTML = '';
+        for (let y = calendarYear - 5; y <= calendarYear + 5; y++) {
+            const opt = document.createElement('option');
+            opt.value = y;
+            opt.textContent = y;
+            yearSelect.appendChild(opt);
+        }
+    }
+}
+
+function navigateCalendar(action, value) {
+    const date = state.calendarDate;
+    if (action === 'prev') {
+        date.setMonth(date.getMonth() - 1);
+    } else if (action === 'next') {
+        date.setMonth(date.getMonth() + 1);
+    } else if (action === 'today') {
+        state.calendarDate = new Date();
+    } else if (action === 'month') {
+        date.setMonth(parseInt(value));
+    } else if (action === 'year') {
+        date.setFullYear(parseInt(value));
+    }
+    renderCalendar();
+}
+
+function openNewReminderAtDate(dateStr) {
+    const newModal = document.getElementById('new-reminder-modal');
+    if (!newModal) return;
+
+    const txtInput = document.getElementById('new-reminder-input');
+    const tagInput = document.getElementById('new-reminder-tag');
+    const dateInput = document.getElementById('new-reminder-date');
+    
+    if (txtInput) txtInput.value = '';
+    if (tagInput) tagInput.value = '';
+    if (dateInput) dateInput.value = dateStr;
+    
+    renderNewReminderTagHelper();
+    newModal.classList.add('active');
+}
+
+async function renderCalendar() {
+    populateCalendarDropdowns();
+
+    const monthSelect = document.getElementById('cal-month-select');
+    const yearSelect = document.getElementById('cal-year-select');
+    const monthYearLabel = document.getElementById('cal-month-year-label');
+    const grid = document.getElementById('calendar-days-grid');
+    if (!grid) return;
+
+    // Cargar las tarjetas Kanban frescas de forma asíncrona si está activo
+    if (state.calShowKanban) {
+        try {
+            state.kanbanCards = await py.get_kanban_cards() || [];
+        } catch (e) {
+            console.error('Error al cargar tarjetas de kanban para calendario:', e);
+        }
+    }
+
+    // Calcular dinámicamente cuántas tareas caben por celda
+    const gridHeight = grid.clientHeight || 450;
+    const rowCount = 6;
+    const cellHeight = (gridHeight - (rowCount - 1) * 4) / rowCount;
+    const availableHeight = cellHeight - 24; // Restar altura de la cabecera
+    const maxVisible = Math.max(1, Math.floor(availableHeight / 19));
+
+    const currentYear = state.calendarDate.getFullYear();
+    const currentMonth = state.calendarDate.getMonth();
+
+    if (monthSelect) monthSelect.value = currentMonth;
+    if (yearSelect) yearSelect.value = currentYear;
+
+    const months = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+    if (monthYearLabel) {
+        monthYearLabel.textContent = `${months[currentMonth]} ${currentYear}`;
+    }
+
+    grid.innerHTML = '';
+
+    // Primer día del mes
+    const firstDay = new Date(currentYear, currentMonth, 1);
+    // Día de la semana del primer día (0: Domingo, 1: Lunes, etc.)
+    const dayOfWeek = firstDay.getDay();
+    // Offset para que empiece en Lunes (0: Lun, 1: Mar, ..., 6: Dom)
+    const offset = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+
+    // Días en el mes
+    const totalDays = new Date(currentYear, currentMonth + 1, 0).getDate();
+    // Días del mes anterior
+    const prevTotalDays = new Date(currentYear, currentMonth, 0).getDate();
+
+    // Rellenar días del mes anterior
+    for (let i = offset - 1; i >= 0; i--) {
+        const dayNum = prevTotalDays - i;
+        const cell = document.createElement('div');
+        cell.className = 'cal-day-cell other-month';
+        cell.innerHTML = `
+            <div class="cal-day-header" style="display:flex; justify-content:space-between; align-items:center; width:100%; margin-bottom:4px;">
+                <span class="cal-day-num" style="margin:0;">${dayNum}</span>
+                <span class="cal-more-indicator" style="display:none;"></span>
+            </div>
+            <div class="cal-day-events"></div>
+        `;
+        
+        const prevMonthDate = new Date(currentYear, currentMonth - 1, dayNum);
+        const dateStr = prevMonthDate.toISOString().split('T')[0];
+        cell.onclick = () => openNewReminderAtDate(dateStr);
+        
+        renderEventsForCell(cell, dateStr, maxVisible);
+        grid.appendChild(cell);
+    }
+
+    const todayObj = new Date();
+    const todayStr = todayObj.toISOString().split('T')[0];
+
+    // Rellenar días del mes actual
+    for (let dayNum = 1; dayNum <= totalDays; dayNum++) {
+        const cell = document.createElement('div');
+        const cellDate = new Date(currentYear, currentMonth, dayNum);
+        // Formatear fecha local YYYY-MM-DD
+        const y = cellDate.getFullYear();
+        const m = String(cellDate.getMonth() + 1).padStart(2, '0');
+        const d = String(cellDate.getDate()).padStart(2, '0');
+        const dateStr = `${y}-${m}-${d}`;
+
+        cell.className = 'cal-day-cell';
+        if (dateStr === todayStr) {
+            cell.classList.add('today');
+        }
+
+        cell.innerHTML = `
+            <div class="cal-day-header" style="display:flex; justify-content:space-between; align-items:center; width:100%; margin-bottom:4px;">
+                <span class="cal-day-num" style="margin:0;">${dayNum}</span>
+                <span class="cal-more-indicator" style="display:none;"></span>
+            </div>
+            <div class="cal-day-events"></div>
+        `;
+        cell.onclick = () => openNewReminderAtDate(dateStr);
+
+        renderEventsForCell(cell, dateStr, maxVisible);
+        grid.appendChild(cell);
+    }
+
+    // Rellenar días del mes siguiente hasta completar una grilla limpia (múltiplo de 7)
+    const totalCells = grid.children.length;
+    const remainingCells = totalCells % 7 === 0 ? 0 : 7 - (totalCells % 7);
+    for (let dayNum = 1; dayNum <= remainingCells; dayNum++) {
+        const cell = document.createElement('div');
+        cell.className = 'cal-day-cell other-month';
+        cell.innerHTML = `
+            <div class="cal-day-header" style="display:flex; justify-content:space-between; align-items:center; width:100%; margin-bottom:4px;">
+                <span class="cal-day-num" style="margin:0;">${dayNum}</span>
+                <span class="cal-more-indicator" style="display:none;"></span>
+            </div>
+            <div class="cal-day-events"></div>
+        `;
+        
+        const nextMonthDate = new Date(currentYear, currentMonth + 1, dayNum);
+        const dateStr = nextMonthDate.toISOString().split('T')[0];
+        cell.onclick = () => openNewReminderAtDate(dateStr);
+
+        renderEventsForCell(cell, dateStr, maxVisible);
+        grid.appendChild(cell);
+    }
+}
+
+function renderEventsForCell(cell, dateStr, maxVisible) {
+    const eventsContainer = cell.querySelector('.cal-day-events');
+    const moreIndicator = cell.querySelector('.cal-more-indicator');
+    if (!eventsContainer) return;
+
+    const tagFilter = state.reminderTagFilter || REMINDER_TAG_ALL;
+
+    const matchingReminders = state.reminders.filter((r) => {
+        if (!r.dueDate) return false;
+        // Normalizar dueDate a YYYY-MM-DD
+        const rDate = r.dueDate.split('T')[0];
+        if (rDate !== dateStr) return false;
+        // Filtro de etiqueta
+        if (tagFilter !== REMINDER_TAG_ALL) {
+            const tags = (r.tag || '').split(',').map(t => t.trim()).filter(Boolean);
+            if (!tags.includes(tagFilter)) return false;
+        }
+        return true;
+    });
+
+    const matchingKanban = [];
+    if (state.calShowKanban && Array.isArray(state.kanbanCards)) {
+        const todayObj = new Date();
+        const y = todayObj.getFullYear();
+        const m = String(todayObj.getMonth() + 1).padStart(2, '0');
+        const d = String(todayObj.getDate()).padStart(2, '0');
+        const todayStr = `${y}-${m}-${d}`;
+        state.kanbanCards.forEach((card) => {
+            const parsed = parseKanbanCardText(card.text);
+            if (parsed.due && parsed.due >= todayStr) {
+                // Solo mostrar desde hoy hasta la fecha de vencimiento
+                const showInThisCell = (dateStr >= todayStr && dateStr <= parsed.due);
+                if (showInThisCell) {
+                    matchingKanban.push({
+                        id: card.id,
+                        text: `📋 [KB] ${parsed.title}`,
+                        done: card.col_id === 4,
+                        isKanban: true,
+                        tag: 'Kanban',
+                        originalCard: card
+                    });
+                }
+            }
+        });
+    }
+
+    const allEvents = [...matchingReminders, ...matchingKanban];
+
+    const hasMore = allEvents.length > maxVisible;
+    const visibleEvents = hasMore ? allEvents.slice(0, maxVisible) : allEvents;
+
+    if (hasMore && moreIndicator) {
+        moreIndicator.textContent = `+${allEvents.length - maxVisible}`;
+        moreIndicator.style.display = 'inline-block';
+        moreIndicator.onclick = (e) => {
+            e.stopPropagation();
+            openDayDetailsModal(dateStr, allEvents);
+        };
+    } else if (moreIndicator) {
+        moreIndicator.style.display = 'none';
+    }
+
+    visibleEvents.forEach((r) => {
+        const evCard = document.createElement('div');
+        if (r.isKanban) {
+            evCard.className = `cal-event-card kanban-task ${r.done ? 'done' : 'pending'}`;
+        } else {
+            evCard.className = `cal-event-card ${r.done ? 'done' : 'pending'}`;
+        }
+        evCard.textContent = r.text;
+        evCard.title = `${r.text} ${r.tag ? '(🏷️ ' + r.tag + ')' : ''}`;
+        
+        evCard.onclick = (e) => {
+            e.stopPropagation(); // Evitar abrir modal de creación
+            if (r.isKanban) {
+                editKanbanCard(r.id);
+            } else {
+                openEditModal('reminder', r);
+            }
+        };
+        
+        eventsContainer.appendChild(evCard);
+    });
+}
+
+function openDayDetailsModal(dateStr, reminders) {
+    const modal = document.getElementById('calendar-day-details-modal');
+    const titleEl = document.getElementById('cal-day-modal-title');
+    const listEl = document.getElementById('cal-day-modal-list');
+    if (!modal || !listEl) return;
+
+    // Formatear fecha a algo amigable
+    const parts = dateStr.split('-');
+    const formattedDate = parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : dateStr;
+    if (titleEl) {
+        titleEl.textContent = `Tareas del día — ${formattedDate}`;
+    }
+
+    listEl.innerHTML = '';
+
+    reminders.forEach((r) => {
+        const itemEl = document.createElement('div');
+        itemEl.className = 'ag-item';
+        itemEl.style.cssText = 'display:flex; justify-content:space-between; align-items:center; padding:12px; margin-bottom:8px; border-radius:8px; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.06); cursor:pointer;';
+        
+        itemEl.onmouseenter = () => {
+            itemEl.style.background = 'rgba(108, 92, 231, 0.08)';
+            itemEl.style.borderColor = 'rgba(108, 92, 231, 0.2)';
+        };
+        itemEl.onmouseleave = () => {
+            itemEl.style.background = 'rgba(255,255,255,0.02)';
+            itemEl.style.borderColor = 'rgba(255,255,255,0.06)';
+        };
+
+        const leftEl = document.createElement('div');
+        leftEl.style.cssText = 'display:flex; flex-direction:column; gap:4px; max-width:80%;';
+
+        const textSpan = document.createElement('span');
+        textSpan.textContent = r.text;
+        textSpan.style.cssText = r.done ? 'text-decoration:line-through; opacity:0.5;' : 'font-weight:600;';
+        leftEl.appendChild(textSpan);
+
+        if (r.tag) {
+            const tagsWrapper = document.createElement('div');
+            tagsWrapper.style.cssText = 'display:flex; gap:4px; flex-wrap:wrap;';
+            const tags = r.tag.split(',').map(t => t.trim()).filter(Boolean);
+            tags.forEach((tag) => {
+                const tagBadge = document.createElement('span');
+                tagBadge.className = 'ag-tag-badge';
+                tagBadge.textContent = tag;
+                tagBadge.style.fontSize = '0.65rem';
+                tagsWrapper.appendChild(tagBadge);
+            });
+            leftEl.appendChild(tagsWrapper);
+        }
+
+        itemEl.appendChild(leftEl);
+
+        const editBtn = document.createElement('button');
+        editBtn.className = 'ag-edit-btn';
+        editBtn.textContent = '✏️';
+        editBtn.style.cssText = 'background:none; border:none; cursor:pointer; font-size:1.1rem; padding:4px;';
+        itemEl.appendChild(editBtn);
+
+        itemEl.onclick = () => {
+            modal.classList.remove('active');
+            if (r.isKanban) {
+                editKanbanCard(r.id);
+            } else {
+                openEditModal('reminder', r);
+            }
+        };
+
+        listEl.appendChild(itemEl);
+    });
+
+    modal.classList.add('active');
 }
 
 async function fetchShoppingList(resetPage = true) {
@@ -2406,6 +2860,16 @@ async function fetchKanban() {
             });
         });
     }
+
+    try {
+        const allCards = await py.get_kanban_cards();
+        state.kanbanCards = allCards || [];
+        if (state.agendaView === 'calendar' && document.getElementById('view-agenda').classList.contains('active')) {
+            renderCalendar();
+        }
+    } catch (err) {
+        console.error('Error fetching global kanban cards:', err);
+    }
 }
 
 function kbDragStart(event, cardId) {
@@ -2596,8 +3060,8 @@ async function clearDoneKanbanCards() {
                 return;
             }
             
-            const deletes = cards.map(card => py.delete_kanban_card(card.id));
-            await Promise.all(deletes);
+            const idsToDelete = cards.map(card => card.id);
+            await py.delete_kanban_card_batch(idsToDelete);
             
             await fetchKanban();
             notify('Tareas de la columna Hechos eliminadas', 'success');

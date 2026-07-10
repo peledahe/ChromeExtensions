@@ -354,7 +354,7 @@
     },
     update_agenda: async function(aid, text, date, tag = null) {
       const list = await storage.get('agenda', []);
-      const idx = list.findIndex(item => item.id === aid);
+      const idx = list.findIndex(item => item.id == aid);
       if (idx !== -1) {
         list[idx].text = text;
         list[idx].dueDate = date;
@@ -366,12 +366,19 @@
     },
     delete_agenda: async function(aid) {
       let list = await storage.get('agenda', []);
-      list = list.filter(item => item.id !== aid);
+      list = list.filter(item => item.id != aid);
+      await storage.set('agenda', list);
+    },
+    delete_agenda_batch: async function(aids) {
+      if (!Array.isArray(aids) || aids.length === 0) return;
+      let list = await storage.get('agenda', []);
+      const aidStrings = aids.map(String);
+      list = list.filter(item => !aidStrings.includes(String(item.id)));
       await storage.set('agenda', list);
     },
     toggle_agenda: async function(aid, done) {
       const list = await storage.get('agenda', []);
-      const idx = list.findIndex(item => item.id === aid);
+      const idx = list.findIndex(item => item.id == aid);
       if (idx !== -1) {
         list[idx].done = !!done;
         await storage.set('agenda', list);
@@ -379,7 +386,7 @@
     },
     set_item_notes: async function(table, itemId, notes) {
       const list = await storage.get(table, []);
-      const idx = list.findIndex(item => item.id === itemId);
+      const idx = list.findIndex(item => item.id == itemId);
       if (idx !== -1) {
         list[idx].notes = notes;
         await storage.set(table, list);
@@ -493,6 +500,10 @@
     },
     get_kanban_cards: async function(colId) {
       const allCards = await storage.get('kanban_cards', []);
+      // Si no se pasa colId, retornar todas las tarjetas
+      if (colId === undefined || colId === null || colId === '') {
+        return allCards.sort((a, b) => a.pos - b.pos);
+      }
       return allCards
         .filter(card => card.col_id === Number(colId))
         .sort((a, b) => a.pos - b.pos);
@@ -529,7 +540,14 @@
     },
     delete_kanban_card: async function(cid) {
       let allCards = await storage.get('kanban_cards', []);
-      allCards = allCards.filter(card => card.id !== cid);
+      allCards = allCards.filter(card => card.id != cid);
+      await storage.set('kanban_cards', allCards);
+    },
+    delete_kanban_card_batch: async function(cids) {
+      if (!Array.isArray(cids) || cids.length === 0) return;
+      let allCards = await storage.get('kanban_cards', []);
+      const cidStrings = cids.map(String);
+      allCards = allCards.filter(card => !cidStrings.includes(String(card.id)));
       await storage.set('kanban_cards', allCards);
     },
 
