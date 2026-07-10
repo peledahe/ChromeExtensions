@@ -4,9 +4,10 @@
 // Si ya está abierta en alguna pestaña, la enfoca y la activa en lugar de abrir una duplicada
 chrome.action.onClicked.addListener((tab) => {
   const targetUrl = chrome.runtime.getURL('organizer.html');
-  chrome.tabs.query({ url: targetUrl }, (tabs) => {
-    if (tabs && tabs.length > 0) {
-      const existingTab = tabs[0];
+  chrome.tabs.query({}, (tabs) => {
+    // Buscamos cualquier pestaña que comience con la URL de organizer.html
+    const existingTab = tabs.find(t => t.url && t.url.startsWith(targetUrl));
+    if (existingTab) {
       chrome.tabs.update(existingTab.id, { active: true });
       chrome.windows.update(existingTab.windowId, { focused: true });
     } else {
