@@ -6,7 +6,8 @@
   "description": "Captura y anota la pantalla de manera fácil y rápida (multiplataforma).",
   "permissions": [
     "activeTab",
-    "storage"
+    "storage",
+    "tabs"
   ],
   "background": {
     "service_worker": "background.js"

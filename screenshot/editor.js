@@ -532,7 +532,13 @@ window.addEventListener('keydown', (e) => {
 
 // --- Inicialización y Carga de la Captura ---
 function init() {
-  // Obtener la imagen temporal guardada en el almacenamiento local de Chrome
+  // Resetear estado para la nueva captura
+  state.shapes = [];
+  state.draft = null;
+  state.step = 1;
+  state.selection = null;
+  updateNumberBadge();
+
   chrome.storage.local.get('tempScreenshot', (data) => {
     const raw = data.tempScreenshot;
     if (!raw) {
@@ -544,15 +550,10 @@ function init() {
     const img = new Image();
     img.onload = () => {
       state.baseImage = img;
-      
-      // Ajustar dimensiones del canvas nativas
       canvas.width = img.naturalWidth;
       canvas.height = img.naturalHeight;
-      
       applyZoom(80);
-      
       render();
-      updateNumberBadge();
       setTool('rect');
       setStatus('Captura cargada con éxito. Listo para anotar.');
       showToast('Captura de pantalla cargada.');
@@ -565,4 +566,12 @@ function init() {
   });
 }
 
+// Recargar la imagen si la pestaña ya estaba abierta y llega una nueva captura
+chrome.storage.onChanged.addListener((changes, areaName) => {
+  if (areaName === 'local' && changes.tempScreenshot) {
+    init();
+  }
+});
+
 init();
+

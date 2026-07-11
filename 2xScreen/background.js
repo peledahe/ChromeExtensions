@@ -47,6 +47,49 @@ chrome.tabs.onRemoved.addListener(async (tabId) => {
   }
 });
 
+// Escucha los cambios de URL para mantener el historial de navegación interno en modo 2x
+chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
+  if (changeInfo.url && activeTabsMemory[tabId]) {
+    const tabData = activeTabsMemory[tabId];
+    
+    // Ignorar urls internas de Chrome y similares
+    if (changeInfo.url.startsWith("chrome://") || changeInfo.url.startsWith("about:") || changeInfo.url.startsWith("edge://")) return;
+
+    if (!tabData.history) {
+      tabData.history = [changeInfo.url];
+      tabData.currentIndex = 0;
+    } else {
+      const currentUrl = tabData.history[tabData.currentIndex];
+      if (changeInfo.url !== currentUrl) {
+        // Verificar si es un retroceso/avance a una página ya en el historial
+        const existingIndex = tabData.history.indexOf(changeInfo.url);
+        if (existingIndex !== -1) {
+          tabData.currentIndex = existingIndex;
+        } else {
+          // Si es una nueva URL, recortar el historial a partir del índice actual y añadir la nueva
+          tabData.history = tabData.history.slice(0, tabData.currentIndex + 1);
+          tabData.history.push(changeInfo.url);
+          tabData.currentIndex = tabData.history.length - 1;
+        }
+        await chrome.storage.local.set({ active2xTabs: activeTabsMemory });
+      }
+    }
+
+    // Notificar al content script en tiempo real
+    try {
+      const canGoBack = tabData.currentIndex > 0;
+      const canGoForward = tabData.currentIndex < tabData.history.length - 1;
+      await chrome.tabs.sendMessage(tabId, {
+        action: "updateNavigationButtons",
+        canGoBack,
+        canGoForward
+      });
+    } catch (e) {
+      // Ignorar si el script de contenido aún no se ha inyectado
+    }
+  }
+});
+
 // Función para alternar el modo 2x
 async function toggle2xMode(tab) {
   const tabData = activeTabsMemory[tab.id];
@@ -129,7 +172,9 @@ function create2xWindow(tab) {
           originalWindowId: tab.windowId,
           popupWindowId: popupWindow.id,
           originalState: originalState,
-          alignRightScreen: hasMultipleDisplays
+          alignRightScreen: hasMultipleDisplays,
+          history: [ tab.url ],
+          currentIndex: 0
         };
         chrome.storage.local.set({ active2xTabs: activeTabsMemory });
 
@@ -324,21 +369,47 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           break;
 
         case "check2xMode":
-          const storageData = await chrome.storage.local.get("active2xTabs");
-          const active2xTabs = storageData.active2xTabs || {};
-          const tabData = active2xTabs[tabId];
+          const tabData = activeTabsMemory[tabId];
           const is2x = !!tabData;
           const alignRight = tabData ? !!tabData.alignRightScreen : false;
-          sendResponse({ enabled: is2x, alignRightScreen: alignRight });
+          let canGoBack = false;
+          let canGoForward = false;
+          if (tabData && tabData.history) {
+            canGoBack = tabData.currentIndex > 0;
+            canGoForward = tabData.currentIndex < tabData.history.length - 1;
+          }
+          sendResponse({ 
+            enabled: is2x, 
+            alignRightScreen: alignRight,
+            canGoBack: canGoBack,
+            canGoForward: canGoForward
+          });
           break;
 
         case "goBack":
-          await chrome.tabs.goBack(tabId);
+          if (activeTabsMemory[tabId] && activeTabsMemory[tabId].currentIndex > 0) {
+            activeTabsMemory[tabId].currentIndex--;
+            await chrome.storage.local.set({ active2xTabs: activeTabsMemory });
+            await chrome.tabs.goBack(tabId);
+          }
           sendResponse({ success: true });
           break;
 
         case "goForward":
-          await chrome.tabs.goForward(tabId);
+          if (activeTabsMemory[tabId] && activeTabsMemory[tabId].history && activeTabsMemory[tabId].currentIndex < activeTabsMemory[tabId].history.length - 1) {
+            activeTabsMemory[tabId].currentIndex++;
+            await chrome.storage.local.set({ active2xTabs: activeTabsMemory });
+            await chrome.tabs.goForward(tabId);
+          }
+          sendResponse({ success: true });
+          break;
+
+        case "goHome":
+          if (activeTabsMemory[tabId] && activeTabsMemory[tabId].history && activeTabsMemory[tabId].history.length > 0) {
+            activeTabsMemory[tabId].currentIndex = 0;
+            await chrome.storage.local.set({ active2xTabs: activeTabsMemory });
+            await chrome.tabs.update(tabId, { url: activeTabsMemory[tabId].history[0] });
+          }
           sendResponse({ success: true });
           break;
 
@@ -404,40 +475,47 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           sendResponse({ success: true });
           break;
 
-        case "take_screenshot":
+        case "take_screenshot": {
+          const screenshotExtId = message.screenshotExtId;
           const targetWindowId = sender.tab ? sender.tab.windowId : null;
           chrome.tabs.captureVisibleTab(targetWindowId, { format: 'png' }, (dataUrl) => {
             if (chrome.runtime.lastError) {
-              console.error("Error al capturar pestaña nativamente:", chrome.runtime.lastError.message || chrome.runtime.lastError);
+              console.error("Error al capturar pestaña:", chrome.runtime.lastError.message);
               sendResponse({ error: chrome.runtime.lastError.message });
               return;
             }
+            if (screenshotExtId) {
+              // Delegar apertura del editor a la extensión de capturas externa
+              chrome.runtime.sendMessage(screenshotExtId, { action: "open_image_in_editor", tempScreenshot: dataUrl }, (res) => {
+                if (chrome.runtime.lastError) {
+                  console.error("Error al enviar imagen a la extensión screenshot:", chrome.runtime.lastError.message);
+                }
+                sendResponse({ success: true });
+              });
+            } else {
+              sendResponse({ error: "Extensión de capturas no disponible." });
+            }
+          });
+          return true; // respuesta asíncrona
+        }
 
-            chrome.storage.local.set({ tempScreenshot: dataUrl }, () => {
-              // Calcular dimensiones para la ventana emergente flotante del editor
-              const tabWidth = sender.tab ? sender.tab.width : 1280;
-              const tabHeight = sender.tab ? sender.tab.height : 800;
-              const width = Math.max(1024, Math.floor(tabWidth * 0.95));
-              const height = Math.max(768, Math.floor(tabHeight * 0.95));
 
-              chrome.windows.create({
-                url: chrome.runtime.getURL('editor.html'),
-                type: 'popup',
-                width: width,
-                height: height,
-                focused: true
+        case "open_url":
+          chrome.tabs.query({}, (tabs) => {
+            const existingTab = tabs.find(t => t.url === message.url);
+            if (existingTab) {
+              chrome.tabs.update(existingTab.id, { active: true }, () => {
+                chrome.windows.update(existingTab.windowId, { focused: true }, () => {
+                  sendResponse({ success: true });
+                });
+              });
+            } else {
+              chrome.tabs.create({
+                url: message.url
               }, () => {
                 sendResponse({ success: true });
               });
-            });
-          });
-          break;
-
-        case "open_url":
-          chrome.tabs.create({
-            url: message.url
-          }, () => {
-            sendResponse({ success: true });
+            }
           });
           break;
 

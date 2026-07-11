@@ -17,7 +17,7 @@ async function init() {
     if (response && response.enabled) {
       const storage = await chrome.storage.local.get("isBarCollapsed");
       const isCollapsed = storage.isBarCollapsed !== undefined ? storage.isBarCollapsed : false;
-      await initUI(!!response.alignRightScreen, isCollapsed);
+      await initUI(!!response.alignRightScreen, isCollapsed, !!response.canGoBack, !!response.canGoForward);
     }
   } catch (err) {
     // Si falla la comunicación inicial, reintentamos después
@@ -38,7 +38,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           try {
             const storage = await chrome.storage.local.get("isBarCollapsed");
             const isCollapsed = storage.isBarCollapsed !== undefined ? storage.isBarCollapsed : false;
-            await initUI(!!message.alignRightScreen, isCollapsed);
+            await initUI(!!message.alignRightScreen, isCollapsed, !!message.canGoBack, !!message.canGoForward);
           } catch (err) {
             console.debug("Error leyendo almacenamiento en set2xMode:", err);
             destroyUI();
@@ -47,6 +47,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       } else {
         destroyUI();
       }
+    } else if (message.action === "updateNavigationButtons") {
+      const bBack = shadow?.querySelector("#mc-back");
+      const bFwd = shadow?.querySelector("#mc-fwd");
+      const bHome = shadow?.querySelector("#mc-home");
+      if (bBack) bBack.style.display = message.canGoBack ? "" : "none";
+      if (bFwd) bFwd.style.display = message.canGoForward ? "" : "none";
+      if (bHome) bHome.style.display = message.canGoBack ? "flex" : "none";
     }
     sendResponse({ success: true });
   } catch (err) {
@@ -72,7 +79,7 @@ function stopLoadingState() {
 }
 
 // Función para construir e inyectar la UI flotante
-async function initUI(alignRightScreen, isCollapsed) {
+async function initUI(alignRightScreen, isCollapsed, initialCanGoBack = false, initialCanGoForward = false) {
   // Evitar duplicados
   if (document.getElementById("minichrome-2x-extension-root")) {
     updateURLInput();
@@ -153,7 +160,12 @@ async function initUI(alignRightScreen, isCollapsed) {
     <div class="mc-bar">
       <button class="mc-btn" id="mc-back" title="Atrás">‹</button>
       <button class="mc-btn" id="mc-fwd" title="Adelante">›</button>
-      <button class="mc-btn" id="mc-reload" title="Recargar">↻</button>
+      <button class="mc-btn" id="mc-home" title="Página de inicio (Home)" style="display: none; align-items: center; justify-content: center;">
+        <svg viewBox="0 0 24 24" style="width:14px; height:14px; fill:none; stroke:currentColor; stroke-width:2.2; stroke-linecap:round; stroke-linejoin:round;">
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+          <polyline points="9 22 9 12 15 12 15 22"/>
+        </svg>
+      </button>
       
       <div class="mc-shield" id="mc-shield" title="Estado de seguridad">
         <svg viewBox="0 0 24 24">
@@ -175,14 +187,14 @@ async function initUI(alignRightScreen, isCollapsed) {
 
       <button class="mc-btn mc-btn-fav" id="mc-fav" title="Guardar favorito">☆</button>
       
-      <button class="mc-btn" id="mc-screenshot" title="Tomar captura (ScreenShot Merke)" style="display: flex; align-items: center; justify-content: center;">
+      <button class="mc-btn" id="mc-screenshot" title="Tomar captura de pantalla" style="display: flex; align-items: center; justify-content: center;">
         <svg viewBox="0 0 24 24" style="width:14px; height:14px; fill:none; stroke:currentColor; stroke-width:2.5; stroke-linecap:round; stroke-linejoin:round;">
           <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
           <circle cx="12" cy="13" r="4"/>
         </svg>
       </button>
 
-      <button class="mc-btn" id="mc-agenda" title="Abrir Mk Organizer" style="display: flex; align-items: center; justify-content: center;">
+      <button class="mc-btn" id="mc-agenda" title="Abrir Organizador" style="display: flex; align-items: center; justify-content: center;">
         <svg viewBox="0 0 24 24" style="width:14px; height:14px; fill:none; stroke:currentColor; stroke-width:2.2; stroke-linecap:round; stroke-linejoin:round;">
           <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
           <line x1="16" y1="2" x2="16" y2="6"/>
@@ -237,7 +249,7 @@ async function initUI(alignRightScreen, isCollapsed) {
   const bar = shadow.querySelector(".mc-bar");
   const btnBack = shadow.querySelector("#mc-back");
   const btnFwd = shadow.querySelector("#mc-fwd");
-  const btnReload = shadow.querySelector("#mc-reload");
+  const btnHome = shadow.querySelector("#mc-home");
   const btnGo = shadow.querySelector("#mc-go");
   const inputUrl = shadow.querySelector("#mc-url");
   const shield = shadow.querySelector("#mc-shield");
@@ -262,6 +274,11 @@ async function initUI(alignRightScreen, isCollapsed) {
     if (!extensionsStatus.screenshot && btnScreenshot) btnScreenshot.style.display = "none";
     if (!extensionsStatus.arcade && btnArcade) btnArcade.style.display = "none";
   }
+
+  // Configurar visibilidad inicial de los botones de navegación
+  if (btnBack) btnBack.style.display = initialCanGoBack ? "" : "none";
+  if (btnFwd) btnFwd.style.display = initialCanGoForward ? "" : "none";
+  if (btnHome) btnHome.style.display = initialCanGoBack ? "flex" : "none";
 
   // Mostrar la URL y estado inicial
   updateURLInput();
@@ -297,11 +314,13 @@ async function initUI(alignRightScreen, isCollapsed) {
     startLoadingState();
     chrome.runtime.sendMessage({ action: "goForward" });
   });
-  btnReload.addEventListener("click", () => {
-    if (!isContextValid()) return destroyUI();
-    startLoadingState();
-    chrome.runtime.sendMessage({ action: "reload" });
-  });
+  if (btnHome) {
+    btnHome.addEventListener("click", () => {
+      if (!isContextValid()) return destroyUI();
+      startLoadingState();
+      chrome.runtime.sendMessage({ action: "goHome" });
+    });
+  }
 
   if (shield) {
     shield.addEventListener("click", () => {
@@ -425,11 +444,12 @@ async function initUI(alignRightScreen, isCollapsed) {
     chrome.runtime.sendMessage({ action: "restoreWindow" });
   });
 
-  // Acción de captura de pantalla
+  // Acción de captura de pantalla (el background de 2xScreen captura y delega a la extensión externa)
   if (btnScreenshot) {
     btnScreenshot.addEventListener("click", () => {
       if (!isContextValid()) return destroyUI();
-      window.postMessage({ action: 'trigger-screenshot-merke' }, '*');
+      const extId = extensionsStatus?.screenshot;
+      chrome.runtime.sendMessage({ action: "take_screenshot", screenshotExtId: extId });
     });
   }
 
