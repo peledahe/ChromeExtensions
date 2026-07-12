@@ -561,6 +561,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 // === LOGICA DE INSTALACION Y SOPORTE DE NATIVE HOST ===
 
+// Helper Python para Linux (Python3 + xprop son estándar en distros X11)
 const HELPER_PY_CONTENT = `#!/usr/bin/env python3
 import sys
 import json
@@ -629,40 +630,21 @@ def undecorate_linux(window_title):
         log_debug(f"Error en undecorate Linux: {e}")
     return False
 
-def undecorate_windows(window_title):
-    try:
-        import ctypes
-        hwnd = ctypes.windll.user32.FindWindowW(None, window_title)
-        if hwnd:
-            style = ctypes.windll.user32.GetWindowLongW(hwnd, -16)
-            style &= ~0x00C00000  # WS_CAPTION
-            style &= ~0x00040000  # WS_THICKFRAME
-            ctypes.windll.user32.SetWindowLongW(hwnd, -16, style)
-            ctypes.windll.user32.SetWindowPos(hwnd, 0, 0, 0, 0, 0, 0, 0x0027)
-            return True
-    except Exception as e:
-        log_debug(f"Error en undecorate Windows: {e}")
-    return False
-
 def register_extension_id(ext_id):
     if not ext_id or not isinstance(ext_id, str) or not ext_id.isalnum():
         return False
-    
     script_dir = os.path.dirname(os.path.abspath(__file__))
     local_json = os.path.join(script_dir, "com.merke.twoxscreen.json")
     paths = [local_json]
-    
-    if "linux" in platform.system().lower():
-        home = os.path.expanduser("~")
-        linux_paths = [
-            os.path.join(home, ".config/google-chrome/NativeMessagingHosts/com.merke.twoxscreen.json"),
-            os.path.join(home, ".config/chromium/NativeMessagingHosts/com.merke.twoxscreen.json"),
-            os.path.join(home, ".config/microsoft-edge/NativeMessagingHosts/com.merke.twoxscreen.json"),
-            os.path.join(home, ".config/microsoft-edge-beta/NativeMessagingHosts/com.merke.twoxscreen.json"),
-            os.path.join(home, ".config/microsoft-edge-dev/NativeMessagingHosts/com.merke.twoxscreen.json"),
-        ]
-        paths.extend(linux_paths)
-        
+    home = os.path.expanduser("~")
+    linux_paths = [
+        os.path.join(home, ".config/google-chrome/NativeMessagingHosts/com.merke.twoxscreen.json"),
+        os.path.join(home, ".config/chromium/NativeMessagingHosts/com.merke.twoxscreen.json"),
+        os.path.join(home, ".config/microsoft-edge/NativeMessagingHosts/com.merke.twoxscreen.json"),
+        os.path.join(home, ".config/microsoft-edge-beta/NativeMessagingHosts/com.merke.twoxscreen.json"),
+        os.path.join(home, ".config/microsoft-edge-dev/NativeMessagingHosts/com.merke.twoxscreen.json"),
+    ]
+    paths.extend(linux_paths)
     success = False
     for path in paths:
         if os.path.exists(path):
@@ -697,15 +679,81 @@ def main():
         elif action == "undecorate":
             window_title = msg.get("title")
             if window_title:
-                current_os = platform.system().lower()
-                if "linux" in current_os:
-                    success = undecorate_linux(window_title)
-                elif "windows" in current_os:
-                    success = undecorate_windows(window_title)
+                success = undecorate_linux(window_title)
         send_message({"success": success})
 
 if __name__ == "__main__":
     main()
+`;
+
+// Helper PowerShell para Windows: usa Add-Type/P-Invoke para llamar Win32 API directamente.
+// PowerShell viene preinstalado desde Windows 7; no requiere Python ni ninguna otra dependencia.
+const HELPER_PS1_CONTENT = `
+# twoxscreen_helper.ps1 — Native Messaging Host para 2xScreen (Windows)
+# Requiere: PowerShell 3+ (incluido en Windows 7 SP1 y superiores)
+Add-Type -TypeDefinition @"
+using System;
+using System.Runtime.InteropServices;
+public class Win32NM {
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    public static extern IntPtr FindWindow(string lpClassName, string lpWindowName);
+    [DllImport("user32.dll")]
+    public static extern int GetWindowLong(IntPtr hWnd, int nIndex);
+    [DllImport("user32.dll")]
+    public static extern int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong);
+    [DllImport("user32.dll")]
+    public static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
+}
+"@ -Language CSharp
+
+\$stdin  = [Console]::OpenStandardInput()
+\$stdout = [Console]::OpenStandardOutput()
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
+
+while (\$true) {
+    \$lenBuf = New-Object byte[] 4
+    \$read = \$stdin.Read(\$lenBuf, 0, 4)
+    if (\$read -lt 4) { break }
+    \$msgLen = [BitConverter]::ToUInt32(\$lenBuf, 0)
+    \$msgBuf = New-Object byte[] \$msgLen
+    \$stdin.Read(\$msgBuf, 0, \$msgLen) | Out-Null
+    \$msgStr = [System.Text.Encoding]::UTF8.GetString(\$msgBuf)
+    try { \$msg = \$msgStr | ConvertFrom-Json } catch { break }
+
+    \$success = \$false
+    switch (\$msg.action) {
+        "ping" {
+            \$success = \$true
+        }
+        "register_id" {
+            # En Windows el ID ya queda grabado en el manifest al instalar
+            \$success = \$true
+        }
+        "undecorate" {
+            \$title = \$msg.title
+            if (\$title) {
+                \$hwnd = [Win32NM]::FindWindow(\$null, \$title)
+                if (\$hwnd -ne [IntPtr]::Zero) {
+                    \$GWL_STYLE = -16
+                    \$WS_CAPTION    = 0x00C00000
+                    \$WS_THICKFRAME = 0x00040000
+                    \$SWP_FLAGS     = 0x0027  # NOMOVE|NOSIZE|NOZORDER|FRAMECHANGED
+                    \$style = [Win32NM]::GetWindowLong(\$hwnd, \$GWL_STYLE)
+                    \$style = \$style -band (-bnot \$WS_CAPTION) -band (-bnot \$WS_THICKFRAME)
+                    [Win32NM]::SetWindowLong(\$hwnd, \$GWL_STYLE, \$style) | Out-Null
+                    [Win32NM]::SetWindowPos(\$hwnd, [IntPtr]::Zero, 0, 0, 0, 0, \$SWP_FLAGS) | Out-Null
+                    \$success = \$true
+                }
+            }
+        }
+    }
+
+    \$responseJson = '{"success":' + (\$success.ToString().ToLower()) + '}'
+    \$responseBytes = [System.Text.Encoding]::UTF8.GetBytes(\$responseJson)
+    \$stdout.Write([BitConverter]::GetBytes([uint32]\$responseBytes.Length), 0, 4)
+    \$stdout.Write(\$responseBytes, 0, \$responseBytes.Length)
+    \$stdout.Flush()
+}
 `;
 
 async function checkNativeConnection() {
@@ -778,76 +826,131 @@ async function getInstallerScriptData() {
     const os = platformInfo.os;
     let fileContent = "";
     let filename = "";
+    const extId = chrome.runtime.id;
 
     if (os === "win") {
+      // -----------------------------------------------------------------------
+      // WINDOWS: helper PowerShell puro — no requiere Python ni ninguna
+      // dependencia adicional. PowerShell viene preinstalado en Windows 7+.
+      // El .bat generado:
+      //   1. Crea %APPDATA%\2xscreen\twoxscreen_helper.ps1  (via echo multilínea)
+      //   2. Crea %APPDATA%\2xscreen\twoxscreen_helper.bat  (wrapper que lanza el .ps1)
+      //   3. Crea el manifest com.merke.twoxscreen.json apuntando al .bat
+      //   4. Registra el host en el Registro de Windows para Chrome y Edge
+      // -----------------------------------------------------------------------
       filename = "install_2xscreen.bat";
-      const base64Helper = btoa(unescape(encodeURIComponent(HELPER_PY_CONTENT)));
-      const chunks = [];
-      for (let i = 0; i < base64Helper.length; i += 70) {
-        chunks.push(base64Helper.substring(i, i + 70));
-      }
-      const b64Formatted = chunks.map(line => `echo ${line} >> "%INSTALL_DIR%\\helper.b64"`).join("\r\n");
+
+      // Escapar el contenido PS1 para insertarlo línea a línea en un .bat
+      // Cada línea se escribe con: echo LINEA >> archivo
+      // Los caracteres especiales de BAT (!, %, <, >, &, |) deben escaparse.
+      const ps1Lines = HELPER_PS1_CONTENT
+        .replace(/\r\n/g, "\n")
+        .split("\n");
+
+      // Genera los comandos echo para escribir el .ps1 línea a línea
+      const ps1EchoLines = ps1Lines.map((line, idx) => {
+        // Escapar caracteres especiales de CMD
+        const escaped = line
+          .replace(/%/g, "%%")
+          .replace(/!/g, "^!")
+          .replace(/&/g, "^&")
+          .replace(/\|/g, "^|")
+          .replace(/</g, "^<")
+          .replace(/>/g, "^>")
+          .replace(/\^/g, "^^")
+          // re-escapar el ^> que acabamos de crear (es el >> del echo)
+          // en realidad los ^ ya están escapados arriba; solo necesitamos
+          // que las comillas dobles del PS1 sobrevivan:
+          .replace(/"/g, `""`);
+        const redirect = idx === 0 ? ">" : ">>";
+        return `echo ${escaped} ${redirect} "%INSTALL_DIR%\\twoxscreen_helper.ps1"`;
+      }).join("\r\n");
 
       fileContent = `@echo off
-set "INSTALL_DIR=%USERPROFILE%\\AppData\\Local\\2xscreen"
+setlocal EnableDelayedExpansion
+chcp 65001 >nul 2>&1
+
+set "INSTALL_DIR=%APPDATA%\\2xscreen"
 if not exist "%INSTALL_DIR%" mkdir "%INSTALL_DIR%"
 
-echo -----BEGIN CERTIFICATE----- > "%INSTALL_DIR%\\helper.b64"
-${b64Formatted}
-echo -----END CERTIFICATE----- >> "%INSTALL_DIR%\\helper.b64"
+${ps1EchoLines}
 
-certutil -decode "%INSTALL_DIR%\\helper.b64" "%INSTALL_DIR%\\twoxscreen_helper.py" >nul
-del "%INSTALL_DIR%\\helper.b64"
+(echo @echo off) > "%INSTALL_DIR%\\twoxscreen_helper.bat"
+(echo powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "%%~dp0twoxscreen_helper.ps1") >> "%INSTALL_DIR%\\twoxscreen_helper.bat"
 
-powershell -Command "$path = '%INSTALL_DIR%\\twoxscreen_helper.py'.Replace('\\', '\\\\'); $json = @{ name = 'com.merke.twoxscreen'; description = 'Helper nativo de 2xScreen para quitar bordes de ventana'; path = $path; type = 'stdio'; allowed_origins = @('chrome-extension://gnjddnfmlhjmmglbhalfcckcplmcdkaf/', 'chrome-extension://ihbfgcligcckngjlbjccjjojmpepajin/', 'chrome-extension://${chrome.runtime.id}/') } | ConvertTo-Json; [IO.File]::WriteAllText('%INSTALL_DIR%\\com.merke.twoxscreen.json', $json)"
+powershell -NoProfile -ExecutionPolicy Bypass -Command ^
+  "$d='%INSTALL_DIR%'.Replace('\\','\\\\');" ^
+  "$json=[ordered]@{" ^
+  "  name='com.merke.twoxscreen';" ^
+  "  description='Helper nativo de 2xScreen para quitar bordes de ventana';" ^
+  "  path=($d+'\\\\twoxscreen_helper.bat');" ^
+  "  type='stdio';" ^
+  "  allowed_origins=@('chrome-extension://gnjddnfmlhjmmglbhalfcckcplmcdkaf/','chrome-extension://ihbfgcligcckngjlbjccjjojmpepajin/','chrome-extension://${extId}/');" ^
+  "};" ^
+  "$json|ConvertTo-Json|Set-Content -Encoding UTF8 '%INSTALL_DIR%\\com.merke.twoxscreen.json'"
 
 REG ADD "HKCU\\Software\\Google\\Chrome\\NativeMessagingHosts\\com.merke.twoxscreen" /ve /t REG_SZ /d "%INSTALL_DIR%\\com.merke.twoxscreen.json" /f >nul
 REG ADD "HKCU\\Software\\Microsoft\\Edge\\NativeMessagingHosts\\com.merke.twoxscreen" /ve /t REG_SZ /d "%INSTALL_DIR%\\com.merke.twoxscreen.json" /f >nul
 
-echo 2xScreen configurado con exito.
+echo Listo. Puedes cerrar esta ventana y volver a la extension.
 pause
 `;
+
+
     } else {
+      // -----------------------------------------------------------------------
+      // LINUX / macOS: helper Python3 + xprop.
+      // Python3 y xprop son estándar en la mayoría de distros Linux con X11.
+      // El .sh generado:
+      //   1. Verifica que python3 y xprop estén disponibles
+      //   2. Instala el helper Python en ~/.local/share/2xscreen/
+      //   3. Crea el manifest y lo copia a todos los navegadores detectados
+      // -----------------------------------------------------------------------
       filename = "install_2xscreen.sh";
       fileContent = `#!/bin/bash
 INSTALL_DIR="$HOME/.local/share/2xscreen"
 mkdir -p "$INSTALL_DIR"
 
-cat << 'EOF' > "$INSTALL_DIR/twoxscreen_helper.py"
+if ! command -v python3 &>/dev/null; then
+  echo "Error: python3 no esta instalado. Instala con: sudo apt install python3"
+  exit 1
+fi
+if ! command -v xprop &>/dev/null; then
+  echo "Error: xprop no esta instalado. Instala con: sudo apt install x11-utils"
+  exit 1
+fi
+
+cat << 'PYEOF' > "$INSTALL_DIR/twoxscreen_helper.py"
 ${HELPER_PY_CONTENT}
-EOF
+PYEOF
 chmod +x "$INSTALL_DIR/twoxscreen_helper.py"
 
-cat << 'EOF' > "$INSTALL_DIR/com.merke.twoxscreen.json"
+cat > "$INSTALL_DIR/com.merke.twoxscreen.json" << JSONEOF
 {
   "name": "com.merke.twoxscreen",
   "description": "Helper nativo de 2xScreen para quitar bordes de ventana",
-  "path": "INSTALL_DIR_PLACEHOLDER/twoxscreen_helper.py",
+  "path": "$INSTALL_DIR/twoxscreen_helper.py",
   "type": "stdio",
   "allowed_origins": [
     "chrome-extension://gnjddnfmlhjmmglbhalfcckcplmcdkaf/",
     "chrome-extension://ihbfgcligcckngjlbjccjjojmpepajin/",
-    "chrome-extension://${chrome.runtime.id}/"
+    "chrome-extension://${extId}/"
   ]
 }
-EOF
+JSONEOF
 
-sed -i "s|INSTALL_DIR_PLACEHOLDER|$INSTALL_DIR|g" "$INSTALL_DIR/com.merke.twoxscreen.json"
-
-CHROME_DIR="$HOME/.config/google-chrome/NativeMessagingHosts"
-CHROMIUM_DIR="$HOME/.config/chromium/NativeMessagingHosts"
-EDGE_DIR="$HOME/.config/microsoft-edge/NativeMessagingHosts"
-EDGE_BETA_DIR="$HOME/.config/microsoft-edge-beta/NativeMessagingHosts"
-EDGE_DEV_DIR="$HOME/.config/microsoft-edge-dev/NativeMessagingHosts"
-
-for d in "$CHROME_DIR" "$CHROMIUM_DIR" "$EDGE_DIR" "$EDGE_BETA_DIR" "$EDGE_DEV_DIR"; do
-    mkdir -p "$d"
-    cp "$INSTALL_DIR/com.merke.twoxscreen.json" "$d/com.merke.twoxscreen.json"
-    chmod 644 "$d/com.merke.twoxscreen.json"
+for d in "$HOME/.config/google-chrome/NativeMessagingHosts" "$HOME/.config/chromium/NativeMessagingHosts" "$HOME/.config/microsoft-edge/NativeMessagingHosts" "$HOME/.config/microsoft-edge-beta/NativeMessagingHosts" "$HOME/.config/microsoft-edge-dev/NativeMessagingHosts"; do
+    parent="$(dirname "$d")"
+    if [ -d "$parent" ]; then
+        mkdir -p "$d"
+        cp "$INSTALL_DIR/com.merke.twoxscreen.json" "$d/com.merke.twoxscreen.json"
+        chmod 644 "$d/com.merke.twoxscreen.json"
+    fi
 done
 
-echo "Instalación completada con éxito."
+echo "Listo. Vuelve a la extension y verifica la conexion."
 `;
+
     }
 
     return { success: true, filename, fileContent };

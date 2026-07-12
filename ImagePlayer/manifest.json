@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Mk Visor de Imágenes",
   "short_name": "mk-imageplayer",
-  "version": "1.2",
+  "version": "1.3",
   "description": "Extensión para visualizar y organizar tus carpetas de imágenes locales usando la File System Access API.",
   "action": {
     "default_title": "Abrir Visor de Imágenes",
@@ -21,6 +21,7 @@
     "service_worker": "background.js"
   },
   "permissions": [
-    "management"
+    "management",
+    "tabs"
   ]
 }

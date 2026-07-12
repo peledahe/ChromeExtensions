@@ -100,6 +100,11 @@ document.addEventListener('click', async (e) => {
                 if (window.deleteReminder) await window.deleteReminder(id);
                 break;
             }
+            case 'publishReminderGCal': {
+                const json = JSON.parse(el.dataset.json || '{}');
+                if (window.publishReminderToGCal) await window.publishReminderToGCal(json);
+                break;
+            }
             case 'toggleShopping': {
                 const id = parseInt(el.dataset.id);
                 const done = el.dataset.done === 'true';

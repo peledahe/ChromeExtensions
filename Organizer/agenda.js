@@ -140,6 +140,28 @@ function bindStaticEvents() {
     const cfgBtn = document.getElementById('btn-config');
     if (cfgBtn) cfgBtn.onclick = () => activateTab('config');
 
+    const aboutBtn = document.getElementById('btn-about');
+    const aboutModal = document.getElementById('organizer-about-modal');
+    const aboutCloseBtn = document.getElementById('organizer-about-close-btn');
+    if (aboutBtn && aboutModal) {
+        aboutBtn.onclick = () => aboutModal.style.display='flex';
+    }
+    if (aboutCloseBtn && aboutModal) {
+        aboutCloseBtn.onclick = () => aboutModal.style.display='none';
+    }
+    if (aboutModal) {
+        aboutModal.addEventListener('click', (e) => {
+            if (e.target === aboutModal) aboutModal.style.display = 'none';
+        });
+    }
+    const aboutLink = document.getElementById('organizer-about-modal-link');
+    if (aboutLink) {
+        aboutLink.onclick = (e) => {
+            e.preventDefault();
+            window.open('https://ext.merke.net', '_blank');
+        };
+    }
+
     const openNewModalBtn = document.getElementById('open-new-reminder-modal-btn');
     const agendaClearDoneBtn = document.getElementById('agenda-clear-done-btn');
     const newModal = document.getElementById('new-reminder-modal');
@@ -1422,6 +1444,9 @@ function renderReminders() {
         const visibleTags = tags.slice(0, 2);
         const hiddenCount = Math.max(0, tags.length - visibleTags.length);
 
+        const gcalBtn = (window.gcalState && window.gcalState.connected) ? 
+            `<button class="ag-gcal-btn" data-action="publishReminderGCal" data-json='${jsonStr(r)}' title="Publicar en Google Calendar" style="background:none; border:none; cursor:pointer; font-size:0.95rem; margin-right:4px;">📅</button>` : '';
+
         const row = document.createElement('div');
         row.className = `ag-item ${r.done ? 'ag-item-paid' : ''}`;
         row.innerHTML = `
@@ -1433,6 +1458,7 @@ function renderReminders() {
                 ${visibleTags.map((tag) => `<span class="ag-tag-badge" title="${escapeHtml(tags.join(', '))}">🏷️ ${escapeHtml(tag)}</span>`).join('')}
                 ${hiddenCount > 0 ? `<span class="ag-tag-badge" title="${escapeHtml(tags.join(', '))}">+${hiddenCount}</span>` : ''}
                 ${dateStr ? `<span class="ag-badge">📅 ${dateStr}</span>` : ''}
+                ${gcalBtn}
                 <button class="ag-notes-btn ${r.notes ? 'has-notes' : ''}" data-action="openObsModal" data-tab="agenda" data-id="${r.id}" data-notes="${escapeHtml(r.notes || '')}" title="Observaciones">📝</button>
                 <button class="ag-edit-btn" data-action="openEditModal" data-type="reminder" data-json='${jsonStr(r)}'>✏️</button>
                 <button class="ag-delete-btn" data-action="deleteReminder" data-id="${r.id}">🗑️</button>
@@ -1790,7 +1816,27 @@ function renderEventsForCell(cell, dateStr, maxVisible) {
         });
     }
 
-    const allEvents = [...matchingReminders, ...matchingKanban];
+    const matchingGCal = [];
+    if (window.gcalEvents && Array.isArray(window.gcalEvents)) {
+        window.gcalEvents.forEach((ev) => {
+            const startVal = ev.start?.date || ev.start?.dateTime;
+            if (startVal) {
+                const evDate = startVal.split('T')[0];
+                if (evDate === dateStr) {
+                    matchingGCal.push({
+                        id: ev.id,
+                        text: `📅 ${ev.summary}`,
+                        done: false,
+                        isGCal: true,
+                        htmlLink: ev.htmlLink,
+                        calendarName: ev.calendarName
+                    });
+                }
+            }
+        });
+    }
+
+    const allEvents = [...matchingReminders, ...matchingKanban, ...matchingGCal];
 
     const hasMore = allEvents.length > maxVisible;
     const visibleEvents = hasMore ? allEvents.slice(0, maxVisible) : allEvents;
@@ -1810,16 +1856,22 @@ function renderEventsForCell(cell, dateStr, maxVisible) {
         const evCard = document.createElement('div');
         if (r.isKanban) {
             evCard.className = `cal-event-card kanban-task ${r.done ? 'done' : 'pending'}`;
+        } else if (r.isGCal) {
+            evCard.className = 'cal-event-card gcal-task';
         } else {
             evCard.className = `cal-event-card ${r.done ? 'done' : 'pending'}`;
         }
         evCard.textContent = r.text;
-        evCard.title = `${r.text} ${r.tag ? '(🏷️ ' + r.tag + ')' : ''}`;
+        evCard.title = r.isGCal ? `${r.text} (${r.calendarName})` : `${r.text} ${r.tag ? '(🏷️ ' + r.tag + ')' : ''}`;
         
         evCard.onclick = (e) => {
             e.stopPropagation(); // Evitar abrir modal de creación
             if (r.isKanban) {
                 editKanbanCard(r.id);
+            } else if (r.isGCal) {
+                if (r.htmlLink) {
+                    window.open(r.htmlLink, '_blank');
+                }
             } else {
                 openEditModal('reminder', r);
             }
@@ -1882,16 +1934,24 @@ function openDayDetailsModal(dateStr, reminders) {
 
         itemEl.appendChild(leftEl);
 
-        const editBtn = document.createElement('button');
-        editBtn.className = 'ag-edit-btn';
-        editBtn.textContent = '✏️';
-        editBtn.style.cssText = 'background:none; border:none; cursor:pointer; font-size:1.1rem; padding:4px;';
-        itemEl.appendChild(editBtn);
+        if (!r.isGCal) {
+            const editBtn = document.createElement('button');
+            editBtn.className = 'ag-edit-btn';
+            editBtn.textContent = '✏️';
+            editBtn.style.cssText = 'background:none; border:none; cursor:pointer; font-size:1.1rem; padding:4px;';
+            itemEl.appendChild(editBtn);
+        } else {
+            itemEl.style.borderLeft = '3px solid #4285f4';
+        }
 
         itemEl.onclick = () => {
             modal.classList.remove('active');
             if (r.isKanban) {
                 editKanbanCard(r.id);
+            } else if (r.isGCal) {
+                if (r.htmlLink) {
+                    window.open(r.htmlLink, '_blank');
+                }
             } else {
                 openEditModal('reminder', r);
             }

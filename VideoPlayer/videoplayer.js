@@ -2240,6 +2240,34 @@
             await loadTags();
             await fetchCloudPlaylists();
             renderTagsList();
+
+            // Modal Acerca de
+            const aboutBtn = document.getElementById('videoplayer-about-modal-open-btn');
+            const aboutModal = document.getElementById('videoplayer-about-modal');
+            const aboutCloseBtn = document.getElementById('videoplayer-about-modal-close-btn');
+            const aboutLink = document.getElementById('videoplayer-about-modal-link');
+
+            if (aboutBtn && aboutModal) {
+                aboutBtn.addEventListener('click', () => {
+                    aboutModal.style.display = 'flex';
+                });
+            }
+            if (aboutModal) {
+                aboutModal.addEventListener('click', (e) => {
+                    if (e.target === aboutModal) aboutModal.style.display = 'none';
+                });
+            }
+            if (aboutCloseBtn && aboutModal) {
+                aboutCloseBtn.addEventListener('click', () => {
+                    aboutModal.style.display = 'none';
+                });
+            }
+            if (aboutLink) {
+                aboutLink.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    window.open('https://ext.merke.net', '_blank');
+                });
+            }
         } catch (e) {
             console.error('Error durante inicializacion de videoplayer:', e);
             showNotification('Error al iniciar VideoPlayer', 'error');

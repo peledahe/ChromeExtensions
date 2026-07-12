@@ -50,3 +50,40 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true; // Mantener canal abierto para respuesta asíncrona
   }
 });
+
+// --- ADVERTENCIA DE DESINSTALACIÓN POR DATOS LOCALES ---
+
+function updateUninstallURL() {
+  if (typeof chrome === 'undefined' || !chrome.storage || !chrome.runtime || !chrome.runtime.setUninstallURL) return;
+
+  chrome.storage.local.get(null, (allData) => {
+    const keysWithData = ['agenda', 'shopping', 'income', 'kanban', 'notes', 'passwords', 'deudas_list'];
+    const hasData = keysWithData.some(key => {
+      const val = allData[key];
+      return Array.isArray(val) ? val.length > 0 : !!val;
+    });
+
+    if (hasData) {
+      // URL de advertencia si tiene datos locales guardados
+      chrome.runtime.setUninstallURL('https://merke.net/organizer/uninstall/?warning=true');
+    } else {
+      // URL estándar si está vacío
+      chrome.runtime.setUninstallURL('https://merke.net/organizer/uninstall/');
+    }
+  });
+}
+
+// Inicializar y escuchar cambios
+chrome.runtime.onInstalled.addListener(() => {
+  updateUninstallURL();
+});
+
+chrome.runtime.onStartup.addListener(() => {
+  updateUninstallURL();
+});
+
+chrome.storage.onChanged.addListener((changes, areaName) => {
+  if (areaName === 'local') {
+    updateUninstallURL();
+  }
+});

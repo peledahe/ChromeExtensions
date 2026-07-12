@@ -161,6 +161,29 @@
         menu.style.top = `${y}px`;
     }
 
+    async function openInScreenshot(img) {
+        if (!img || !state.screenshotExtId) return;
+        try {
+            showNotification('Abriendo en Mk ScreenShot...', 'info', false);
+            if (!img.file) {
+                img.file = await img.handle.getFile();
+            }
+            const dataUrl = await fileToDataUrl(img.file);
+            chrome.runtime.sendMessage(state.screenshotExtId, {
+                action: "open_image_in_editor",
+                tempScreenshot: dataUrl
+            }, (response) => {
+                if (chrome.runtime.lastError) {
+                    console.error(chrome.runtime.lastError);
+                    showNotification('Error al abrir en Mk ScreenShot', 'error');
+                }
+            });
+        } catch (e) {
+            console.error(e);
+            showNotification('Error al leer el archivo', 'error');
+        }
+    }
+
     function bindContextMenu() {
         const menu = q('ip-ctx-menu');
         if (!menu) return;
@@ -187,6 +210,16 @@
         });
 
         q('ip-ctx-close').addEventListener('click', closeContextMenu);
+
+        // Editar en Screenshot
+        const ctxScreenshot = q('ip-ctx-screenshot');
+        if (ctxScreenshot) {
+            ctxScreenshot.addEventListener('click', async () => {
+                const img = state.filtered.find((i) => i.path === contextImagePath);
+                closeContextMenu();
+                await openInScreenshot(img);
+            });
+        }
 
         // Descargar imagen
         q('ip-ctx-download').addEventListener('click', () => {
@@ -369,6 +402,8 @@
                         state.screenshotExtId = ext.id;
                         const btn = q('ip-lb-screenshot');
                         if (btn) btn.style.display = 'inline-flex';
+                        const ctxBtn = q('ip-ctx-screenshot');
+                        if (ctxBtn) ctxBtn.style.display = 'block';
                     }
                     resolve();
                 });
@@ -746,6 +781,20 @@
             acts.appendChild(btnRen);
             acts.appendChild(btnMov);
             acts.appendChild(btnDel);
+
+            if (state.screenshotExtId) {
+                const screenBtn = document.createElement('button');
+                screenBtn.className = 'ip-thumb-screenshot';
+                screenBtn.type = 'button';
+                screenBtn.title = 'Editar en Screenshot';
+                screenBtn.innerHTML = '🎨';
+                screenBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    openInScreenshot(img);
+                });
+                card.appendChild(screenBtn);
+            }
+
             card.appendChild(selectBtn);
             overlay.appendChild(nameEl);
             overlay.appendChild(acts);
@@ -1357,6 +1406,36 @@
 
         q('ip-cfg-btn').addEventListener('click', openConfigModal);
 
+        // Modal Acerca de
+        const aboutBtns = document.querySelectorAll('.ip-about-open-btn');
+        const aboutModal = document.getElementById('imageplayer-about-modal');
+        const aboutCloseBtn = document.getElementById('imageplayer-about-modal-close-btn');
+        const aboutLink = document.getElementById('imageplayer-about-modal-link');
+
+        if (aboutModal) {
+            aboutBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    aboutModal.style.display = 'flex';
+                });
+            });
+        }
+        if (aboutModal) {
+            aboutModal.addEventListener('click', (e) => {
+                if (e.target === aboutModal) aboutModal.style.display = 'none';
+            });
+        }
+        if (aboutCloseBtn && aboutModal) {
+            aboutCloseBtn.addEventListener('click', () => {
+                aboutModal.style.display = 'none';
+            });
+        }
+        if (aboutLink) {
+            aboutLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                window.open('https://ext.merke.net', '_blank');
+            });
+        }
+
         // Selector nativo de directorio
         q('ip-cfg-select-btn').addEventListener('click', async () => {
             try {
@@ -1412,30 +1491,7 @@
         if (btnScreenshot) {
             btnScreenshot.addEventListener('click', async () => {
                 const img = state.filtered[state.lbIndex];
-                if (!img || !state.screenshotExtId) return;
-
-                try {
-                    showNotification('Abriendo en Mk ScreenShot...', 'info', false);
-
-                    if (!img.file) {
-                        img.file = await img.handle.getFile();
-                    }
-
-                    const dataUrl = await fileToDataUrl(img.file);
-
-                    chrome.runtime.sendMessage(state.screenshotExtId, {
-                        action: "open_image_in_editor",
-                        tempScreenshot: dataUrl
-                    }, (response) => {
-                        if (chrome.runtime.lastError) {
-                            console.error(chrome.runtime.lastError);
-                            showNotification('Error al abrir en Mk ScreenShot', 'error');
-                        }
-                    });
-                } catch (e) {
-                    console.error(e);
-                    showNotification('Error al leer el archivo', 'error');
-                }
+                await openInScreenshot(img);
             });
         }
         q('ip-lb-prev').addEventListener('click', () => {

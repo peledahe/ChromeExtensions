@@ -2788,3 +2788,35 @@
             border-left: 2px solid #0984e3;
         }
 
+        .cal-event-card.gcal-task {
+            background: rgba(66, 133, 244, 0.12);
+            color: #8ab4f8;
+            border-left: 2px solid #4285f4;
+            cursor: pointer;
+        }
+
+        .gcal-list-item {
+            padding: 4px 6px;
+            border-radius: 4px;
+            transition: background 0.15s;
+        }
+        .gcal-list-item:hover {
+            background: rgba(255, 255, 255, 0.04);
+        }
+
+
+/* ESTILOS CSP PARA MODAL ACERCA DE */
+#btn-about {
+  opacity: 0.45;
+  transition: opacity 0.2s;
+}
+#btn-about:hover {
+  opacity: 0.9;
+}
+.merke-about-link {
+  opacity: 0.85;
+  transition: opacity 0.2s;
+}
+.merke-about-link:hover {
+  opacity: 1 !important;
+}

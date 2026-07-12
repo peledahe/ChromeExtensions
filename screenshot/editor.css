@@ -40,6 +40,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 12px;
   padding: 8px 16px;
   background: var(--panel);
@@ -529,6 +530,49 @@ input[type="range"]::-webkit-slider-thumb:hover {
 .toast.fade-out {
   opacity: 0;
   transform: translateY(-10px) scale(0.95);
+}
+
+/* Switch Toggle Estilo Premium */
+.switch-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.switch-wrap input {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 28px;
+  height: 16px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  position: relative;
+  cursor: pointer;
+  transition: var(--transition);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.switch-wrap input:checked {
+  background: var(--accent);
+  border-color: var(--accent-light);
+}
+
+.switch-wrap input::before {
+  content: "";
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background: #fff;
+  border-radius: 50%;
+  top: 2px;
+  left: 2px;
+  transition: var(--transition);
+}
+
+.switch-wrap input:checked::before {
+  left: 14px;
 }
 
 /* --- Reglas Responsivas --- */
