@@ -3,7 +3,7 @@
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAngS5AD2l3PP2igyLZ7VhGadL0BLIwHO4KFNCL0iT3Hg8fJZbPzX7ulwSrHRzCZMLVMfnMT18JG2t3gGtKLznKBe1EPtvppTnMXI4vP9MRdQdbP6D80R47QHZiTErQ4vJSCIVDzQsKmuOxf8iLLqob5h4YORhLQMI6wPS99CvuqThhsAAv4ZSHjHhL/X2pxoykASSEJY1Qg64G/3LeZLpaBMQHtsJSVm3KdJT/ZghA5a85N+IjpYr1RruQv9SbzkpqMo7lWi1vdZ3MddLJ4TRUcOmnX/wzu2d/tGWLDPeqJpVPAO6l5iEnHJ1aqHDmE55qSZgO3z2NaIVPNMM5LFeuQIDAQAB",
   "name": "Mk Organizer",
   "short_name": "mk-organizer",
-  "version": "1.3",
+  "version": "1.4",
   "description": "Organizador: agenda, presupuesto, deudas (Bola de Nieve), Kanban, notas y claves sincronizados en Google Drive.",
   "permissions": [
     "storage",

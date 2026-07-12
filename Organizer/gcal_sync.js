@@ -8,6 +8,8 @@ const gcalState = {
     events: []
 };
 
+let cachedAccessToken = null;
+
 // Inicializar estado de Google Calendar
 async function initGCalendarSync() {
     if (typeof chrome === 'undefined' || !chrome.storage) return;
@@ -59,6 +61,7 @@ function signInGCalendar() {
             return;
         }
 
+        cachedAccessToken = token;
         gcalState.connected = true;
         chrome.storage.local.set({ gcal_connected: true }, () => {
             window.showToast('Conectado a Google Calendar exitosamente', 'success');
@@ -73,6 +76,7 @@ function signOutGCalendar() {
     gcalState.calendars = [];
     gcalState.events = [];
     window.gcalEvents = [];
+    cachedAccessToken = null;
     
     chrome.storage.local.remove(['gcal_connected', 'gcal_selected_calendars', 'gcal_destination_calendar'], () => {
         window.showToast('Desconectado de Google Calendar.', 'success');
@@ -304,6 +308,9 @@ async function publishAllRemindersToGCal(remindersList) {
 
 // Obtener token de identidad de Chrome con promesa
 function getAuthTokenPromise() {
+    if (cachedAccessToken) {
+        return Promise.resolve(cachedAccessToken);
+    }
     return new Promise((resolve) => {
         if (typeof chrome === 'undefined' || !chrome.identity) {
             resolve(null);
@@ -313,6 +320,7 @@ function getAuthTokenPromise() {
             if (chrome.runtime.lastError || !token) {
                 resolve(null);
             } else {
+                cachedAccessToken = token;
                 resolve(token);
             }
         });
@@ -330,6 +338,7 @@ async function fetchWithAuth(url, options = {}) {
     let response = await fetch(url, options);
 
     if (response.status === 401) {
+        cachedAccessToken = null;
         // Remover token caducado de la caché de Chrome
         await new Promise((resolve) => {
             chrome.identity.removeCachedAuthToken({ token: token }, resolve);
@@ -413,7 +422,11 @@ function updateGCalUI() {
     if (calListContainer) {
         calListContainer.innerHTML = '';
         if (gcalState.calendars.length === 0 && gcalState.connected) {
-            calListContainer.innerHTML = '<div style="font-size:0.8rem; color:var(--ag-text-muted);">Cargando calendarios...</div>';
+            if (gcalState.syncing) {
+                calListContainer.innerHTML = '<div style="font-size:0.8rem; color:var(--ag-text-muted);">Cargando calendarios...</div>';
+            } else {
+                calListContainer.innerHTML = '<div style="font-size:0.82rem; color:#ff7675; cursor:pointer; text-decoration:underline;" onclick="fetchGCalendars()">Error al cargar calendarios. Clic aquí para reintentar.</div>';
+            }
         } else {
             gcalState.calendars.forEach(cal => {
                 const label = document.createElement('label');
