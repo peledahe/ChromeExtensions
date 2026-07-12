@@ -96,6 +96,9 @@
             align-items: center;
             gap: 10px;
             text-decoration: none;
+        }
+
+        .logo span {
             background: linear-gradient(135deg, #a78bfa 0%, #22d3ee 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
@@ -279,6 +282,12 @@
             border: 1px solid rgba(255, 255, 255, 0.08);
             color: var(--icon-color, #fff);
             font-size: 1.8rem;
+        }
+
+        .card-icon-wrapper img {
+            width: 60%;
+            height: 60%;
+            object-fit: contain;
         }
 
         .card-version {
@@ -583,7 +592,10 @@
 
     <header>
         <div class="container nav-wrapper">
-            <a href="#" class="logo font-outfit">Mk Extensions</a>
+            <a href="#" class="logo font-outfit">
+                <img src="assets/merke-icono.svg" style="width: 24px; height: 24px; object-fit: contain;" alt="Merke Icon">
+                <span>Mk Extensions</span>
+            </a>
             <ul class="nav-links">
                 <li><a href="#extensions">Extensiones</a></li>
                 <li><a href="#privacy">Privacidad</a></li>
@@ -616,16 +628,16 @@
                 <!-- 1. Mk Organizer -->
                 <div class="card" style="--glow-color: var(--glow-organizer); --icon-color: #a78bfa;" data-ext="organizer">
                     <div class="card-header">
-                        <div class="card-icon-wrapper">📅</div>
-                        <span class="card-version">v1.1</span>
+                        <div class="card-icon-wrapper"><img src="Organizer/icon128.png" alt="Mk Organizer"></div>
+                        <span class="card-version">v1.3</span>
                     </div>
                     <div class="card-body">
                         <h3>Mk Organizer</h3>
-                        <p>Tu asistente definitivo: presupuesto mensual categorizado (proyectado/confirmado), planificador de deudas por Bola de Nieve, metas de ahorro multi-moneda, Kanban y gestor de claves.</p>
+                        <p>Tu asistente definitivo con sincronización de Google Drive y Calendar: presupuesto mensual, planificador de deudas Bola de Nieve, metas de ahorro multi-moneda, Kanban y claves.</p>
                     </div>
                     <div class="card-footer">
                         <button class="btn-more">
-                            Ver Detalles
+                             Ver Detalles
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
                         </button>
                         <a href="https://chromewebstore.google.com/detail/mk-agenda-notas/phebjjgpcneapmgppmppicefookimdfk?hl=es-419&authuser=0" target="_blank" class="btn-install">Instalar</a>
@@ -635,8 +647,8 @@
                 <!-- 2. Mk 2xScreen -->
                 <div class="card" style="--glow-color: var(--glow-screen); --icon-color: #22d3ee;" data-ext="twoscreen">
                     <div class="card-header">
-                        <div class="card-icon-wrapper">🖥️</div>
-                        <span class="card-version">v1.2</span>
+                        <div class="card-icon-wrapper"><img src="2xScreen/icons/icon128.png" alt="Mk 2xScreen"></div>
+                        <span class="card-version">v1.4</span>
                     </div>
                     <div class="card-body">
                         <h3>Mk 2xScreen</h3>
@@ -644,7 +656,7 @@
                     </div>
                     <div class="card-footer">
                         <button class="btn-more">
-                            Ver Detalles
+                             Ver Detalles
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
                         </button>
                         <a href="https://chromewebstore.google.com/detail/mk-2xscreen/jhddmkehgmagebjjifoppgbdmedcnknd?hl=es-419&authuser=0" target="_blank" class="btn-install">Instalar</a>
@@ -654,8 +666,8 @@
                 <!-- 3. Mk VideoPlayer -->
                 <div class="card" style="--glow-color: var(--glow-video); --icon-color: #f43f5e;" data-ext="videoplayer">
                     <div class="card-header">
-                        <div class="card-icon-wrapper">🎬</div>
-                        <span class="card-version">v1.1</span>
+                        <div class="card-icon-wrapper"><img src="VideoPlayer/icon128.png" alt="Mk VideoPlayer"></div>
+                        <span class="card-version">v1.2</span>
                     </div>
                     <div class="card-body">
                         <h3>Mk VideoPlayer</h3>
@@ -663,7 +675,7 @@
                     </div>
                     <div class="card-footer">
                         <button class="btn-more">
-                            Ver Detalles
+                             Ver Detalles
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
                         </button>
                         <a href="https://chromewebstore.google.com/detail/mk-videoplayer/icbdlconfggomjahkjogeifimddnampi?hl=es-419&authuser=0" target="_blank" class="btn-install">Instalar</a>
@@ -673,16 +685,16 @@
                 <!-- 4. Mk Visor de Imágenes -->
                 <div class="card" style="--glow-color: var(--glow-image); --icon-color: #f59e0b;" data-ext="imageplayer">
                     <div class="card-header">
-                        <div class="card-icon-wrapper">🖼️</div>
-                        <span class="card-version">v1.1</span>
+                        <div class="card-icon-wrapper"><img src="ImagePlayer/icon128.png" alt="Mk Visor de Imágenes"></div>
+                        <span class="card-version">v1.3</span>
                     </div>
                     <div class="card-body">
                         <h3>Mk Visor de Imágenes</h3>
-                        <p>Explora y organiza directorios locales de imágenes mediante la File System Access API nativa. Realiza renombrados, desplazamientos y eliminaciones 100% de manera local.</p>
+                        <p>Explora y edita carpetas locales de imágenes usando File System Access API. Integrado con Mk ScreenShot para anotaciones rápidas, renombrados y organización local.</p>
                     </div>
                     <div class="card-footer">
                         <button class="btn-more">
-                            Ver Detalles
+                             Ver Detalles
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
                         </button>
                         <a href="https://chromewebstore.google.com/detail/mk-visor-de-im%C3%A1genes/aifhjgdmiigpkklmbjpokbkdjgojkgbb?hl=es-419&authuser=0" target="_blank" class="btn-install">Instalar</a>
@@ -692,8 +704,8 @@
                 <!-- 5. Mk ScreenShot -->
                 <div class="card" style="--glow-color: var(--glow-screenshot); --icon-color: #10b981;" data-ext="screenshot">
                     <div class="card-header">
-                        <div class="card-icon-wrapper">✂️</div>
-                        <span class="card-version">v1.1</span>
+                        <div class="card-icon-wrapper"><img src="screenshot/icon128.png" alt="Mk ScreenShot"></div>
+                        <span class="card-version">v1.3</span>
                     </div>
                     <div class="card-body">
                         <h3>Mk ScreenShot</h3>
@@ -701,7 +713,7 @@
                     </div>
                     <div class="card-footer">
                         <button class="btn-more">
-                            Ver Detalles
+                             Ver Detalles
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
                         </button>
                         <a href="https://chromewebstore.google.com/detail/mk-screenshot/fieajpanbbbpobmfajnbpgeolicijojd?hl=es-419&authuser=0" target="_blank" class="btn-install">Instalar</a>
@@ -711,8 +723,8 @@
                 <!-- 6. Mk Arcade -->
                 <div class="card" style="--glow-color: var(--glow-arcade); --icon-color: #eab308;" data-ext="arcade">
                     <div class="card-header">
-                        <div class="card-icon-wrapper">👾</div>
-                        <span class="card-version">v1.0</span>
+                        <div class="card-icon-wrapper"><img src="MkArcade/icon128.png" alt="Mk Arcade"></div>
+                        <span class="card-version">v1.1</span>
                     </div>
                     <div class="card-body">
                         <h3>Mk Arcade</h3>
@@ -720,7 +732,7 @@
                     </div>
                     <div class="card-footer">
                         <button class="btn-more">
-                            Ver Detalles
+                             Ver Detalles
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
                         </button>
                         <a href="https://chromewebstore.google.com/detail/mk-arcade/lmbbbpfpaemgbaclnbkgnjkecpoeocpc?hl=es-419&utm_source=ext_sidebar" target="_blank" class="btn-install">Instalar</a>
@@ -749,6 +761,10 @@
         <div class="container">
             <span class="footer-logo font-outfit">Mk Chrome Suite</span>
             <p class="footer-desc">Una suite unificada de extensiones Manifest V3 ligeras e independientes diseñadas para potenciar tu navegador. Creado por <strong>Perry Daniels</strong>.</p>
+            <div style="margin-top: 15px; margin-bottom: 20px;">
+                <div style="font-size: 10px; color: rgba(255,255,255,0.3); margin-bottom: 6px; letter-spacing: 0.6px; text-transform: uppercase;">Desarrollado por</div>
+                <img src="assets/merke-logo-blanco.png" style="height: 30px; object-fit: contain;" alt="Merke Software">
+            </div>
             <ul class="footer-links">
                 <li><a href="#extensions">Extensiones</a></li>
                 <li><a href="#" id="link-privacy-footer">Política de Privacidad</a></li>
@@ -837,8 +853,8 @@
         const extensionData = {
             organizer: {
                 title: "Mk Organizer",
-                icon: "📅",
-                version: "v1.1",
+                icon: '<img src="Organizer/icon128.png" alt="Mk Organizer" style="width:38px;height:38px;object-fit:contain;">',
+                version: "v1.3",
                 color: "#a78bfa",
                 link: "https://chromewebstore.google.com/detail/mk-agenda-notas/phebjjgpcneapmgppmppicefookimdfk?hl=es-419&authuser=0",
                 features: [
@@ -847,15 +863,16 @@
                     "Planificación de metas de ahorro multi-moneda (Q / US$) asociadas al presupuesto.",
                     "Tablero de tareas visual e interactivo estilo Kanban (drag & drop).",
                     "Agenda y calendario interactivo de tareas y recordatorios.",
+                    "Sincronización bidireccional opcional con Google Calendar.",
                     "Gestor de claves y contraseñas local con autocompletado nativo.",
                     "Sincronización en la nube opcional y encriptada en Google Drive (OAuth 2.0)."
                 ],
-                permissions: "Requiere 'storage' (guardado de bases de datos), 'activeTab' (sugerir y rellenar contraseñas) e 'identity' (sincronización voluntaria con Google Drive). Los permisos de Host se utilizan localmente para capturar e interceptar inicios de sesión y ofrecer guardado."
+                permissions: "Requiere 'storage' (guardado de bases de datos), 'activeTab' (sugerir y rellenar contraseñas) e 'identity' (sincronización voluntaria con Google Drive y Google Calendar). Los permisos de Host se utilizan localmente para capturar e interceptar inicios de sesión y ofrecer guardado."
             },
             twoscreen: {
                 title: "Mk 2xScreen",
-                icon: "🖥️",
-                version: "v1.2",
+                icon: '<img src="2xScreen/icons/icon128.png" alt="Mk 2xScreen" style="width:38px;height:38px;object-fit:contain;">',
+                version: "v1.4",
                 color: "#22d3ee",
                 link: "https://chromewebstore.google.com/detail/mk-2xscreen/jhddmkehgmagebjjifoppgbdmedcnknd?hl=es-419&authuser=0",
                 features: [
@@ -869,8 +886,8 @@
             },
             videoplayer: {
                 title: "Mk VideoPlayer",
-                icon: "🎬",
-                version: "v1.1",
+                icon: '<img src="VideoPlayer/icon128.png" alt="Mk VideoPlayer" style="width:38px;height:38px;object-fit:contain;">',
+                version: "v1.2",
                 color: "#f43f5e",
                 link: "https://chromewebstore.google.com/detail/mk-videoplayer/icbdlconfggomjahkjogeifimddnampi?hl=es-419&authuser=0",
                 features: [
@@ -884,14 +901,14 @@
             },
             imageplayer: {
                 title: "Mk Visor de Imágenes",
-                icon: "🖼️",
-                version: "v1.1",
+                icon: '<img src="ImagePlayer/icon128.png" alt="Mk Visor de Imágenes" style="width:38px;height:38px;object-fit:contain;">',
+                version: "v1.3",
                 color: "#f59e0b",
                 link: "https://chromewebstore.google.com/detail/mk-visor-de-im%C3%A1genes/aifhjgdmiigpkklmbjpokbkdjgojkgbb?hl=es-419&authuser=0",
                 features: [
                     "Exploración ágil de carpetas de imágenes del disco local del ordenador.",
-                    "Lightbox premium con controles de zoom y desplazamiento pan libre por arrastre.",
                     "Gestión de ficheros nativa: renombrar, mover y borrar directamente desde la app.",
+                    "Integración directa con Mk ScreenShot para editar cualquier imagen en un solo clic.",
                     "Filtros de búsqueda, ordenamiento alfabético y ordenamiento por fecha.",
                     "Desactivación controlada en dispositivos móviles o iOS para evitar errores."
                 ],
@@ -899,8 +916,8 @@
             },
             screenshot: {
                 title: "Mk ScreenShot",
-                icon: "✂️",
-                version: "v1.1",
+                icon: '<img src="screenshot/icon128.png" alt="Mk ScreenShot" style="width:38px;height:38px;object-fit:contain;">',
+                version: "v1.3",
                 color: "#10b981",
                 link: "https://chromewebstore.google.com/detail/mk-screenshot/fieajpanbbbpobmfajnbpgeolicijojd?hl=es-419&authuser=0",
                 features: [
@@ -914,8 +931,8 @@
             },
             arcade: {
                 title: "Mk Arcade",
-                icon: "👾",
-                version: "v1.0",
+                icon: '<img src="MkArcade/icon128.png" alt="Mk Arcade" style="width:38px;height:38px;object-fit:contain;">',
+                version: "v1.1",
                 color: "#eab308",
                 link: "https://chromewebstore.google.com/detail/mk-arcade/lmbbbpfpaemgbaclnbkgnjkecpoeocpc?hl=es-419&utm_source=ext_sidebar",
                 features: [
@@ -944,7 +961,7 @@
                     e.stopPropagation();
                     
                     // Fill modal details
-                    document.getElementById('modal-icon').innerText = data.icon;
+                    document.getElementById('modal-icon').innerHTML = data.icon;
                     document.getElementById('modal-title').innerText = data.title;
                     document.getElementById('modal-ver').innerText = data.version;
                     document.getElementById('modal-perm-desc').innerText = data.permissions;
