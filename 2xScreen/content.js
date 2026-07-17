@@ -243,6 +243,12 @@ async function initUI(alignRightScreen, isCollapsed, initialCanGoBack = false, i
         <img src="${MERKE_ICON}" style="width:15px; height:15px; object-fit: contain;" alt="Merke">
       </button>
 
+      <button class="mc-btn" id="mc-fullscreen" title="Pantalla completa" style="display: flex; align-items: center; justify-content: center;">
+        <svg viewBox="0 0 24 24" style="width:14px; height:14px; fill:none; stroke:currentColor; stroke-width:2.2; stroke-linecap:round; stroke-linejoin:round;">
+          <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+        </svg>
+      </button>
+
       <button class="mc-btn-2x" id="mc-2x" title="Salir de pantalla doble (Esc)">2x</button>
 
       <button class="mc-btn" id="mc-close-window" title="Cerrar ventana" style="display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 16px; margin-left: 2px; color: rgba(255, 107, 107, 0.9);">
@@ -273,6 +279,7 @@ async function initUI(alignRightScreen, isCollapsed, initialCanGoBack = false, i
   const btnArcade = shadow.querySelector("#mc-arcade");
   const btnAbout = shadow.querySelector("#mc-about");
   const btnConfig = shadow.querySelector("#mc-config");
+  const btnFullscreen = shadow.querySelector("#mc-fullscreen");
   const btnRestore = shadow.querySelector("#mc-2x");
   const btnCloseWindow = shadow.querySelector("#mc-close-window");
 
@@ -294,6 +301,35 @@ async function initUI(alignRightScreen, isCollapsed, initialCanGoBack = false, i
   updateURLInput();
   checkFavoriteState();
   updateZoomValue();
+
+  // Helper para actualizar UI de pantalla completa
+  const updateFullscreenUI = (state) => {
+    if (!btnFullscreen) return;
+    if (state === "fullscreen") {
+      btnFullscreen.title = "Salir de pantalla completa";
+      btnFullscreen.innerHTML = `
+        <svg viewBox="0 0 24 24" style="width:14px; height:14px; fill:none; stroke:currentColor; stroke-width:2.2; stroke-linecap:round; stroke-linejoin:round;">
+          <path d="M4 14h6v6m10-6h-6v6M4 10h6V4m10 6h-6V4"/>
+        </svg>
+      `;
+    } else {
+      btnFullscreen.title = "Pantalla completa";
+      btnFullscreen.innerHTML = `
+        <svg viewBox="0 0 24 24" style="width:14px; height:14px; fill:none; stroke:currentColor; stroke-width:2.2; stroke-linecap:round; stroke-linejoin:round;">
+          <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+        </svg>
+      `;
+    }
+  };
+
+  // Obtener estado de pantalla completa inicial
+  chrome.runtime.sendMessage({ action: "get_window_state" }, (response) => {
+    if (chrome.runtime.lastError) {
+      console.debug("Error al consultar el estado de ventana:", chrome.runtime.lastError.message);
+    } else if (response && response.state) {
+      updateFullscreenUI(response.state);
+    }
+  });
 
   // Animación inicial: mostramos la pestaña notch
   notch.addEventListener("click", async () => {
@@ -453,6 +489,22 @@ async function initUI(alignRightScreen, isCollapsed, initialCanGoBack = false, i
     if (!isContextValid()) return destroyUI();
     chrome.runtime.sendMessage({ action: "restoreWindow" });
   });
+
+  // Botón alternar pantalla completa
+  if (btnFullscreen) {
+    btnFullscreen.addEventListener("click", () => {
+      if (!isContextValid()) return destroyUI();
+      chrome.runtime.sendMessage({ action: "toggle_fullscreen" }, (response) => {
+        if (chrome.runtime.lastError) {
+          showToast("Error de Comunicación", `Asegúrate de recargar la extensión. Detalle: ${chrome.runtime.lastError.message}`);
+        } else if (response && response.error) {
+          showToast("Error al cambiar pantalla completa", response.error);
+        } else if (response && response.success) {
+          updateFullscreenUI(response.state);
+        }
+      });
+    });
+  }
 
   // Acción de captura de pantalla (el background de 2xScreen captura y delega a la extensión externa)
   if (btnScreenshot) {

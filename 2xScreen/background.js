@@ -529,6 +529,41 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           }
           break;
 
+        case "toggle_fullscreen":
+          if (sender.tab && sender.tab.windowId) {
+            chrome.windows.get(sender.tab.windowId, (win) => {
+              if (chrome.runtime.lastError) {
+                sendResponse({ error: chrome.runtime.lastError.message });
+                return;
+              }
+              const newState = win.state === "fullscreen" ? "normal" : "fullscreen";
+              chrome.windows.update(sender.tab.windowId, { state: newState }, (updatedWin) => {
+                if (chrome.runtime.lastError) {
+                  sendResponse({ error: chrome.runtime.lastError.message });
+                } else {
+                  sendResponse({ success: true, state: newState });
+                }
+              });
+            });
+          } else {
+            sendResponse({ error: "No se identificó la ventana emisora" });
+          }
+          break;
+
+        case "get_window_state":
+          if (sender.tab && sender.tab.windowId) {
+            chrome.windows.get(sender.tab.windowId, (win) => {
+              if (chrome.runtime.lastError) {
+                sendResponse({ error: chrome.runtime.lastError.message });
+              } else {
+                sendResponse({ success: true, state: win.state });
+              }
+            });
+          } else {
+            sendResponse({ error: "No se identificó la ventana emisora" });
+          }
+          break;
+
         case "check_native_status":
           checkNativeConnection().then(isConnected => {
             sendResponse({ connected: isConnected });
