@@ -299,7 +299,7 @@
             display: flex;
             align-items: center;
             gap: 8px;
-            margin: -6px 0 14px;
+            /* margin: -4px 0 14px; */
         }
         .agenda-filter-label {
             font-size: 0.84rem;
@@ -2742,10 +2742,9 @@
             transform: translateY(-1px);
         }
         .cal-event-card.pending {
-            background: rgba(108, 92, 231, 0.15);
-            color: #d63031;
-            color: #a29bfe;
-            border-left: 2px solid var(--ag-accent);
+            background: rgba(253, 121, 168, 0.15);
+            color: #fd79a8;
+            border-left: 2px solid #e84393;
         }
         .cal-event-card.done {
             background: rgba(0, 184, 148, 0.1);
@@ -2787,6 +2786,27 @@
             color: #74b9ff;
             border-left: 2px solid #0984e3;
         }
+        .cal-event-card.kanban-task.kb-status-pending {
+            background: rgba(253, 203, 110, 0.12);
+            color: #fdcb6e;
+            border-left: 2px solid #fdcb6e;
+        }
+        .cal-event-card.kanban-task.kb-status-inprogress {
+            background: rgba(108, 92, 231, 0.15);
+            color: #a29bfe;
+            border-left: 2px solid #6c5ce7;
+        }
+        .cal-event-card.kanban-task.kb-status-blocked {
+            background: rgba(225, 112, 85, 0.12);
+            color: #ffaa90;
+            border-left: 2px solid #e17055;
+        }
+        .cal-event-card.kanban-task.kb-status-done {
+            background: rgba(0, 184, 148, 0.08);
+            color: rgba(255, 255, 255, 0.35);
+            border-left: 2px solid #00b894;
+            text-decoration: line-through;
+        }
 
         .cal-event-card.gcal-task {
             background: rgba(66, 133, 244, 0.12);
@@ -2820,3 +2840,187 @@
 .merke-about-link:hover {
   opacity: 1 !important;
 }
+
+/* ─── ESTILOS PREMIUM PARA CONTROLES DE LA AGENDA ─── */
+.ag-pill-toggle-label {
+    cursor: pointer;
+    display: inline-block;
+    user-select: none;
+}
+
+.ag-pill-toggle-input {
+    display: none !important;
+}
+
+.ag-pill-toggle-button {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    padding: 0 14px;
+    border-radius: 20px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--ag-text-muted);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    height: 32px !important;
+    box-sizing: border-box !important;
+}
+
+.ag-pill-toggle-button .toggle-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.15);
+    transition: all 0.2s ease;
+}
+
+.ag-pill-toggle-input:checked + .ag-pill-toggle-button {
+    background: rgba(108, 92, 231, 0.12);
+    border-color: rgba(108, 92, 231, 0.4);
+    color: #a29bfe;
+    box-shadow: 0 0 10px rgba(108, 92, 231, 0.1);
+}
+
+.ag-pill-toggle-input:checked + .ag-pill-toggle-button .toggle-dot {
+    background: #a29bfe;
+    box-shadow: 0 0 6px #a29bfe;
+}
+
+.ag-pill-toggle-button:hover {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.12);
+    color: var(--ag-text);
+}
+
+.ag-pill-toggle-input:checked + .ag-pill-toggle-button:hover {
+    background: rgba(108, 92, 231, 0.18);
+    border-color: rgba(108, 92, 231, 0.5);
+}
+
+/* Agenda Filter Row Estilizada */
+.agenda-filter-row {
+    background: rgba(255, 255, 255, 0.03) !important;
+    border: 1px solid rgba(255, 255, 255, 0.06) !important;
+    padding: 0 14px !important;
+    border-radius: 20px !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    height: 32px !important;
+    box-sizing: border-box !important;
+}
+
+.agenda-filter-label {
+    font-size: 0.72rem !important;
+    font-weight: 600 !important;
+    color: var(--ag-text-muted) !important;
+}
+
+.agenda-filter-select {
+    background: transparent !important;
+    border: none !important;
+    font-size: 0.72rem !important;
+    font-weight: 700 !important;
+    color: var(--ag-text) !important;
+    cursor: pointer !important;
+    outline: none !important;
+    padding: 0 20px 0 4px !important;
+    margin: 0 !important;
+    height: 100% !important;
+    -webkit-appearance: none !important;
+    appearance: none !important;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23a0a0a8' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e") !important;
+    background-repeat: no-repeat !important;
+    background-position: right 2px center !important;
+    background-size: 10px !important;
+}
+
+.agenda-filter-select option {
+    background-color: #1e1e24 !important;
+    color: #fff !important;
+}
+
+/* Segment controls de Agenda */
+.agenda-view-toggle {
+    border-radius: 20px !important;
+    padding: 2px !important;
+    background: rgba(255,255,255,0.02) !important;
+    border: 1px solid rgba(255,255,255,0.05) !important;
+    height: 32px !important;
+    box-sizing: border-box !important;
+    display: flex !important;
+    align-items: center !important;
+}
+
+.agenda-toggle-btn {
+    border-radius: 18px !important;
+    border: 1px solid transparent !important;
+    font-size: 0.72rem !important;
+    font-weight: 600 !important;
+    color: var(--ag-text-muted) !important;
+    background: transparent !important;
+    transition: all 0.15s ease !important;
+    height: 100% !important;
+    box-sizing: border-box !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 0 14px !important;
+}
+
+.agenda-toggle-btn.active {
+    background: rgba(108, 92, 231, 0.15) !important;
+    border: 1px solid rgba(108, 92, 231, 0.3) !important;
+    color: #a29bfe !important;
+}
+
+.agenda-toggle-btn:hover:not(.active) {
+    color: var(--ag-text) !important;
+    background: rgba(255, 255, 255, 0.03) !important;
+}
+
+/* Botones Principales de la Cabecera de Agenda */
+#open-new-reminder-modal-btn {
+    background: linear-gradient(135deg, #6c5ce7 0%, #a29bfe 100%) !important;
+    border: none !important;
+    box-shadow: 0 4px 12px rgba(108, 92, 231, 0.25) !important;
+    color: #fff !important;
+    font-weight: 600 !important;
+    transition: all 0.2s ease !important;
+}
+
+#open-new-reminder-modal-btn:hover {
+    transform: translateY(-1px) !important;
+    box-shadow: 0 6px 16px rgba(108, 92, 231, 0.4) !important;
+    filter: brightness(1.08) !important;
+}
+
+#agenda-clear-done-btn {
+    background: rgba(255, 255, 255, 0.03) !important;
+    border: 1px solid rgba(255, 255, 255, 0.06) !important;
+    color: var(--ag-text-muted) !important;
+    transition: all 0.2s ease !important;
+}
+
+#agenda-clear-done-btn:hover {
+    background: rgba(255, 255, 255, 0.07) !important;
+    border-color: rgba(255, 255, 255, 0.12) !important;
+    color: var(--ag-text) !important;
+}
+
+#agenda-publish-gcal-btn {
+    background: rgba(66, 133, 244, 0.05) !important;
+    border: 1px solid rgba(66, 133, 244, 0.2) !important;
+    color: #8ab4f8 !important;
+    transition: all 0.2s ease !important;
+}
+
+#agenda-publish-gcal-btn:hover {
+    background: rgba(66, 133, 244, 0.12) !important;
+    border-color: rgba(66, 133, 244, 0.35) !important;
+    box-shadow: 0 0 10px rgba(66, 133, 244, 0.12) !important;
+    color: #fff !important;
+}
+

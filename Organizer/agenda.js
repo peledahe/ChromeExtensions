@@ -31,6 +31,7 @@ const state = {
     },
     agendaView: 'list',
     calShowKanban: false,
+    calShowCalendar: true,
     kanbanCards: [],
     calendarDate: new Date(),
     cfg: {
@@ -65,6 +66,8 @@ const state = {
     pwAutoSavePolicy: 'ask',
     kbModalStatus: 'pending'
 };
+
+window.state = state;
 
 const DB_LARAVEL_TEMPLATE = {
     site: 'Fundascout DB (Laravel)',
@@ -222,6 +225,19 @@ function bindStaticEvents() {
         calShowKanbanCheckbox.onchange = (e) => {
             state.calShowKanban = e.target.checked;
             localStorage.setItem('lastCalShowKanban', e.target.checked);
+            renderCalendar();
+        };
+    }
+
+    const calShowCalendarCheckbox = document.getElementById('cal-show-calendar-checkbox');
+    if (calShowCalendarCheckbox) {
+        const lastVal = localStorage.getItem('lastCalShowCalendar');
+        const preferredShow = lastVal === null ? true : lastVal === 'true';
+        calShowCalendarCheckbox.checked = preferredShow;
+        state.calShowCalendar = preferredShow;
+        calShowCalendarCheckbox.onchange = (e) => {
+            state.calShowCalendar = e.target.checked;
+            localStorage.setItem('lastCalShowCalendar', e.target.checked);
             renderCalendar();
         };
     }
@@ -1557,6 +1573,7 @@ function switchAgendaView(view) {
     const filterRow = document.getElementById('agenda-filter-row-container');
 
     const calKanbanToggleWrapper = document.getElementById('cal-kanban-toggle-wrapper');
+    const calCalendarToggleWrapper = document.getElementById('cal-calendar-toggle-wrapper');
 
     if (view === 'list') {
         if (listBtn) listBtn.classList.add('active');
@@ -1565,6 +1582,7 @@ function switchAgendaView(view) {
         if (calContainer) calContainer.style.display = 'none';
         if (filterRow) filterRow.style.display = 'flex';
         if (calKanbanToggleWrapper) calKanbanToggleWrapper.style.display = 'none';
+        if (calCalendarToggleWrapper) calCalendarToggleWrapper.style.display = 'none';
         renderReminders();
     } else {
         if (listBtn) listBtn.classList.remove('active');
@@ -1573,6 +1591,7 @@ function switchAgendaView(view) {
         if (calContainer) calContainer.style.display = 'flex';
         if (filterRow) filterRow.style.display = 'flex';
         if (calKanbanToggleWrapper) calKanbanToggleWrapper.style.display = 'flex';
+        if (calCalendarToggleWrapper) calCalendarToggleWrapper.style.display = 'flex';
         renderCalendar();
     }
 }
@@ -1808,6 +1827,7 @@ function renderEventsForCell(cell, dateStr, maxVisible) {
                         text: `📋 [KB] ${parsed.title}`,
                         done: card.col_id === 4,
                         isKanban: true,
+                        colId: card.col_id,
                         tag: 'Kanban',
                         originalCard: card
                     });
@@ -1817,7 +1837,7 @@ function renderEventsForCell(cell, dateStr, maxVisible) {
     }
 
     const matchingGCal = [];
-    if (window.gcalEvents && Array.isArray(window.gcalEvents)) {
+    if (state.calShowCalendar && window.gcalEvents && Array.isArray(window.gcalEvents)) {
         window.gcalEvents.forEach((ev) => {
             const startVal = ev.start?.date || ev.start?.dateTime;
             if (startVal) {
@@ -1855,7 +1875,11 @@ function renderEventsForCell(cell, dateStr, maxVisible) {
     visibleEvents.forEach((r) => {
         const evCard = document.createElement('div');
         if (r.isKanban) {
-            evCard.className = `cal-event-card kanban-task ${r.done ? 'done' : 'pending'}`;
+            let kbStatus = 'pending';
+            if (r.colId === 2) kbStatus = 'inprogress';
+            else if (r.colId === 3) kbStatus = 'blocked';
+            else if (r.colId === 4) kbStatus = 'done';
+            evCard.className = `cal-event-card kanban-task kb-status-${kbStatus}`;
         } else if (r.isGCal) {
             evCard.className = 'cal-event-card gcal-task';
         } else {
@@ -1899,15 +1923,71 @@ function openDayDetailsModal(dateStr, reminders) {
     reminders.forEach((r) => {
         const itemEl = document.createElement('div');
         itemEl.className = 'ag-item';
-        itemEl.style.cssText = 'display:flex; justify-content:space-between; align-items:center; padding:12px; margin-bottom:8px; border-radius:8px; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.06); cursor:pointer;';
+
+        // Definir colores y estilos según el tipo de tarea
+        let bgColor = 'rgba(255,255,255,0.02)';
+        let borderColor = 'rgba(255,255,255,0.06)';
+        let borderLeft = '3px solid rgba(255,255,255,0.1)';
+        let hoverBg = 'rgba(108, 92, 231, 0.08)';
+        let hoverBorder = 'rgba(108, 92, 231, 0.2)';
+
+        if (r.isGCal) {
+            borderLeft = '3px solid #4285f4';
+            bgColor = 'rgba(66, 133, 244, 0.06)';
+            borderColor = 'rgba(66, 133, 244, 0.15)';
+            hoverBg = 'rgba(66, 133, 244, 0.12)';
+            hoverBorder = 'rgba(66, 133, 244, 0.25)';
+        } else if (r.isKanban) {
+            if (r.colId === 1) { // pending
+                borderLeft = '3px solid #fdcb6e';
+                bgColor = 'rgba(253, 203, 110, 0.06)';
+                borderColor = 'rgba(253, 203, 110, 0.15)';
+                hoverBg = 'rgba(253, 203, 110, 0.12)';
+                hoverBorder = 'rgba(253, 203, 110, 0.25)';
+            } else if (r.colId === 2) { // inprogress
+                borderLeft = '3px solid #6c5ce7';
+                bgColor = 'rgba(108, 92, 231, 0.06)';
+                borderColor = 'rgba(108, 92, 231, 0.15)';
+                hoverBg = 'rgba(108, 92, 231, 0.12)';
+                hoverBorder = 'rgba(108, 92, 231, 0.25)';
+            } else if (r.colId === 3) { // blocked
+                borderLeft = '3px solid #e17055';
+                bgColor = 'rgba(225, 112, 85, 0.06)';
+                borderColor = 'rgba(225, 112, 85, 0.15)';
+                hoverBg = 'rgba(225, 112, 85, 0.12)';
+                hoverBorder = 'rgba(225, 112, 85, 0.25)';
+            } else if (r.colId === 4) { // done
+                borderLeft = '3px solid #00b894';
+                bgColor = 'rgba(0, 184, 148, 0.04)';
+                borderColor = 'rgba(0, 184, 148, 0.12)';
+                hoverBg = 'rgba(0, 184, 148, 0.08)';
+                hoverBorder = 'rgba(0, 184, 148, 0.22)';
+            }
+        } else { // agenda normal
+            if (r.done) {
+                borderLeft = '3px solid #00b894';
+                bgColor = 'rgba(0, 184, 148, 0.04)';
+                borderColor = 'rgba(0, 184, 148, 0.12)';
+                hoverBg = 'rgba(0, 184, 148, 0.08)';
+                hoverBorder = 'rgba(0, 184, 148, 0.22)';
+            } else {
+                borderLeft = '3px solid #e84393';
+                bgColor = 'rgba(253, 121, 168, 0.06)';
+                borderColor = 'rgba(253, 121, 168, 0.15)';
+                hoverBg = 'rgba(253, 121, 168, 0.12)';
+                hoverBorder = 'rgba(253, 121, 168, 0.25)';
+            }
+        }
+
+        itemEl.style.cssText = `display:flex; justify-content:space-between; align-items:center; padding:12px; margin-bottom:8px; border-radius:8px; background:${bgColor}; border:1px solid ${borderColor}; border-left:${borderLeft}; cursor:pointer; transition: all 0.2s ease;`;
         
         itemEl.onmouseenter = () => {
-            itemEl.style.background = 'rgba(108, 92, 231, 0.08)';
-            itemEl.style.borderColor = 'rgba(108, 92, 231, 0.2)';
+            itemEl.style.background = hoverBg;
+            itemEl.style.borderColor = hoverBorder;
         };
         itemEl.onmouseleave = () => {
-            itemEl.style.background = 'rgba(255,255,255,0.02)';
-            itemEl.style.borderColor = 'rgba(255,255,255,0.06)';
+            itemEl.style.background = bgColor;
+            itemEl.style.borderColor = borderColor;
         };
 
         const leftEl = document.createElement('div');
@@ -1927,6 +2007,27 @@ function openDayDetailsModal(dateStr, reminders) {
                 tagBadge.className = 'ag-tag-badge';
                 tagBadge.textContent = tag;
                 tagBadge.style.fontSize = '0.65rem';
+                
+                // Aplicar color personalizado a las badges según estatus
+                if (r.isKanban) {
+                    if (r.colId === 1) {
+                        tagBadge.style.background = 'rgba(253, 203, 110, 0.15)';
+                        tagBadge.style.color = '#fdcb6e';
+                    } else if (r.colId === 2) {
+                        tagBadge.style.background = 'rgba(108, 92, 231, 0.15)';
+                        tagBadge.style.color = '#a29bfe';
+                    } else if (r.colId === 3) {
+                        tagBadge.style.background = 'rgba(225, 112, 85, 0.15)';
+                        tagBadge.style.color = '#ffaa90';
+                    } else if (r.colId === 4) {
+                        tagBadge.style.background = 'rgba(0, 184, 148, 0.15)';
+                        tagBadge.style.color = '#00b894';
+                    }
+                } else if (r.isGCal) {
+                    tagBadge.style.background = 'rgba(66, 133, 244, 0.15)';
+                    tagBadge.style.color = '#8ab4f8';
+                }
+                
                 tagsWrapper.appendChild(tagBadge);
             });
             leftEl.appendChild(tagsWrapper);
@@ -1940,8 +2041,6 @@ function openDayDetailsModal(dateStr, reminders) {
             editBtn.textContent = '✏️';
             editBtn.style.cssText = 'background:none; border:none; cursor:pointer; font-size:1.1rem; padding:4px;';
             itemEl.appendChild(editBtn);
-        } else {
-            itemEl.style.borderLeft = '3px solid #4285f4';
         }
 
         itemEl.onclick = () => {
