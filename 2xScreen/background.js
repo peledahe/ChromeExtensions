@@ -196,68 +196,64 @@ function create2xWindow(tab) {
             // Esperar un instante para que Chrome procese el cambio de título en el OS
             await new Promise(r => setTimeout(r, 60));
 
-            // Enviar señal al helper nativo para quitar la decoración de la ventana
-            const applyGeometry = async () => {
+            // 1. Aplicar la geometría y foco final primero
+            try {
+              await chrome.windows.update(popupWindow.id, {
+                left: targetLeft,
+                top: targetTop,
+                width: targetWidth,
+                height: targetHeight,
+                focused: true
+              });
+            } catch (e) {
+              console.debug("Error aplicando geometria inicial:", e);
+            }
+
+            // Esperar un instante (150ms) para que la ventana se asiente y procese el redimensionamiento
+            await new Promise(r => setTimeout(r, 150));
+
+            // Función para finalizar el proceso (recargar la pestaña)
+            let finalized = false;
+            const finalizeProcess = async () => {
+              if (finalized) return;
+              finalized = true;
               try {
-                await chrome.windows.update(popupWindow.id, {
-                  left: targetLeft,
-                  top: targetTop,
-                  width: targetWidth,
-                  height: targetHeight,
-                  focused: true
-                });
-                
-                setTimeout(async () => {
-                  try {
-                    await chrome.tabs.reload(tab.id);
-                  } catch (e) {
-                    console.error("Error al recargar la pestaña:", e);
-                  }
-                }, 150);
+                await chrome.tabs.reload(tab.id);
               } catch (e) {
-                console.debug("Error aplicando geometria final:", e);
+                console.error("Error al recargar la pestaña en finalización:", e);
               }
             };
 
+            // 2. Conectar al helper nativo para quitar la decoración de la ventana
             try {
               const port = chrome.runtime.connectNative("com.merke.twoxscreen");
-              let geomApplied = false;
 
               port.postMessage({ action: "undecorate", title: tempTitle });
 
               port.onMessage.addListener(async (res) => {
                 console.debug("Native helper response:", res);
                 port.disconnect();
-                if (!geomApplied) {
-                  geomApplied = true;
-                  // Esperar un instante para que el OS procese el cambio de decoración
-                  await new Promise(r => setTimeout(r, 100));
-                  await applyGeometry();
-                }
+                // Esperar un instante para que el OS procese el cambio de decoración antes de recargar
+                await new Promise(r => setTimeout(r, 100));
+                await finalizeProcess();
               });
 
               port.onDisconnect.addListener(async () => {
                 if (chrome.runtime.lastError) {
                   console.debug("Native messaging not available:", chrome.runtime.lastError.message);
                 }
-                if (!geomApplied) {
-                  geomApplied = true;
-                  await applyGeometry();
-                }
+                await finalizeProcess();
               });
 
               // Timeout de seguridad de 600ms por si el helper tarda demasiado o falla
               setTimeout(async () => {
-                if (!geomApplied) {
-                  geomApplied = true;
-                  try { port.disconnect(); } catch (e) {}
-                  await applyGeometry();
-                }
+                try { port.disconnect(); } catch (e) {}
+                await finalizeProcess();
               }, 600);
 
             } catch (e) {
               console.debug("Native messaging connect error:", e);
-              await applyGeometry();
+              await finalizeProcess();
             }
 
           } catch (e) {

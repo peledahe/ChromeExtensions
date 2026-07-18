@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Mk 2xScreen",
-  "version": "1.4",
+  "version": "1.5",
   "description": "Simula una pantalla completa de doble ancho sin barras nativas con una barra de direcciones flotante estilo Minichrome.",
   "permissions": [
     "system.display",
