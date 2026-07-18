@@ -62,7 +62,7 @@ function signInGDrive() {
         syncState.accessToken = token;
         syncState.connected = true;
         
-        chrome.storage.local.set({ gdrive_token: token }, () => {
+        chrome.storage.local.set({ gdrive_token: token, gdrive_force_download: true }, () => {
             window.showToast('Conectado a Google Drive exitosamente', 'success');
             updateSyncUI();
             syncNow(true); // Intentar sincronización automática inicial
@@ -91,10 +91,23 @@ async function syncNow(auto = false) {
     updateSyncUI();
 
     try {
-        // 1. Obtener todos los datos locales
-        const keys = ['agenda', 'shopping', 'income', 'kanban', 'notes', 'passwords', 'app_config', 'deudas_list', 'deudas_presupuesto', 'budget_limits'];
+        // 1. Obtener todos los datos locales, incluyendo banderas de control
+        const keys = [
+            'agenda', 'shopping', 'income', 'kanban', 'notes', 'passwords', 'app_config', 
+            'deudas_list', 'deudas_presupuesto', 'budget_limits',
+            'gdrive_force_download', 'local_data_modified', 'gdrive_last_sync'
+        ];
         
         chrome.storage.local.get(keys, async (localData) => {
+            const forceDownload = localData.gdrive_force_download === true;
+            const dataModified = localData.local_data_modified === true;
+            const lastSyncTime = localData.gdrive_last_sync || 0;
+
+            // Limpiamos las banderas de control del objeto que subiremos a Google Drive
+            delete localData.gdrive_force_download;
+            delete localData.local_data_modified;
+            delete localData.gdrive_last_sync;
+
             localData.timestamp = Date.now();
 
             // 2. Buscar si ya existe el archivo en Drive
@@ -105,10 +118,42 @@ async function syncNow(auto = false) {
                 const remoteData = await downloadFromGDrive(fileId);
                 
                 if (remoteData && remoteData.timestamp) {
-                    const localTs = localData.timestamp || 0;
                     const remoteTs = remoteData.timestamp || 0;
 
-                    if (remoteTs > localTs && !auto) {
+                    // CASO A: Primera sincronización tras pulsar conectar Google Drive
+                    if (forceDownload) {
+                        // Limpiar la bandera para evitar loops
+                        chrome.storage.local.remove(['gdrive_force_download']);
+
+                        if (!dataModified) {
+                            // Los datos locales son solo de demostración. Descargamos de la nube de forma silenciosa.
+                            await applyDownloadedData(remoteData);
+                            syncState.lastSync = new Date().toLocaleString();
+                            chrome.storage.local.set({ gdrive_last_sync: Date.now() });
+                            notify('Datos recuperados de Google Drive exitosamente', 'success');
+                            setTimeout(() => location.reload(), 1000);
+                            return;
+                        } else {
+                            // El usuario tiene cambios locales propios, pedir confirmación antes de sobrescribir
+                            window.showConfirm('Se encontraron datos previos en Google Drive. ¿Deseas descargar los datos de la nube y sobrescribir tus datos locales actuales?', async (confirm) => {
+                                if (confirm) {
+                                    await applyDownloadedData(remoteData);
+                                    syncState.lastSync = new Date().toLocaleString();
+                                    chrome.storage.local.set({ gdrive_last_sync: Date.now() });
+                                    notify('Datos descargados y aplicados correctamente', 'success');
+                                    setTimeout(() => location.reload(), 1000);
+                                } else {
+                                    // Conservar locales y sobrescribir la nube
+                                    await uploadToGDrive(fileId, localData);
+                                    finishSync();
+                                }
+                            });
+                            return;
+                        }
+                    }
+
+                    // CASO B: Sincronización normal posterior. Comparamos contra la marca del último sync local
+                    if (remoteTs > lastSyncTime && !auto) {
                         // Los datos remotos son más nuevos, preguntar antes de sobrescribir
                         window.showConfirm('Los datos en Google Drive son más recientes. ¿Deseas descargar los datos de la nube y sobrescribir los locales?', async (confirm) => {
                             if (confirm) {
@@ -116,7 +161,7 @@ async function syncNow(auto = false) {
                                 syncState.lastSync = new Date().toLocaleString();
                                 chrome.storage.local.set({ gdrive_last_sync: Date.now() });
                                 notify('Datos descargados y aplicados correctamente', 'success');
-                                location.reload(); // Recargar para aplicar cambios
+                                setTimeout(() => location.reload(), 1000);
                             } else {
                                 // Forzar subida de datos locales
                                 await uploadToGDrive(fileId, localData);
@@ -132,6 +177,9 @@ async function syncNow(auto = false) {
             } else {
                 // Crear archivo nuevo en Drive
                 await createInGDrive('mkorganizer_data.json', localData);
+                if (forceDownload) {
+                    chrome.storage.local.remove(['gdrive_force_download']);
+                }
             }
 
             finishSync();
@@ -162,6 +210,9 @@ async function applyDownloadedData(remoteData) {
                 cleanData[k] = remoteData[k];
             }
         });
+        
+        // Marcamos que ya no son datos de demostración limpios
+        cleanData.local_data_modified = true;
         
         chrome.storage.local.set(cleanData, () => {
             if (cleanData.app_config && typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {

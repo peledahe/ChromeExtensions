@@ -4,6 +4,8 @@
 // ============================================================
 
 (function() {
+  let isInjectingDemo = false;
+
   // Inicialización de la estructura mock de QWebChannel
   window.qt = {
     webChannelTransport: {}
@@ -114,6 +116,15 @@
       });
     },
     set: function(key, value) {
+      // Guardar bandera local_data_modified si no estamos inyectando datos de demostración
+      // e egnoramos las claves propias de la sincronización de gdrive para evitar ciclos.
+      const syncKeys = ['gdrive_token', 'gdrive_last_sync', 'gdrive_force_download', 'local_data_modified'];
+      if (!isInjectingDemo && !syncKeys.includes(key)) {
+        if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+          chrome.storage.local.set({ local_data_modified: true });
+        }
+      }
+
       return new Promise((resolve) => {
         try {
           const useSync = (key === 'app_config');
@@ -175,7 +186,9 @@
     const check = await storage.get('agenda', null);
     if (check !== null && !force) return;
 
-    console.log("Inyectando hermosos datos de demostración en español...");
+    isInjectingDemo = true;
+    try {
+      console.log("Inyectando hermosos datos de demostración en español...");
 
     const todayStr = new Date().toISOString().split('T')[0];
     const tomorrow = new Date();
@@ -310,6 +323,9 @@
     ]);
 
     console.log("Datos de demostración inyectados exitosamente.");
+    } finally {
+      isInjectingDemo = false;
+    }
   }
 
   window.injectDemoData = injectDemoData;
