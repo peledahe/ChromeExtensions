@@ -805,6 +805,20 @@
         </div>
     </div>
 
+    <!-- MODAL DETALLES DE EVENTO GOOGLE CALENDAR -->
+    <div class="edit-modal-overlay" id="gcal-event-modal">
+        <div class="edit-modal-box" style="width: 450px; max-height: 85vh; display: flex; flex-direction: column;">
+            <h3 id="gcal-event-modal-title" style="margin-bottom:12px; font-weight: 700; color: #4285f4;">Detalles del Evento</h3>
+            <div id="gcal-event-details-content" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px; font-size: 0.95rem;">
+                <!-- Contenido dinámico del evento -->
+            </div>
+            <div class="edit-modal-actions" style="margin-top: auto; display: flex; gap: 8px;">
+                <button class="ag-btn ag-btn-primary" id="gcal-event-link-btn" style="flex: 1;">Abrir en Google Calendar</button>
+                <button class="ag-btn ag-btn-ghost" id="gcal-event-close-btn" style="flex: 1;">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
     <!-- MODAL MEDIOS DE PAGO -->
     <div class="pm-modal-overlay" id="pm-modal">
         <div class="pm-modal-box">

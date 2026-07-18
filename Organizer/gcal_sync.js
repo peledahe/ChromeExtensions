@@ -169,6 +169,8 @@ async function fetchGCalEvents() {
                     const events = (data.items || []).map(ev => ({
                         id: ev.id,
                         summary: ev.summary || 'Evento sin título',
+                        description: ev.description || '',
+                        location: ev.location || '',
                         start: ev.start,
                         end: ev.end,
                         calendarName: cal.summary,

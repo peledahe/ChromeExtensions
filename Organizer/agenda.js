@@ -264,6 +264,19 @@ function bindStaticEvents() {
         calDayModalCloseBtn.onclick = () => calDayModal.classList.remove('active');
     }
 
+    const gcalEventModalCloseBtn = document.getElementById('gcal-event-close-btn');
+    const gcalEventModal = document.getElementById('gcal-event-modal');
+    if (gcalEventModalCloseBtn && gcalEventModal) {
+        gcalEventModalCloseBtn.onclick = () => gcalEventModal.classList.remove('active');
+    }
+    if (gcalEventModal) {
+        gcalEventModal.onclick = (e) => {
+            if (e.target === gcalEventModal) {
+                gcalEventModal.classList.remove('active');
+            }
+        };
+    }
+
     const addShopBtn = document.getElementById('add-shop-btn');
     if (addShopBtn) addShopBtn.onclick = addShopping;
 
@@ -1849,7 +1862,11 @@ function renderEventsForCell(cell, dateStr, maxVisible) {
                         done: false,
                         isGCal: true,
                         htmlLink: ev.htmlLink,
-                        calendarName: ev.calendarName
+                        calendarName: ev.calendarName,
+                        description: ev.description || '',
+                        location: ev.location || '',
+                        start: ev.start,
+                        end: ev.end
                     });
                 }
             }
@@ -1893,9 +1910,7 @@ function renderEventsForCell(cell, dateStr, maxVisible) {
             if (r.isKanban) {
                 editKanbanCard(r.id);
             } else if (r.isGCal) {
-                if (r.htmlLink) {
-                    window.open(r.htmlLink, '_blank');
-                }
+                openGCalEventModal(r);
             } else {
                 openEditModal('reminder', r);
             }
@@ -2048,9 +2063,7 @@ function openDayDetailsModal(dateStr, reminders) {
             if (r.isKanban) {
                 editKanbanCard(r.id);
             } else if (r.isGCal) {
-                if (r.htmlLink) {
-                    window.open(r.htmlLink, '_blank');
-                }
+                openGCalEventModal(r);
             } else {
                 openEditModal('reminder', r);
             }
@@ -2058,6 +2071,78 @@ function openDayDetailsModal(dateStr, reminders) {
 
         listEl.appendChild(itemEl);
     });
+
+    modal.classList.add('active');
+}
+
+function openGCalEventModal(eventInfo) {
+    const modal = document.getElementById('gcal-event-modal');
+    const detailsContent = document.getElementById('gcal-event-details-content');
+    const linkBtn = document.getElementById('gcal-event-link-btn');
+    if (!modal || !detailsContent) return;
+
+    // Formatear fechas y horas
+    let startStr = 'Sin fecha de inicio';
+    let endStr = 'Sin fecha de fin';
+    
+    if (eventInfo.start) {
+        if (eventInfo.start.dateTime) {
+            const startDate = new Date(eventInfo.start.dateTime);
+            startStr = startDate.toLocaleString('es-ES', { dateStyle: 'long', timeStyle: 'short' });
+        } else if (eventInfo.start.date) {
+            startStr = eventInfo.start.date + ' (Todo el día)';
+        }
+    }
+    if (eventInfo.end) {
+        if (eventInfo.end.dateTime) {
+            const endDate = new Date(eventInfo.end.dateTime);
+            endStr = endDate.toLocaleString('es-ES', { dateStyle: 'long', timeStyle: 'short' });
+        } else if (eventInfo.end.date) {
+            endStr = eventInfo.end.date + ' (Todo el día)';
+        }
+    }
+
+    // Limpiar contenido y construir información detallada
+    detailsContent.innerHTML = `
+        <div style="display:flex; flex-direction:column; gap:4px;">
+            <strong style="color:var(--text-muted, #a0a0a0); font-size:0.8rem; text-transform:uppercase;">Título</strong>
+            <span style="font-size:1.1rem; font-weight:600; color:var(--text-color, #ffffff);">${eventInfo.text ? eventInfo.text.replace('📅 ', '') : 'Sin título'}</span>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:4px;">
+            <strong style="color:var(--text-muted, #a0a0a0); font-size:0.8rem; text-transform:uppercase;">Inicio</strong>
+            <span style="color:var(--text-color, #ffffff);">${startStr}</span>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:4px;">
+            <strong style="color:var(--text-muted, #a0a0a0); font-size:0.8rem; text-transform:uppercase;">Fin</strong>
+            <span style="color:var(--text-color, #ffffff);">${endStr}</span>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:4px;">
+            <strong style="color:var(--text-muted, #a0a0a0); font-size:0.8rem; text-transform:uppercase;">Calendario</strong>
+            <span style="color:var(--text-color, #ffffff);">${eventInfo.calendarName || 'Principal'}</span>
+        </div>
+        ${eventInfo.location ? `
+        <div style="display:flex; flex-direction:column; gap:4px;">
+            <strong style="color:var(--text-muted, #a0a0a0); font-size:0.8rem; text-transform:uppercase;">Ubicación</strong>
+            <span style="color:var(--text-color, #ffffff);">${eventInfo.location}</span>
+        </div>` : ''}
+        ${eventInfo.description ? `
+        <div style="display:flex; flex-direction:column; gap:4px;">
+            <strong style="color:var(--text-muted, #a0a0a0); font-size:0.8rem; text-transform:uppercase;">Descripción</strong>
+            <div style="color:var(--text-color, #ffffff); white-space:pre-wrap; max-height:150px; overflow-y:auto; background:rgba(255,255,255,0.03); padding:8px; border-radius:4px; border:1px solid rgba(255,255,255,0.05); font-size:0.9rem;">${eventInfo.description}</div>
+        </div>` : ''}
+    `;
+
+    // Configurar botón para abrir en Google Calendar si tiene htmlLink
+    if (linkBtn) {
+        if (eventInfo.htmlLink) {
+            linkBtn.style.display = 'block';
+            linkBtn.onclick = () => {
+                window.open(eventInfo.htmlLink, '_blank');
+            };
+        } else {
+            linkBtn.style.display = 'none';
+        }
+    }
 
     modal.classList.add('active');
 }
