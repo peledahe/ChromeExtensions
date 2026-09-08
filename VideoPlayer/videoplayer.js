@@ -559,6 +559,33 @@
     let playlistTimeout = null;
     let isFirstPlayStarted = false;
     let playRequestId = 0; // generación de la petición de reproducción en curso
+
+    // ═══════════ Recorte de intro/outro y transición entre videos ═══════════
+    const SKIP_INTRO_SECONDS = 10;   // no empezar en el segundo 0
+    const SKIP_OUTRO_SECONDS = 10;   // pasar al siguiente antes del final
+    // Por debajo de este umbral recortar 20 s dejaría el video casi sin
+    // contenido, así que en videos cortos se reproduce completo.
+    // Con 35 s quedan 15 s visibles, que es el mínimo razonable.
+    const MIN_DURATION_FOR_SKIP = 35;
+    const FADE_MS = 450;             // acompaña al transition:0.5s de .player-content
+
+    let endSkipArmed = false;        // evita disparar el salto final más de una vez
+
+    function canSkipEdges(duration) {
+        return isFinite(duration) && duration >= MIN_DURATION_FOR_SKIP;
+    }
+
+    function introOffsetFor(duration) {
+        return canSkipEdges(duration) ? SKIP_INTRO_SECONDS : 0;
+    }
+
+    // Cambia de video con un fundido para que el corte no sea brusco
+    function fadeToVideo(index) {
+        if (index < 0 || index >= currentVideos.length) return;
+        endSkipArmed = false;
+        mainPlayer.classList.add('player-fading');
+        setTimeout(() => playVideo(index), FADE_MS);
+    }
     const playbackHistory = new Map();
 
     // ═══════════ Identidad de una etiqueta ═══════════
@@ -1462,6 +1489,10 @@
         // arrancar, la anterior debe abandonar en vez de pelear por el <video>.
         const requestId = ++playRequestId;
 
+        // Se rearma al empezar a reproducir; mientras tanto no debe dispararse
+        // con la duración del video anterior.
+        endSkipArmed = false;
+
         const playerLoader = document.getElementById('player-loader');
         if (playerLoader) playerLoader.style.display = 'flex';
 
@@ -1495,12 +1526,22 @@
                     isFirstPlayStarted = true;
                     startThumbnailQueue(currentVideos);
 
+                    const duration = mainPlayer.duration;
                     const savedTime = playbackHistory.get(video.url) || 0;
+
                     if (savedTime > 0) {
-                        mainPlayer.currentTime = savedTime;
+                        // Reanudar donde se dejó, pero nunca dentro del tramo
+                        // final recortado (arrancaría saltando de inmediato).
+                        const limite = canSkipEdges(duration)
+                            ? duration - SKIP_OUTRO_SECONDS - 1
+                            : Infinity;
+                        mainPlayer.currentTime = Math.min(savedTime, limite);
                     } else if (video.url && !video.url.includes('.m3u8')) {
-                        mainPlayer.currentTime = Math.min(5, mainPlayer.duration || 5);
+                        mainPlayer.currentTime = introOffsetFor(duration);
                     }
+
+                    // A partir de aquí el salto de outro puede dispararse
+                    endSkipArmed = true;
                     mainPlayer.classList.remove('player-fading');
                 }).catch(e => {
                     // AbortError: la reproducción fue interrumpida a propósito
@@ -1591,11 +1632,25 @@
         return name;
     }
 
+    // Salto del tramo final: pasa al siguiente video SKIP_OUTRO_SECONDS antes
+    // del final. Como el video nunca llega a terminar, 'ended' no se dispara y
+    // este es el camino habitual; onended queda para los videos cortos.
+    mainPlayer.addEventListener('timeupdate', () => {
+        if (!endSkipArmed) return;
+        if (currentIndex + 1 >= currentVideos.length) return;
+
+        const duration = mainPlayer.duration;
+        if (!canSkipEdges(duration)) return;
+
+        if (mainPlayer.currentTime >= duration - SKIP_OUTRO_SECONDS) {
+            endSkipArmed = false;   // un solo disparo por video
+            fadeToVideo(currentIndex + 1);
+        }
+    });
+
     mainPlayer.onended = () => {
         if (currentIndex + 1 < currentVideos.length) {
-            setTimeout(() => {
-                playVideo(currentIndex + 1);
-            }, 1000);
+            fadeToVideo(currentIndex + 1);
         }
     };
 
