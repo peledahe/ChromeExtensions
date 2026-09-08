@@ -841,29 +841,66 @@
                 margin-top: 0;
             }
             .kb-board {
-                grid-template-columns: repeat(2, minmax(260px, 1fr));
+                grid-template-columns: repeat(2, minmax(280px, 1fr));
                 height: auto;
-                overflow-x: hidden;
+                overflow-x: auto;
                 overflow-y: visible;
+                -webkit-overflow-scrolling: touch;
             }
             .ag-content:has(#view-kanban.active) {
                 overflow-y: auto;
             }
+            .kb-col.collapsed .kb-cards {
+                transition: max-height 0.3s ease, padding 0.3s ease;
+            }
         }
 
-        @media (max-width: 760px) {
+        @media (max-width: 768px) {
+            .kb-board {
+                grid-template-columns: 1fr;
+                overflow-x: hidden;
+                overflow-y: visible;
+                height: auto;
+                gap: 12px;
+            }
+            .kb-col {
+                min-width: 0;
+                min-height: auto;
+                max-height: none;
+            }
+            .kb-col.collapsed {
+                max-height: none;
+                min-height: auto;
+            }
+            .kb-col.collapsed .kb-cards {
+                max-height: 200px;
+                overflow-y: auto;
+                -webkit-overflow-scrolling: touch;
+                padding: 10px;
+            }
+            .kb-cards {
+                max-height: 400px;
+                overflow-y: auto;
+                -webkit-overflow-scrolling: touch;
+                padding: 10px;
+            }
+        }
+
+        @media (max-width: 480px) {
             #view-kanban .section-header {
                 align-items: stretch;
+                flex-direction: column;
             }
             #view-kanban .section-header h1,
             #view-kanban .section-header p {
                 width: 100%;
             }
             #view-kanban .section-header p {
-                margin-bottom: 2px;
+                margin-bottom: 8px;
             }
             .kb-label-filter {
                 gap: 5px;
+                width: 100%;
             }
             .kb-label-chip {
                 font-size: 0.68rem;
@@ -876,12 +913,24 @@
                 height: auto;
             }
             .kb-col {
-                min-width: 0;
-                min-height: 300px;
+                min-height: auto;
             }
-            .kb-cards {
-                max-height: none;
-                overflow-y: visible;
+            .kb-col-header {
+                padding: 10px 12px 8px;
+            }
+            .kb-col-title {
+                font-size: 0.75rem;
+                gap: 5px;
+            }
+            .kb-col-count {
+                font-size: 0.65rem;
+                padding: 1px 6px;
+            }
+            .kb-card {
+                padding: 9px 11px;
+            }
+            .kb-card-title {
+                font-size: 0.85rem;
             }
         }
 
@@ -951,6 +1000,34 @@
             justify-content: center;
         }
         .kb-col-clean:hover { color: #ff7675; background: rgba(255,255,255,0.08); }
+        .kb-col-toggle-collapse {
+            background: none;
+            border: none;
+            color: rgba(255,255,255,0.3);
+            cursor: pointer;
+            line-height: 1;
+            padding: 4px;
+            border-radius: 5px;
+            transition: color 0.15s, background 0.15s, transform 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .kb-col-toggle-collapse:hover { color: #fff; background: rgba(255,255,255,0.08); }
+        .kb-col-toggle-collapse svg {
+            transition: transform 0.2s ease;
+        }
+        .kb-col.collapsed .kb-col-toggle-collapse svg {
+            transform: rotate(180deg);
+        }
+        .kb-col.collapsed .kb-cards {
+            display: none;
+        }
+        .kb-col.collapsed {
+            flex: 0 0 auto;
+            max-height: none;
+            min-height: auto;
+        }
 
         .kb-cards {
             flex: 1;

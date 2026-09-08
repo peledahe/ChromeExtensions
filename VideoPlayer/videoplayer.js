@@ -69,6 +69,59 @@
         return { name: dirHandle.name, path: currentPath, children, handle: dirHandle };
     }
 
+    // ═══════════ Etiquetas: almacenamiento en la propia carpeta raíz ═══════════
+    // Se guardan en un archivo dentro de la carpeta de videos en vez de en
+    // localStorage. Así las etiquetas viajan con la carpeta: al cambiar de raíz
+    // no se mezclan ni se pierden, y al volver a una carpeta usada antes se
+    // recuperan solas. El punto inicial lo oculta en Linux/macOS y en Windows
+    // lo deja agrupado al principio del listado.
+    const TAGS_FILENAME = '.videoplayer-tags.json';
+
+    async function readTagsFile() {
+        if (!localState.rootHandle) return null;
+        try {
+            const fileHandle = await localState.rootHandle.getFileHandle(TAGS_FILENAME);
+            const file = await fileHandle.getFile();
+            const text = await file.text();
+            if (!text || !text.trim()) return {};
+            const parsed = JSON.parse(text);
+            return (parsed && typeof parsed === 'object') ? parsed : {};
+        } catch (e) {
+            // NotFoundError = la carpeta todavía no tiene archivo de etiquetas
+            if (e && e.name !== 'NotFoundError') {
+                console.warn('No se pudo leer el archivo de etiquetas:', e);
+            }
+            return null;
+        }
+    }
+
+    async function writeTagsFile(data) {
+        if (!localState.rootHandle) return false;
+        try {
+            const fileHandle = await localState.rootHandle.getFileHandle(TAGS_FILENAME, { create: true });
+            const writable = await fileHandle.createWritable();
+            await writable.write(JSON.stringify(data, null, 2));
+            await writable.close();
+            return true;
+        } catch (e) {
+            console.error('No se pudo guardar el archivo de etiquetas:', e);
+            if (typeof showNotification === 'function') {
+                showNotification('No se pudieron guardar las etiquetas en la carpeta', 'error');
+            }
+            return false;
+        }
+    }
+
+    // Las escrituras se encadenan: guardar varias etiquetas seguidas no debe
+    // solapar dos createWritable() sobre el mismo archivo.
+    let tagsWriteChain = Promise.resolve(true);
+    function writeTagsFileSerialized(data) {
+        tagsWriteChain = tagsWriteChain
+            .catch(() => false)
+            .then(() => writeTagsFile(data));
+        return tagsWriteChain;
+    }
+
     // Objeto py simulador local para la extensión
     const py = {
         async get_media_path() {
@@ -93,16 +146,6 @@
                 console.error(e);
                 return '[]';
             }
-        },
-        async get_playlists() {
-            return localStorage.getItem('videoCloudPlaylists') || '[]';
-        },
-        async set_playlists(json) {
-            localStorage.setItem('videoCloudPlaylists', json);
-            return true;
-        },
-        async resolve_video_url(url) {
-            return url;
         },
         async get_videos(folderPath) {
             // Liberar Object URLs anteriores para no saturar memoria
@@ -135,6 +178,52 @@
                         list.push(videoItem);
                         localState.activeVideos.push(videoItem);
                     }
+                }
+            }
+            return JSON.stringify(list);
+        },
+        // Resuelve una lista de rutas relativas (posiblemente de carpetas
+        // distintas) en una sola pasada. Necesario para las vistas por etiqueta:
+        // llamar a get_videos() por cada carpeta revocaría las URLs creadas en
+        // las anteriores, dejando media lista sin poder reproducirse.
+        async get_videos_by_paths(jsonPaths) {
+            let paths;
+            try {
+                paths = JSON.parse(jsonPaths);
+            } catch (_e) {
+                return '[]';
+            }
+            if (!Array.isArray(paths)) return '[]';
+
+            localState.objectUrls.forEach(url => URL.revokeObjectURL(url));
+            localState.objectUrls.clear();
+            localState.activeVideos = [];
+
+            const list = [];
+            for (const relPath of paths) {
+                const parts = String(relPath).split('/');
+                const name = parts.pop();
+                const parentPath = parts.join('/') || '.';
+                const dirHandle = localState.directoryHandles.get(parentPath);
+                if (!dirHandle) continue;
+                try {
+                    const fileHandle = await dirHandle.getFileHandle(name);
+                    const file = await fileHandle.getFile();
+                    const url = URL.createObjectURL(file);
+                    localState.objectUrls.add(url);
+
+                    const videoItem = {
+                        name,
+                        path: relPath,
+                        url,
+                        size: file.size,
+                        mtime: file.lastModified / 1000,
+                        handle: fileHandle
+                    };
+                    list.push(videoItem);
+                    localState.activeVideos.push(videoItem);
+                } catch (_e) {
+                    // El archivo ya no existe (movido o borrado fuera de la app)
                 }
             }
             return JSON.stringify(list);
@@ -243,29 +332,28 @@
                 return false;
             }
         },
-        async get_video_tags_for_path(scopePath) {
-            const tags = JSON.parse(localStorage.getItem('videoTags') || '{}');
-            return JSON.stringify(tags[scopePath] || []);
-        },
         async get_video_tags() {
-            const tags = JSON.parse(localStorage.getItem('videoTags') || '{}');
-            return JSON.stringify(tags);
-        },
-        async save_video_tags_for_path(scopePath, jsonTags) {
-            const tags = JSON.parse(localStorage.getItem('videoTags') || '{}');
-            tags[scopePath] = JSON.parse(jsonTags);
-            localStorage.setItem('videoTags', JSON.stringify(tags));
-            return true;
+            const fromFile = await readTagsFile();
+            if (fromFile) return JSON.stringify(fromFile);
+
+            // Esta carpeta raíz aún no tiene archivo de etiquetas. Si quedan
+            // etiquetas del esquema anterior (localStorage global) se adoptan
+            // UNA sola vez; así no se arrastran a las demás carpetas raíz.
+            const legacy = localStorage.getItem('videoTags');
+            if (legacy && localStorage.getItem('videoTagsMigrated') !== '1') {
+                localStorage.setItem('videoTagsMigrated', '1');
+                return legacy;
+            }
+            return '{}';
         },
         async save_video_tags(jsonTagsAll) {
-            localStorage.setItem('videoTags', jsonTagsAll);
-            return true;
-        },
-        async clear_video_tags_for_path(scopePath) {
-            const tags = JSON.parse(localStorage.getItem('videoTags') || '{}');
-            delete tags[scopePath];
-            localStorage.setItem('videoTags', JSON.stringify(tags));
-            return true;
+            let data;
+            try {
+                data = JSON.parse(jsonTagsAll);
+            } catch (_e) {
+                return false;
+            }
+            return await writeTagsFileSerialized(data);
         },
         async get_playback_history() {
             return localStorage.getItem('videoPlaybackHistory') || '{}';
@@ -301,22 +389,6 @@
     const settingsBtn = document.getElementById('settings-btn');
     const sidebar = document.querySelector('.sidebar');
 
-    // Elementos Cloud
-    const cloudPlaylistList = document.getElementById('cloud-playlist-list');
-    const newCloudPlaylistBtn = document.getElementById('new-cloud-playlist');
-    const cloudModal = document.getElementById('cloud-modal');
-    const closeCloudModalBtn = document.getElementById('close-cloud-modal');
-    const cancelCloudModalBtn = document.getElementById('cancel-cloud-modal');
-    const saveCloudModalBtn = document.getElementById('save-cloud-modal');
-    const cloudUrlInput = document.getElementById('cloud-url-input');
-    const addToCloudBtn = document.getElementById('add-to-cloud-btn');
-    const cloudItemsList = document.getElementById('cloud-items-list');
-    const cloudPlaylistNameInput = document.getElementById('cloud-playlist-name-input');
-    const externalPlayer = document.getElementById('external-player');
-
-    let cloudPlaylists = [];
-    let activeCloudPlaylistIndex = -1;
-
     // Etiquetas
     const tagsList = document.getElementById('tags-list');
     const tagsModal = document.getElementById('tags-modal');
@@ -330,7 +402,6 @@
 
     let videoTags = {};
     let currentTaggingVideo = null;
-    let currentTaggingFolder = null;
 
     const settingsModal = document.getElementById('settings-modal');
     const saveSettingsBtn = document.getElementById('save-settings');
@@ -339,7 +410,6 @@
     const clearAllTagsBtn = document.getElementById('clear-all-tags-btn');
     const sortSelect = document.getElementById('sort-select');
     let hlsInstance = null;
-    const STARTUP_VIDEO_URL = '';
 
     let settings = {
         mediaPath: '',
@@ -456,15 +526,6 @@
         }
     }
 
-    function normalizeFolder(folder) {
-        if (!folder || folder === '.') return '';
-        return String(folder).replace(/^\/+/, '').replace(/\/+$/, '');
-    }
-
-    function buildLocalMediaUrl(folder, filename) {
-        return ''; // ya no usamos rutas absolutas crudas de file:// en la extensión web
-    }
-
     function setVideoSource(url) {
         if (hlsInstance) {
             hlsInstance.destroy();
@@ -494,18 +555,78 @@
     let currentIndex = -1;
     let videoToDelete = null;
     let folderPathToDelete = null;
-    let cloudPlaylistToDelete = null;
     let isDeletingAllTags = false;
     let playlistTimeout = null;
     let isFirstPlayStarted = false;
-    const thumbnailCache = new Map();
+    let playRequestId = 0; // generación de la petición de reproducción en curso
     const playbackHistory = new Map();
+
+    // ═══════════ Identidad de una etiqueta ═══════════
+    // La clave es la RUTA RELATIVA del archivo (p.ej. "Alfa/mm/video.mp4").
+    // Antes se usaba video.url, que es una blob: URL regenerada en cada escaneo:
+    // por eso las etiquetas "desaparecían" al recargar. La ruta es estable entre
+    // sesiones y es el mismo dato que maneja la galería, así ambas comparten
+    // almacenamiento. Al mover o renombrar un archivo hay que migrar la clave.
+    function getTagKey(video) {
+        if (!video) return '';
+        if (video.path) return String(video.path).replace(/^\.\//, '');
+        return video.name || '';
+    }
+
+    function folderOfKey(key) {
+        const parts = String(key).split('/');
+        parts.pop();
+        return parts.join('/') || '.';
+    }
+
+    // Convierte etiquetas guardadas con los formatos antiguos al formato por ruta
+    function migrateTags(raw) {
+        const out = {};
+        let changed = false;
+
+        Object.entries(raw || {}).forEach(([key, val]) => {
+            if (!val || !Array.isArray(val.tags) || val.tags.length === 0) return;
+
+            let path = null;
+            if (key.startsWith('blob:')) {
+                // Formato antiguo del reproductor: clave efímera, se reconstruye
+                // la ruta con los datos que se guardaron junto a la etiqueta.
+                const name = val.data && val.data.name;
+                const folder = val.lastKnownFolder;
+                if (name) {
+                    const usable = folder && folder !== '.' && !folder.startsWith('🏷') && !folder.startsWith('☁');
+                    path = usable ? `${folder}/${name}` : name;
+                }
+                changed = true;
+            } else if (key.includes('|')) {
+                // Formato de la galería: "ruta|tamaño|fecha"
+                path = key.split('|')[0];
+                changed = true;
+            } else {
+                path = key;
+            }
+
+            if (!path) { changed = true; return; }
+            path = path.replace(/^\.\//, '');
+
+            if (!out[path]) out[path] = { tags: [], name: path.split('/').pop() };
+            val.tags.forEach(t => {
+                if (!out[path].tags.includes(t)) out[path].tags.push(t);
+            });
+        });
+
+        return { tags: out, changed };
+    }
 
     async function loadTags() {
         try {
-            const scopePath = (settings.mediaPath || '').trim();
-            videoTags = JSON.parse(await py.get_video_tags_for_path(scopePath));
+            const raw = JSON.parse(await py.get_video_tags()) || {};
+            const { tags, changed } = migrateTags(raw);
+            videoTags = tags;
+            // Persistir la migración para no repetirla en cada arranque
+            if (changed) await py.save_video_tags(JSON.stringify(videoTags));
         } catch(e) {
+            console.warn('Error al cargar etiquetas:', e);
             videoTags = {};
         }
         renderTagsList();
@@ -588,203 +709,16 @@
         }
     }
 
-    async function fetchCloudPlaylists() {
-        try {
-            const data = JSON.parse(await py.get_playlists());
-            cloudPlaylists = Array.isArray(data) ? data : [];
-            renderCloudPlaylists();
-        } catch (e) { console.error('Error fetching cloud playlists', e); }
-    }
-
-    function renderCloudPlaylists() {
-        cloudPlaylistList.innerHTML = cloudPlaylists.map((list, index) => `
-            <li class="cloud-playlist-item" data-index="${index}">
-                <span class="playlist-name">🎬 ${list.name}</span>
-                <div class="playlist-actions" style="display:flex; gap:5px;">
-                    <button class="btn-icon-mini edit-cloud-playlist" data-index="${index}" title="Editar">✏️</button>
-                    <button class="btn-icon-mini delete-cloud-playlist" data-index="${index}" title="Eliminar">🗑️</button>
-                </div>
-            </li>
-        `).join('');
-
-        cloudPlaylistList.querySelectorAll('.cloud-playlist-item').forEach(item => {
-            const idx = parseInt(item.dataset.index);
-            item.addEventListener('click', (e) => {
-                if (e.target.closest('.playlist-actions')) return;
-                openCloudPlaylist(idx);
-            });
-
-            item.querySelector('.edit-cloud-playlist').addEventListener('click', () => showCloudModal(idx));
-
-            item.querySelector('.delete-cloud-playlist').addEventListener('click', (e) => {
-                e.stopPropagation();
-                deleteCloudPlaylist(idx);
-            });
-        });
-    }
-
-    function openCloudPlaylist(index, autoPlay = true) {
-        currentVideos = cloudPlaylists[index].items;
-        const listName = cloudPlaylists[index].name;
-        currentFolderName.textContent = `☁️ ${listName}`;
-        renderVideos(currentVideos);
-        showNotification(`Lista Cloud "${listName}" cargada`, 'success');
-        if (autoPlay && currentVideos.length > 0) playVideo(0);
-    }
-
-    [
-        cloudPlaylistNameInput,
-        cloudUrlInput,
-        document.getElementById('new-tag-input')
-    ].forEach(input => {
-        if (input) {
-            input.addEventListener('paste', (e) => {
-                e.stopPropagation();
-            });
-            input.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter') {
-                    if (input.id === 'cloud-url-input') {
-                        e.preventDefault();
-                        addToCloudBtn.click();
-                    } else if (input.id === 'new-tag-input') {
-                        e.preventDefault();
-                        const addTagBtn = document.getElementById('add-tag-btn');
-                        if (addTagBtn) addTagBtn.click();
-                    }
-                }
-            });
-        }
-    });
-
-    function showCloudModal(index = -1) {
-        activeCloudPlaylistIndex = index;
-        const list = index === -1 ? { name: '', items: [] } : cloudPlaylists[index];
-        document.getElementById('cloud-modal-title').textContent = index === -1 ? 'Crear Lista Cloud' : `Gestionar: ${list.name}`;
-        cloudPlaylistNameInput.value = list.name;
-        renderCloudItems(list.items);
-        cloudModal.classList.add('active');
-    }
-
-    function renderCloudItems(items) {
-        cloudItemsList.innerHTML = items.map((item, idx) => `
-            <div class="sortable-item" data-index="${idx}" draggable="true">
-                <span class="item-title">☰ ${item.name}</span>
-                <div class="item-actions">
-                    <button class="btn-icon-mini remove-item">❌</button>
-                </div>
-            </div>
-        `).join('');
-
-        let draggedItemIndex = null;
-
-        cloudItemsList.querySelectorAll('.sortable-item').forEach(item => {
-            item.addEventListener('dragstart', (e) => {
-                draggedItemIndex = parseInt(item.dataset.index);
-                e.dataTransfer.effectAllowed = 'move';
-                item.style.opacity = '0.5';
-            });
-
-            item.addEventListener('dragover', (e) => {
+    const newTagInputEl = document.getElementById('new-tag-input');
+    if (newTagInputEl) {
+        newTagInputEl.addEventListener('paste', (e) => e.stopPropagation());
+        newTagInputEl.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
                 e.preventDefault();
-                e.dataTransfer.dropEffect = 'move';
-            });
-
-            item.addEventListener('drop', (e) => {
-                e.preventDefault();
-                const targetIndex = parseInt(item.dataset.index);
-                if (draggedItemIndex !== null && draggedItemIndex !== targetIndex) {
-                    const movedItem = items.splice(draggedItemIndex, 1)[0];
-                    items.splice(targetIndex, 0, movedItem);
-                    renderCloudItems(items);
-                    if (activeCloudPlaylistIndex !== -1 && currentFolderName.textContent.includes(cloudPlaylists[activeCloudPlaylistIndex].name)) {
-                        renderVideos(items);
-                    }
-                }
-            });
-
-            item.addEventListener('dragend', () => {
-                item.style.opacity = '1';
-                draggedItemIndex = null;
-            });
-
-            item.querySelector('.remove-item').onclick = () => {
-                items.splice(parseInt(item.dataset.index), 1);
-                renderCloudItems(items);
-                if (activeCloudPlaylistIndex !== -1 && currentFolderName.textContent.includes(cloudPlaylists[activeCloudPlaylistIndex].name)) {
-                    renderVideos(items);
-                }
-            };
+                const btn = document.getElementById('add-tag-btn');
+                if (btn) btn.click();
+            }
         });
-    }
-
-    async function resolveAndAddUrl() {
-        const url = cloudUrlInput.value.trim();
-        if (!url) return;
-
-        const originalContent = addToCloudBtn.innerHTML;
-        addToCloudBtn.disabled = true;
-        addToCloudBtn.innerHTML = '<div class="spinner"></div>';
-
-        try {
-            const data = {
-                name: url.split('/').pop() || 'Video de la nube',
-                url: url,
-                type: 'embed'
-            };
-
-            const currentList = activeCloudPlaylistIndex === -1 ? { name: 'Nueva Lista', items: [] } : cloudPlaylists[activeCloudPlaylistIndex];
-            currentList.items.push(data);
-
-            if (activeCloudPlaylistIndex === -1) {
-                cloudPlaylists.push(currentList);
-                activeCloudPlaylistIndex = cloudPlaylists.length - 1;
-            }
-
-            cloudUrlInput.value = '';
-            renderCloudItems(currentList.items);
-
-            if (currentFolderName.textContent.includes(currentList.name)) {
-                currentVideos = currentList.items;
-                renderVideos(currentVideos);
-            }
-
-            showNotification(`Video añadido: ${data.name}`, 'success', true);
-        } catch (e) {
-            showNotification('Error al analizar URL', 'error');
-        } finally {
-            addToCloudBtn.disabled = false;
-            addToCloudBtn.innerHTML = originalContent;
-        }
-    }
-
-    async function saveCloudPlaylistsToServer() {
-        const listName = cloudPlaylistNameInput.value.trim() || 'Lista sin nombre';
-
-        if (activeCloudPlaylistIndex === -1) {
-            cloudPlaylists.push({ name: listName, items: [] });
-        } else {
-            cloudPlaylists[activeCloudPlaylistIndex].name = listName;
-        }
-
-        try {
-            await py.set_playlists(JSON.stringify(cloudPlaylists));
-            showNotification('Listas actualizadas y guardadas correctamente', 'success', true);
-            renderCloudPlaylists();
-            cloudModal.classList.remove('active');
-        } catch (e) {
-            showNotification('Error al guardar listas', 'error');
-        }
-    }
-
-    function deleteCloudPlaylist(index) {
-        cloudPlaylistToDelete = index;
-        videoToDelete = null;
-        folderPathToDelete = null;
-        const modalTitle = deleteModal.querySelector('h3');
-        const modalText = deleteModal.querySelector('p');
-        modalTitle.textContent = '¿Eliminar Lista Cloud?';
-        modalText.innerHTML = `Estás a punto de eliminar la lista <strong>"${cloudPlaylists[index].name}"</strong>.<br>Esta acción no se puede deshacer.`;
-        deleteModal.classList.add('active');
     }
 
     function renderFolders(nodes, container = folderList) {
@@ -865,21 +799,92 @@
                 e.preventDefault();
                 item.classList.remove('drag-over');
 
+                const raw = e.dataTransfer.getData('text/plain');
+                if (!raw) return;
+
+                // Los arrastres ajenos a la app (una imagen, texto suelto, un archivo
+                // del sistema) no traen nuestro JSON: se ignoran en silencio.
+                let data;
                 try {
-                    const data = JSON.parse(e.dataTransfer.getData('text/plain'));
-                    const toFolder = node.path;
+                    data = JSON.parse(raw);
+                } catch (_err) {
+                    return;
+                }
+                if (!data || typeof data.filename !== 'string' || typeof data.fromFolder !== 'string') {
+                    return;
+                }
 
-                    if (data.fromFolder === toFolder) {
-                        showNotification('El video ya está en esta carpeta', 'info');
-                        return;
+                const toFolder = node.path;
+                if (data.fromFolder === toFolder) {
+                    showNotification('El video ya está en esta carpeta', 'info');
+                    return;
+                }
+
+                try {
+                    if (data.source === 'gallery') {
+                        await moveVideoFromGallery(data.filename, data.fromFolder, toFolder);
+                    } else {
+                        await moveVideo(data.filename, data.fromFolder, toFolder);
                     }
-
-                    await moveVideo(data.filename, data.fromFolder, toFolder);
                 } catch (err) {
                     console.error('Error al procesar el drop:', err);
+                    showNotification('Error al mover el archivo', 'error');
                 }
             });
         });
+    }
+
+    // Movimiento originado en el panel de galería: no toca la lista de
+    // reproducción actual, solo mueve el archivo y refresca árbol y galería.
+    // Al cambiar la ruta de un archivo hay que mover también su etiqueta,
+    // porque la ruta ES la clave. Sin esto la etiqueta quedaría huérfana.
+    async function reassignTagKey(oldPath, newPath) {
+        const from = String(oldPath).replace(/^\.\//, '');
+        const to = String(newPath).replace(/^\.\//, '');
+        if (from === to || !videoTags[from]) return;
+
+        const entry = videoTags[from];
+        delete videoTags[from];
+
+        if (videoTags[to]) {
+            // Ya existía una entrada en el destino: se fusionan las etiquetas
+            entry.tags.forEach(t => {
+                if (!videoTags[to].tags.includes(t)) videoTags[to].tags.push(t);
+            });
+        } else {
+            entry.name = to.split('/').pop();
+            videoTags[to] = entry;
+        }
+
+        await py.save_video_tags(JSON.stringify(videoTags));
+    }
+
+    function joinPath(folder, filename) {
+        return (!folder || folder === '.') ? filename : `${folder}/${filename}`;
+    }
+
+    async function moveVideoFromGallery(filename, fromFolder, toFolder) {
+        const success = await py.move_video(filename, fromFolder, toFolder);
+        if (!success) {
+            showNotification('Error al mover el archivo', 'error');
+            return;
+        }
+
+        await reassignTagKey(joinPath(fromFolder, filename), joinPath(toFolder, filename));
+
+        showNotification(`"${filename}" movido a ${toFolder === '.' ? 'Raíz' : toFolder}`, 'success', true);
+
+        try {
+            await loadTags();
+        } catch (tagErr) {
+            console.warn('[TAGS] Error al recargar etiquetas tras mover:', tagErr);
+        }
+
+        await fetchFolders();
+
+        if (typeof window.galleryRefresh === 'function') {
+            await window.galleryRefresh();
+        }
     }
 
     async function moveVideo(filename, fromFolder, toFolder) {
@@ -892,6 +897,7 @@
             const success = await py.move_video(filename, fromFolder, toFolder);
             if (success) {
                 try {
+                    await reassignTagKey(joinPath(fromFolder, filename), joinPath(toFolder, filename));
                     await loadTags();
                 } catch (tagErr) {
                     console.warn('[TAGS] Error al recargar etiquetas tras mover:', tagErr);
@@ -908,8 +914,6 @@
                         } else {
                             mainPlayer.pause();
                             mainPlayer.src = '';
-                            externalPlayer.src = '';
-                            externalPlayer.style.display = 'none';
                             currentVideoTitle.textContent = 'Ningún video seleccionado';
                         }
                     } else if (currentPlaying) {
@@ -926,6 +930,11 @@
         }
     }
 
+    function isGalleryOpen() {
+        const panel = document.getElementById('gallery-panel');
+        return !!panel && getComputedStyle(panel).display !== 'none';
+    }
+
     async function selectFolder(path, element, autoPlay = true) {
         if (!element) {
             const possible = document.querySelector(`.folder-item[data-path="${path}"]`);
@@ -933,8 +942,14 @@
         }
         if (!element) {
             console.warn(`No se encontró el elemento de carpeta: ${path}`);
-            return;
+            return Promise.reject(new Error(`Carpeta no encontrada: ${path}`));
         }
+
+        // Con la galería abierta no se reproduce nada detrás del panel:
+        // el clic en una carpeta sirve para cambiar el alcance de la galería.
+        const galleryOpen = isGalleryOpen();
+        if (galleryOpen) autoPlay = false;
+
         document.querySelectorAll('.folder-item').forEach(el => el.classList.remove('active'));
         element.classList.add('active');
         currentFolderName.textContent = path;
@@ -948,10 +963,18 @@
 
             if (autoPlay && currentVideos.length > 0) playVideo(0);
 
-            showNotification(`Carpeta "${path}" cargada`, 'success');
-            showPlaylistTemporarily();
+            if (galleryOpen && typeof window.galleryRefresh === 'function') {
+                // Re-escanea la galería con la nueva carpeta como alcance
+                window.galleryRefresh();
+            } else {
+                showNotification(`Carpeta "${path}" cargada`, 'success');
+                showPlaylistTemporarily();
+            }
+            return Promise.resolve();
         } catch (err) {
-            showNotification('Error al cargar los videos', 'error');
+            console.error('Error al cargar videos:', err);
+            showNotification('Error al cargar los videos: ' + err.message, 'error');
+            return Promise.reject(err);
         }
     }
 
@@ -988,10 +1011,10 @@
         }
 
         videoList.innerHTML = videos.map((video, index) => {
-            const cachedThumb = thumbnailCache.get(video.url);
-            const thumbContent = cachedThumb ? `<img src="${cachedThumb}" class="real-thumb">` : '🎬';
-            const videoId = video.url || video.name;
-            const hasTags = videoTags[videoId] && videoTags[videoId].tags.length > 0;
+            const cachedThumb = window.vpThumbnails && window.vpThumbnails.cached(video);
+            const thumbContent = cachedThumb ? `<img src="${cachedThumb}" class="real-thumb" draggable="false">` : '🎬';
+            const videoId = getTagKey(video);
+            const hasTags = !!(videoTags[videoId] && videoTags[videoId].tags && videoTags[videoId].tags.length);
             const tagChips = hasTags
                 ? `<div class="video-tag-chips">${videoTags[videoId].tags.map(t => `<span class="video-tag-chip">${t}</span>`).join('')}</div>`
                 : '';
@@ -1022,7 +1045,6 @@
                         <span class="video-name" title="Doble clic para renombrar">${video.name}</span>
                         ${sizeInfo}
                         ${tagChips}
-                        ${video.type ? `<span class="badge cloud-badge" style="background: var(--accent); color: white; font-size: 0.65rem; padding: 2px 6px; border-radius: 4px; margin-top: 4px; display: inline-block; width: fit-content;">☁️ ${video.type.toUpperCase()}</span>` : ''}
                     </div>
                     <button class="tag-btn ${hasTags ? 'active' : ''}" data-index="${index}" title="Etiquetas">🏷️</button>
                     <button class="delete-btn" data-index="${index}">🗑️</button>
@@ -1043,8 +1065,7 @@
                 const isTagView = folderName.startsWith('🏷️');
                 let realFolder = folderName;
                 if (isTagView) {
-                    const videoId = video.url || video.name;
-                    realFolder = (videoTags[videoId] && videoTags[videoId].lastKnownFolder) || '';
+                    realFolder = folderOfKey(getTagKey(video));
                 }
 
                 e.dataTransfer.setData('text/plain', JSON.stringify({
@@ -1117,15 +1138,6 @@
                 const success = await renameVideoAsync(originalName, newName);
                 if (success) {
                     const folder = currentFolderName.textContent;
-                    const oldUrl = buildLocalMediaUrl(folder, originalName);
-                    const newUrl = buildLocalMediaUrl(folder, newName);
-
-                    if (thumbnailCache.has(oldUrl)) {
-                        const thumbData = thumbnailCache.get(oldUrl);
-                        thumbnailCache.set(newUrl, thumbData);
-                        thumbnailCache.delete(oldUrl);
-                    }
-
                     const activeItem = document.querySelector('.folder-item.active');
                     if (activeItem) {
                         selectFolder(folder, activeItem);
@@ -1147,24 +1159,12 @@
 
     async function renameVideoAsync(oldName, newName) {
         const folder = currentFolderName.textContent;
-        const oldUrl = buildLocalMediaUrl(folder, oldName);
-        const newUrl = buildLocalMediaUrl(folder, newName);
 
         try {
             const success = await py.rename_video(`${folder}/${oldName}`, newName);
             if (success) {
-                if (thumbnailCache.has(oldUrl)) {
-                    const thumbData = thumbnailCache.get(oldUrl);
-                    thumbnailCache.set(newUrl, thumbData);
-                    thumbnailCache.delete(oldUrl);
-                    await DbManager.migrate('thumbnails', oldUrl, newUrl);
-                }
-
-                if (playbackHistory.has(oldUrl)) {
-                    const time = playbackHistory.get(oldUrl);
-                    playbackHistory.set(newUrl, time);
-                    playbackHistory.delete(oldUrl);
-                }
+                // La ruta cambió: la etiqueta debe seguir al archivo
+                await reassignTagKey(joinPath(folder, oldName), joinPath(folder, newName));
 
                 showNotification(`Renombrado a "${newName}"`, 'success', true);
                 return true;
@@ -1178,53 +1178,24 @@
         }
     }
 
-    async function captureThumbnail(url, index) {
-        if (thumbnailCache.has(url)) return Promise.resolve();
+    // Miniatura de un elemento de la lista de reproducción. Usa el mismo motor
+    // que la galería (window.vpThumbnails): busca un fotograma representativo en
+    // vez del segundo 15 fijo, descarta pantallas negras y comparte la caché,
+    // que va indexada por ruta+tamaño y por tanto sobrevive a los reinicios.
+    async function captureThumbnail(video, index) {
+        if (!window.vpThumbnails) return;
 
-        const persistentThumb = await DbManager.get('thumbnails', url);
-        if (persistentThumb) {
-            thumbnailCache.set(url, persistentThumb.dataUrl);
-            updateThumbUI(index, persistentThumb.dataUrl);
-            return Promise.resolve();
+        const cached = window.vpThumbnails.cached(video);
+        if (cached) {
+            updateThumbUI(index, cached);
+            return;
         }
 
         const thumbDiv = document.getElementById(`thumb-${index}`);
-        if (!thumbDiv) return Promise.resolve();
+        if (!thumbDiv) return;
 
-        return new Promise((resolve) => {
-            try {
-                const video = document.createElement('video');
-                video.src = url + "#t=15";
-                video.crossOrigin = "anonymous";
-                video.muted = true;
-
-                video.addEventListener('loadeddata', () => {
-                    setTimeout(() => {
-                        const canvas = document.createElement('canvas');
-                        canvas.width = 160;
-                        canvas.height = 90;
-                        const ctx = canvas.getContext('2d');
-                        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                        const dataUrl = canvas.toDataURL('image/jpeg', 0.5);
-
-                        thumbnailCache.set(url, dataUrl);
-                        DbManager.put('thumbnails', { url, dataUrl });
-                        updateThumbUI(index, dataUrl);
-                        video.remove();
-                        resolve();
-                    }, 500);
-                });
-
-                video.onerror = () => {
-                    video.remove();
-                    resolve();
-                };
-                video.load();
-            } catch (e) {
-                console.warn(e);
-                resolve();
-            }
-        });
+        const dataUrl = await window.vpThumbnails.generate(video);
+        if (dataUrl) updateThumbUI(index, dataUrl);
     }
 
     let activeQueueTimeout = null;
@@ -1238,31 +1209,33 @@
 
         activeQueueTimeout = setTimeout(() => {
             processNextInQueue(videos);
-        }, 5000);
+        }, 2000);
     }
 
     async function processNextInQueue(videos) {
         if (queueIndex >= videos.length) return;
 
-        while(queueIndex < videos.length && thumbnailCache.has(videos[queueIndex].url)) {
-            const dataUrl = thumbnailCache.get(videos[queueIndex].url);
-            updateThumbUI(queueIndex, dataUrl);
+        // Pintar de inmediato las que ya estén en caché
+        while (queueIndex < videos.length) {
+            const cached = window.vpThumbnails && window.vpThumbnails.cached(videos[queueIndex]);
+            if (!cached) break;
+            updateThumbUI(queueIndex, cached);
             queueIndex++;
         }
 
         if (queueIndex >= videos.length) return;
 
-        await captureThumbnail(videos[queueIndex].url, queueIndex);
+        await captureThumbnail(videos[queueIndex], queueIndex);
         queueIndex++;
 
         activeQueueTimeout = setTimeout(() => {
             processNextInQueue(videos);
-        }, 3000);
+        }, 1200);
     }
 
     function updateThumbUI(index, dataUrl) {
         const thumbDiv = document.getElementById(`thumb-${index}`);
-        if (thumbDiv) thumbDiv.innerHTML = `<img src="${dataUrl}" class="real-thumb">`;
+        if (thumbDiv) thumbDiv.innerHTML = `<img src="${dataUrl}" class="real-thumb" draggable="false">`;
     }
 
     function stopThumbnailQueue() {
@@ -1321,7 +1294,6 @@
         deleteModal.classList.remove('active');
         videoToDelete = null;
         folderPathToDelete = null;
-        cloudPlaylistToDelete = null;
         isDeletingAllTags = false;
     }
 
@@ -1334,15 +1306,6 @@
             await deleteFolderAsync();
         } else if (isDeletingAllTags) {
             await clearAllTagsConfirmed();
-        } else if (cloudPlaylistToDelete !== null) {
-            cloudPlaylists.splice(cloudPlaylistToDelete, 1);
-            try {
-                await py.set_playlists(JSON.stringify(cloudPlaylists));
-                renderCloudPlaylists();
-            } catch (e) {
-                showNotification('Error al eliminar lista', 'error');
-            }
-            closeDeleteModal();
         }
     });
 
@@ -1351,47 +1314,12 @@
         const folderRaw = currentFolderName.textContent;
 
         const isTagView = folderRaw.startsWith('🏷️');
-        const videoId = video.url || video.name;
-        const folder = isTagView
-            ? ((videoTags[videoId] && videoTags[videoId].lastKnownFolder) || '')
-            : folderRaw;
+        const videoId = getTagKey(video);
+        const folder = isTagView ? folderOfKey(videoId) : folderRaw;
 
         const isPlayingDeleted = (videoToDelete === currentIndex);
         const nextVideo = (isPlayingDeleted && videoToDelete + 1 < currentVideos.length) ? currentVideos[videoToDelete + 1] : null;
         const currentPlaying = (!isPlayingDeleted && currentIndex !== -1) ? currentVideos[currentIndex] : null;
-
-        if (folder.startsWith('☁️ ')) {
-            const cloudName = folder.replace('☁️ ', '').trim();
-            const playlistIndex = cloudPlaylists.findIndex(p => p.name === cloudName);
-
-            if (playlistIndex !== -1) {
-                cloudPlaylists[playlistIndex].items.splice(videoToDelete, 1);
-                try {
-                    await py.set_playlists(JSON.stringify(cloudPlaylists));
-                    openCloudPlaylist(playlistIndex, false);
-
-                    if (isPlayingDeleted) {
-                        if (nextVideo) {
-                            const newIndex = currentVideos.findIndex(v => v.url === nextVideo.url);
-                            if (newIndex !== -1) playVideo(newIndex);
-                        } else {
-                            mainPlayer.pause();
-                            mainPlayer.src = '';
-                            externalPlayer.src = '';
-                            externalPlayer.style.display = 'none';
-                            currentVideoTitle.textContent = 'Ningún video seleccionado';
-                        }
-                    } else if (currentPlaying) {
-                        currentIndex = currentVideos.findIndex(v => v.url === currentPlaying.url);
-                        updateActiveState(currentIndex);
-                    }
-                } catch (err) {
-                    showNotification('Error al actualizar lista', 'error');
-                }
-            }
-            closeDeleteModal();
-            return;
-        }
 
         try {
             const relPath = folder === '.' || !folder ? video.name : `${folder}/${video.name}`;
@@ -1413,12 +1341,10 @@
                         } else {
                             mainPlayer.pause();
                             mainPlayer.src = '';
-                            externalPlayer.src = '';
-                            externalPlayer.style.display = 'none';
                             currentVideoTitle.textContent = 'Ningún video seleccionado';
                         }
                     } else if (currentPlaying) {
-                        currentIndex = currentVideos.findIndex(v => (v.url || v.name) === (currentPlaying.url || currentPlaying.name));
+                        currentIndex = currentVideos.findIndex(v => getTagKey(v) === getTagKey(currentPlaying));
                         updateActiveState(currentIndex);
                     }
                 } else {
@@ -1433,8 +1359,6 @@
                             } else {
                                 mainPlayer.pause();
                                 mainPlayer.src = '';
-                                externalPlayer.src = '';
-                                externalPlayer.style.display = 'none';
                                 currentVideoTitle.textContent = 'Ningún video seleccionado';
                             }
                         } else if (currentPlaying) {
@@ -1479,8 +1403,9 @@
 
     async function clearAllTagsConfirmed() {
         try {
-            const scopePath = (settings.mediaPath || '').trim();
-            await py.clear_video_tags_for_path(scopePath);
+            // Limpiar todas las etiquetas
+            videoTags = {};
+            await py.save_video_tags(JSON.stringify(videoTags));
             await loadTags();
 
             renderTagsList();
@@ -1504,8 +1429,8 @@
 
         const video  = currentVideos[currentIndex];
         const folder = currentFolderName.textContent;
-        const videoId = video.url || video.name;
-        const hasTags = videoTags[videoId] && videoTags[videoId].tags.length > 0;
+        const videoId = getTagKey(video);
+        const hasTags = !!(videoTags[videoId] && videoTags[videoId].tags && videoTags[videoId].tags.length);
 
         overlay.style.display = 'flex';
 
@@ -1527,6 +1452,16 @@
     function playVideo(index) {
         if (index < 0 || index >= currentVideos.length) return;
 
+        // Cualquier reproducción saca del modo galería: da igual si el video se
+        // eligió en el panel, en la lista lateral o desde una etiqueta.
+        if (isGalleryOpen() && typeof window.galleryClose === 'function') {
+            window.galleryClose();
+        }
+
+        // Identifica esta petición: si llega otra antes de que ésta termine de
+        // arrancar, la anterior debe abandonar en vez de pelear por el <video>.
+        const requestId = ++playRequestId;
+
         const playerLoader = document.getElementById('player-loader');
         if (playerLoader) playerLoader.style.display = 'flex';
 
@@ -1539,6 +1474,12 @@
         updateActiveState(index);
 
         setTimeout(async () => {
+            // Otra reproducción (o la apertura de la galería) tomó el control
+            if (requestId !== playRequestId) {
+                if (playerLoader) playerLoader.style.display = 'none';
+                return;
+            }
+
             if (previousVideo && !mainPlayer.paused && !previousVideo.type) {
                 const time = mainPlayer.currentTime;
                 playbackHistory.set(previousVideo.url, time);
@@ -1549,6 +1490,8 @@
 
             const startPlayback = () => {
                 mainPlayer.play().then(() => {
+                    if (requestId !== playRequestId) return; // superada por otra petición
+
                     isFirstPlayStarted = true;
                     startThumbnailQueue(currentVideos);
 
@@ -1560,26 +1503,28 @@
                     }
                     mainPlayer.classList.remove('player-fading');
                 }).catch(e => {
-                    if (e.name !== 'NotAllowedError') {
-                        console.error('Error playing video:', e);
-                        showNotification('Error al reproducir el video', 'error');
+                    // AbortError: la reproducción fue interrumpida a propósito
+                    // (otro video, o pause() al abrir la galería). No es un fallo.
+                    // NotAllowedError: autoplay bloqueado por el navegador.
+                    const interrupted = e.name === 'AbortError' || e.name === 'NotAllowedError';
+                    const superseded = requestId !== playRequestId;
+
+                    if (!interrupted && !superseded) {
+                        console.error(`Error al reproducir "${video.name}" (${e.name}): ${e.message}`);
+                        showNotification(
+                            e.name === 'NotSupportedError'
+                                ? `Formato no soportado por el navegador: ${video.name}`
+                                : `Error al reproducir el video: ${e.message}`,
+                            'error'
+                        );
                         mainPlayer.pause();
                     }
                     mainPlayer.classList.remove('player-fading');
                 });
             };
 
-            if (video.type === 'youtube' || video.type === 'embed') {
-                mainPlayer.style.display = 'none';
-                mainPlayer.pause();
-                externalPlayer.src = video.url;
-                externalPlayer.style.display = 'block';
-                externalPlayer.classList.remove('player-fading');
-                currentVideoTitle.textContent = formatVideoTitleWithSize(video);
-                updatePlayerTagChips(video);
-            } else {
-                externalPlayer.style.display = 'none';
-                externalPlayer.src = '';
+            {
+                // (bloque conservado tras eliminar la rama de videos incrustados)
                 mainPlayer.style.display = 'block';
                 mainPlayer.muted = settings.startMuted;
                 currentVideoTitle.textContent = formatVideoTitleWithSize(video);
@@ -1728,30 +1673,6 @@
         });
     }
 
-    newCloudPlaylistBtn.addEventListener('click', () => showCloudModal(-1));
-    closeCloudModalBtn.addEventListener('click', () => cloudModal.classList.remove('active'));
-    cancelCloudModalBtn.addEventListener('click', () => cloudModal.classList.remove('active'));
-    addToCloudBtn.addEventListener('click', resolveAndAddUrl);
-    saveCloudModalBtn.addEventListener('click', saveCloudPlaylistsToServer);
-
-    cloudModal.addEventListener('click', (e) => {
-        if (e.target === cloudModal) cloudModal.classList.remove('active');
-    });
-
-    const pasteCloudUrlBtn = document.getElementById('paste-cloud-url');
-    if (pasteCloudUrlBtn) {
-        pasteCloudUrlBtn.addEventListener('click', async () => {
-            try {
-                const text = await navigator.clipboard.readText();
-                if (text) {
-                    cloudUrlInput.value = text;
-                }
-            } catch (err) {
-                showNotification('No se pudo leer el portapapeles. Intenta Ctrl+V.', 'error');
-            }
-        });
-    }
-
     prevBtn.addEventListener('click', () => {
         if (currentIndex > 0) {
             playVideo(currentIndex - 1);
@@ -1853,13 +1774,12 @@
 
     function openTagsModal(video, folder) {
         currentTaggingVideo = video;
-        currentTaggingFolder = folder;
-        const videoId = video.url || video.name;
+        const videoId = getTagKey(video);
 
         tagsVideoTitle.textContent = video.name;
 
         if (!videoTags[videoId]) {
-            videoTags[videoId] = { tags: [], data: video, lastKnownFolder: folder };
+            videoTags[videoId] = { tags: [], name: video.name };
         }
 
         renderTagsModal();
@@ -1869,7 +1789,6 @@
     function closeTagsModal() {
         tagsModal.classList.remove('active');
         currentTaggingVideo = null;
-        currentTaggingFolder = null;
         renderVideos(currentVideos);
     }
 
@@ -1878,7 +1797,7 @@
 
     function renderTagsModal() {
         if (!currentTaggingVideo) return;
-        const videoId = currentTaggingVideo.url || currentTaggingVideo.name;
+        const videoId = getTagKey(currentTaggingVideo);
         const currentTags = (videoTags[videoId] && videoTags[videoId].tags) ? videoTags[videoId].tags : [];
 
         currentVideoTagsDiv.innerHTML = currentTags.map(tag => `
@@ -1929,7 +1848,7 @@
         const newTag = newTagInput.value.trim().toLowerCase();
         if (!newTag || !currentTaggingVideo) return;
 
-        const videoId = currentTaggingVideo.url || currentTaggingVideo.name;
+        const videoId = getTagKey(currentTaggingVideo);
         if (!videoTags[videoId].tags.includes(newTag)) {
             videoTags[videoId].tags.push(newTag);
             saveTags();
@@ -1943,7 +1862,7 @@
         if (!container) return;
         const vid = video || (currentIndex !== -1 ? currentVideos[currentIndex] : null);
         if (!vid) { container.innerHTML = ''; return; }
-        const videoId = vid.url || vid.name;
+        const videoId = getTagKey(vid);
         const tags = (videoTags[videoId] && videoTags[videoId].tags) || [];
         container.innerHTML = '';
         tags.forEach(t => {
@@ -1966,13 +1885,36 @@
         });
     }
 
-    function saveTags() {
-        const scopePath = (settings.mediaPath || '').trim();
-        py.save_video_tags_for_path(scopePath, JSON.stringify(videoTags));
+    async function saveTags() {
+        // Descartar entradas que se quedaron sin etiquetas (al quitar la última
+        // de un video, o al borrar una etiqueta de forma global). Sin esto el
+        // almacenamiento acumularía entradas vacías indefinidamente.
+        Object.keys(videoTags).forEach(key => {
+            const entry = videoTags[key];
+            if (!entry || !Array.isArray(entry.tags) || entry.tags.length === 0) {
+                delete videoTags[key];
+            }
+        });
+
+        // La escritura va al archivo de la carpeta raíz; se espera para que un
+        // fallo (carpeta sin permiso de escritura) se notifique de verdad.
+        await py.save_video_tags(JSON.stringify(videoTags));
+
         renderTagsList();
         updateVideoQuickActions();
         updatePlayerTagChips();
     }
+
+    // API de etiquetas compartida con gallery.js: el reproductor es la única
+    // fuente de verdad y quien persiste en el archivo de la carpeta.
+    window.vpTags = {
+        all: () => JSON.parse(JSON.stringify(videoTags)),
+        replace: async (tags) => {
+            videoTags = (tags && typeof tags === 'object') ? tags : {};
+            await saveTags();
+            if (currentVideos.length > 0) renderVideos(currentVideos);
+        }
+    };
 
     function renderTagsList() {
         if (!tagsList) return;
@@ -2020,7 +1962,6 @@
             isDeletingAllTags = true;
             videoToDelete = null;
             folderPathToDelete = null;
-            cloudPlaylistToDelete = null;
 
             const modalTitle = deleteModal.querySelector('h3');
             const modalText = deleteModal.querySelector('p');
@@ -2033,38 +1974,46 @@
     }
 
     async function playVideosByTag(tag) {
-        const taggedVideosData = [];
+        // Las claves de videoTags ya son rutas relativas, así que basta con
+        // filtrarlas y resolverlas todas de una vez (una sola llamada evita que
+        // se revoquen las URLs de una carpeta al cargar la siguiente).
+        const paths = Object.entries(videoTags)
+            .filter(([, val]) => Array.isArray(val.tags) && val.tags.includes(tag))
+            .map(([path]) => path);
 
-        for (const [key, val] of Object.entries(videoTags)) {
-            if (val.tags && val.tags.includes(tag)) {
-                const folder = val.lastKnownFolder || "";
-                const isCloud = folder.includes('☁️') || (val.data && val.data.type);
-
-                if (!isCloud) {
-                    try {
-                        const folders = JSON.parse(await py.get_video_folders());
-                        const list = JSON.parse(await py.get_videos(folder));
-                        const currentVid = list.find(v => v.name === val.data.name);
-
-                        if (currentVid) {
-                            taggedVideosData.push(currentVid);
-                        }
-                    } catch(e) { console.warn(e); }
-                } else {
-                    taggedVideosData.push({...val.data});
-                }
-            }
+        if (paths.length === 0) {
+            showNotification('No hay videos con esta etiqueta', 'info');
+            return;
         }
 
-        if (taggedVideosData.length > 0) {
-            currentVideos = taggedVideosData;
-            currentFolderName.textContent = `🏷️ Etiqueta: ${tag}`;
-            renderVideos(currentVideos);
-            playVideo(0);
-            showNotification(`Reproduciendo etiqueta: ${tag}`, 'success');
-        } else {
-            showNotification('No se encontraron videos con esta etiqueta', 'error');
+        let list = [];
+        try {
+            list = JSON.parse(await py.get_videos_by_paths(JSON.stringify(paths)));
+        } catch (e) {
+            console.error('Error al resolver videos de la etiqueta:', e);
+            showNotification('Error al cargar los videos de la etiqueta', 'error');
+            return;
         }
+
+        if (list.length === 0) {
+            showNotification(`Los archivos con la etiqueta "${tag}" ya no existen`, 'error');
+            return;
+        }
+
+        currentVideos = list;
+        currentIndex = -1;
+        currentFolderName.textContent = `🏷️ Etiqueta: ${tag}`;
+        document.querySelectorAll('.folder-item').forEach(el => el.classList.remove('active'));
+        renderVideos(currentVideos);
+        playVideo(0);
+
+        const faltan = paths.length - list.length;
+        showNotification(
+            faltan > 0
+                ? `Etiqueta "${tag}": ${list.length} videos (${faltan} no encontrados)`
+                : `Reproduciendo etiqueta: ${tag} (${list.length} videos)`,
+            faltan > 0 ? 'info' : 'success'
+        );
     }
 
     function enableFolderRename(span, oldPath) {
@@ -2131,7 +2080,6 @@
                 mainPlayer.pause();
             }
         });
-        externalPlayer.addEventListener('load', hideLoader);
     }
 
     // Configuración del botón de Exploración/Selección de carpeta (File System API)
@@ -2150,7 +2098,17 @@
 
                 settings.mediaPath = handle.name;
                 document.getElementById('vp-permission-banner').style.display = 'none';
-                showNotification('Carpeta de videos seleccionada', 'success', true);
+
+                // Cada carpeta raíz lleva su propio archivo de etiquetas: se
+                // cargan las de esta carpeta (o queda vacío si es nueva).
+                await loadTags();
+                const numEtiquetas = Object.keys(videoTags).length;
+                showNotification(
+                    numEtiquetas > 0
+                        ? `Carpeta seleccionada · ${numEtiquetas} videos con etiquetas recuperados`
+                        : 'Carpeta de videos seleccionada',
+                    'success', true
+                );
             }
         } catch (err) {
             console.error(err);
@@ -2167,6 +2125,8 @@
             if (status === 'granted') {
                 document.getElementById('vp-permission-banner').style.display = 'none';
                 await loadSettings();
+                // Hasta ahora no se podía leer el archivo de etiquetas de la carpeta
+                await loadTags();
                 showNotification('Acceso concedido exitosamente', 'success', true);
             } else {
                 showNotification('Permiso denegado', 'error');
@@ -2238,7 +2198,6 @@
             } catch (_e) {}
 
             await loadTags();
-            await fetchCloudPlaylists();
             renderTagsList();
 
             // Modal Acerca de
@@ -2278,5 +2237,80 @@
         document.addEventListener('DOMContentLoaded', bootstrapVideoPlayer);
     } else {
         bootstrapVideoPlayer();
+    }
+
+    // ========== Integración con el Panel de Galería embebido ==========
+
+    // Compartir showNotification con gallery.js
+    window.showNotification = showNotification;
+
+    // Compartir el gestor de IndexedDB (caché de miniaturas) con gallery.js
+    window.vpDbManager = DbManager;
+
+    // Permite a gallery.js pedir al reproductor que seleccione y reproduzca un video
+    window.vpSelectAndPlayVideo = function(folderPath, videoName) {
+        // Se cierra la galería antes de cambiar de carpeta: si siguiera abierta,
+        // selectFolder dispararía un re-escaneo del panel que vamos a ocultar.
+        if (typeof window.galleryClose === 'function') window.galleryClose();
+
+        const folderItem = document.querySelector(`.folder-item[data-path="${folderPath}"]`);
+        if (!folderItem) {
+            showNotification(`Carpeta no encontrada: ${folderPath}`, 'error');
+            return;
+        }
+        selectFolder(folderPath, folderItem, false)
+            .then(() => {
+                const videoIndex = currentVideos.findIndex(v => v.name === videoName);
+                if (videoIndex !== -1) {
+                    playVideo(videoIndex);
+                    showNotification(`▶️ Reproduciendo: ${videoName}`, 'success', true);
+                } else {
+                    showNotification(`No se encontró el video: ${videoName}`, 'error');
+                }
+            })
+            .catch((e) => {
+                console.error('Error al seleccionar carpeta desde galería:', e);
+                showNotification(`Error: ${e.message}`, 'error');
+            });
+    };
+
+    // Abrir el panel de galería embebido dentro del área del reproductor
+    window.openGallery = function() {
+        // Invalida cualquier reproducción en curso o pendiente: sin esto, un
+        // playVideo lanzado hace <500 ms cargaría un video detrás del panel, y
+        // el pause() de abajo abortaría su play() generando un DOMException.
+        playRequestId++;
+
+        // Pausar reproducción actual
+        try {
+            mainPlayer.pause();
+        } catch (_e) { /* no-op */ }
+
+        const panel = document.getElementById('gallery-panel');
+        if (panel) panel.style.display = 'block';
+
+        // Oculta flechas de navegación, título flotante y acciones rápidas
+        document.body.classList.add('gallery-active');
+
+        if (typeof window.initGalleryPanel === 'function') {
+            window.initGalleryPanel();
+        } else {
+            console.error('gallery.js no está cargado: initGalleryPanel no disponible');
+            showNotification('No se pudo abrir la galería', 'error');
+        }
+    };
+
+    // gallery.js lo invoca al cerrar el panel: devuelve el cromo del reproductor
+    window.vpOnGalleryClosed = function() {
+        document.body.classList.remove('gallery-active');
+    };
+
+    // Event listener para botón de galería (sin onclick inline para CSP compliance)
+    const galleryBtn = document.getElementById('open-gallery-btn');
+    if (galleryBtn) {
+        galleryBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            window.openGallery();
+        });
     }
 })();

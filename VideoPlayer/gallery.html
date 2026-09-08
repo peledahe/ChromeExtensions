@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Galería de Videos - Detector de Duplicados</title>
+    <link rel="stylesheet" href="theme.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            padding: 20px;
+            min-height: 100vh;
+        }
+
+        .gallery-container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .gallery-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--glass-border);
+        }
+
+        .gallery-title h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+
+        .gallery-title p {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+        }
+
+        .gallery-controls {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .filter-btn {
+            padding: 10px 16px;
+            border: 1px solid var(--glass-border);
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .filter-btn:hover {
+            background: var(--accent);
+            color: white;
+            border-color: var(--accent);
+        }
+
+        .filter-btn.active {
+            background: var(--accent);
+            color: white;
+            border-color: var(--accent);
+        }
+
+        .stats-box {
+            background: var(--bg-secondary);
+            padding: 15px 20px;
+            border-radius: 8px;
+            display: flex;
+            gap: 20px;
+            font-size: 0.9rem;
+            border: 1px solid var(--glass-border);
+        }
+
+        .stat-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .stat-number {
+            font-weight: 700;
+            color: var(--accent);
+            font-size: 1.2rem;
+        }
+
+        .gallery-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 30px;
+        }
+
+        .video-card-gallery {
+            background: var(--bg-secondary);
+            border: 1px solid var(--glass-border);
+            border-radius: 10px;
+            overflow: hidden;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .video-card-gallery:hover {
+            border-color: var(--accent);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+            transform: translateY(-4px);
+        }
+
+        .video-card-gallery.duplicate {
+            border: 2px solid #ff6b6b;
+            background: rgba(255, 107, 107, 0.08);
+        }
+
+        .video-card-gallery.duplicate:hover {
+            border-color: #ff6b6b;
+            box-shadow: 0 8px 24px rgba(255, 107, 107, 0.2);
+        }
+
+        .video-thumb-container {
+            width: 100%;
+            height: 120px;
+            background: #1a1a1a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .video-thumb-container img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .video-thumb-container .placeholder {
+            font-size: 2rem;
+        }
+
+        .duplicate-badge {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: #ff6b6b;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 700;
+        }
+
+        .video-info-gallery {
+            padding: 12px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .video-name-gallery {
+            font-weight: 600;
+            font-size: 0.85rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-bottom: 6px;
+        }
+
+        .video-meta {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            line-height: 1.4;
+            flex: 1;
+        }
+
+        .video-meta-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 2px;
+        }
+
+        .video-meta-label {
+            opacity: 0.7;
+        }
+
+        .video-meta-value {
+            font-weight: 600;
+        }
+
+        .video-actions {
+            display: flex;
+            gap: 6px;
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid var(--glass-border);
+        }
+
+        .action-btn {
+            flex: 1;
+            padding: 6px 8px;
+            background: transparent;
+            border: 1px solid var(--glass-border);
+            color: var(--text-primary);
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.7rem;
+            transition: all 0.2s ease;
+        }
+
+        .action-btn:hover {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: white;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-secondary);
+        }
+
+        .empty-state-icon {
+            font-size: 3rem;
+            margin-bottom: 15px;
+            opacity: 0.5;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--text-secondary);
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 30px;
+            height: 30px;
+            border: 3px solid var(--glass-border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-bottom: 15px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .close-gallery {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--glass-border);
+            border-radius: 6px;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 1.5rem;
+            transition: all 0.2s ease;
+            z-index: 1000;
+        }
+
+        .close-gallery:hover {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: white;
+        }
+
+        .duplicate-group {
+            margin-bottom: 40px;
+            padding: 20px;
+            background: var(--bg-secondary);
+            border: 2px solid #ff6b6b;
+            border-radius: 10px;
+        }
+
+        .duplicate-group-title {
+            font-size: 1rem;
+            font-weight: 700;
+            color: #ff6b6b;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .duplicate-group-subtitle {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            margin-bottom: 15px;
+        }
+
+        .inline-loading {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid var(--glass-border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @media (max-width: 768px) {
+            .gallery-grid {
+                grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+                gap: 12px;
+            }
+
+            .gallery-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 20px;
+            }
+
+            .gallery-controls {
+                width: 100%;
+                justify-content: flex-start;
+            }
+
+            .stats-box {
+                flex-wrap: wrap;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="gallery-container">
+        <div class="gallery-header">
+            <div class="gallery-title">
+                <h1>📸 Galería de Videos</h1>
+                <p>Visualiza todos tus videos y detecta duplicados</p>
+            </div>
+            <div class="gallery-controls">
+                <button class="filter-btn" id="filter-all">📁 Todos</button>
+                <button class="filter-btn" id="filter-duplicates">⚠️ Duplicados</button>
+                <button class="filter-btn" id="filter-reload">🔄 Recargar</button>
+            </div>
+        </div>
+
+        <div class="stats-box" id="stats-box">
+            <div class="stat-item">
+                <span>📹 Total de videos:</span>
+                <span class="stat-number" id="stat-total">0</span>
+            </div>
+            <div class="stat-item">
+                <span>⚠️ Posibles duplicados:</span>
+                <span class="stat-number" id="stat-duplicates">0</span>
+            </div>
+            <div class="stat-item">
+                <span>💾 Tamaño total:</span>
+                <span class="stat-number" id="stat-size">0 MB</span>
+            </div>
+        </div>
+
+        <div id="gallery-content">
+            <div class="loading">
+                <div class="spinner"></div>
+                <p>Cargando galería de videos...</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="close-gallery" id="close-gallery" title="Cerrar galería">×</div>
+
+    <!-- Modal para Asignar Etiquetas -->
+    <div id="tag-modal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.7); z-index:2000; align-items:center; justify-content:center;">
+        <div style="background:var(--bg-primary); border:1px solid var(--glass-border); border-radius:12px; padding:30px; max-width:500px; width:90%; max-height:80vh; overflow-y:auto;">
+            <h2 style="margin-bottom:20px; display:flex; justify-content:space-between; align-items:center;">
+                🏷️ Asignar Etiquetas
+                <button id="tag-modal-close-x" style="background:none; border:none; font-size:1.5rem; cursor:pointer; color:var(--text-secondary);">×</button>
+            </h2>
+            <div id="tag-modal-filename" style="margin-bottom:15px; padding:10px; background:var(--bg-secondary); border-radius:6px; color:var(--text-secondary); font-size:0.9rem;"></div>
+            <div style="margin-bottom:20px;">
+                <label style="display:block; margin-bottom:8px; font-weight:600;">Etiquetas actuales:</label>
+                <div id="tag-modal-current" style="display:flex; flex-wrap:wrap; gap:8px; min-height:30px;"></div>
+            </div>
+            <div style="margin-bottom:20px;">
+                <label style="display:block; margin-bottom:8px; font-weight:600;">Agregar nueva etiqueta:</label>
+                <div style="display:flex; gap:8px;">
+                    <input type="text" id="tag-modal-input" placeholder="nombre de etiqueta" style="flex:1; padding:8px 12px; border:1px solid var(--glass-border); border-radius:6px; background:var(--bg-secondary); color:var(--text-primary);">
+                    <button id="tag-modal-add-btn" style="padding:8px 16px; background:var(--accent); color:white; border:none; border-radius:6px; cursor:pointer; font-weight:600;">+ Agregar</button>
+                </div>
+            </div>
+            <div style="margin-bottom:20px;">
+                <label style="display:block; margin-bottom:8px; font-weight:600;">Etiquetas disponibles:</label>
+                <div id="tag-modal-available" style="display:flex; flex-wrap:wrap; gap:8px; min-height:30px;"></div>
+            </div>
+            <div style="display:flex; gap:10px; justify-content:flex-end;">
+                <button id="tag-modal-close-btn" style="padding:10px 20px; background:transparent; border:1px solid var(--glass-border); color:var(--text-primary); border-radius:6px; cursor:pointer; font-weight:600;">Cerrar</button>
+                <button id="tag-modal-save-btn" style="padding:10px 20px; background:var(--accent); color:white; border:none; border-radius:6px; cursor:pointer; font-weight:600;">✅ Guardar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para Eliminar Video -->
+    <div id="delete-modal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.7); z-index:2000; align-items:center; justify-content:center;">
+        <div style="background:var(--bg-primary); border:2px solid #ff6b6b; border-radius:12px; padding:30px; max-width:400px; width:90%;">
+            <h2 style="margin-bottom:15px; color:#ff6b6b;">⚠️ Eliminar Video</h2>
+            <p id="delete-modal-filename" style="margin-bottom:20px; color:var(--text-secondary);"></p>
+            <p style="margin-bottom:20px; color:var(--text-secondary); font-size:0.9rem;">Esta acción no se puede deshacer.</p>
+            <div style="display:flex; gap:10px; justify-content:flex-end;">
+                <button id="delete-modal-cancel-btn" style="padding:10px 20px; background:transparent; border:1px solid var(--glass-border); color:var(--text-primary); border-radius:6px; cursor:pointer; font-weight:600;">Cancelar</button>
+                <button id="delete-modal-confirm-btn" style="padding:10px 20px; background:#ff6b6b; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:600;">🗑️ Eliminar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para Mover Video -->
+    <div id="move-modal" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.7); z-index:2000; align-items:center; justify-content:center;">
+        <div style="background:var(--bg-primary); border:1px solid var(--glass-border); border-radius:12px; padding:30px; max-width:500px; width:90%;">
+            <h2 style="margin-bottom:15px; display:flex; justify-content:space-between; align-items:center;">
+                📁 Mover Video
+                <button id="move-modal-close-x" style="background:none; border:none; font-size:1.5rem; cursor:pointer; color:var(--text-secondary);">×</button>
+            </h2>
+            <div id="move-modal-filename" style="margin-bottom:20px; padding:10px; background:var(--bg-secondary); border-radius:6px; color:var(--text-secondary); font-size:0.9rem;"></div>
+            <label style="display:block; margin-bottom:8px; font-weight:600;">Selecciona carpeta de destino:</label>
+            <div id="move-modal-folders" style="margin-bottom:20px; max-height:300px; overflow-y:auto; border:1px solid var(--glass-border); border-radius:6px; padding:10px;"></div>
+            <div style="display:flex; gap:10px; justify-content:flex-end;">
+                <button id="move-modal-cancel-btn" style="padding:10px 20px; background:transparent; border:1px solid var(--glass-border); color:var(--text-primary); border-radius:6px; cursor:pointer; font-weight:600;">Cancelar</button>
+                <button id="move-modal-confirm-btn" style="padding:10px 20px; background:var(--accent); color:white; border:none; border-radius:6px; cursor:pointer; font-weight:600;">✅ Mover</button>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        #tag-modal, #delete-modal, #move-modal {
+            flex-direction: column;
+        }
+    </style>
+
+    <script src="gallery.js"></script>
+</body>
+</html>

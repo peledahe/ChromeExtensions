@@ -23,6 +23,9 @@ async function initGDriveSync() {
         }
         updateSyncUI();
 
+        // Verificar si hay backup disponible
+        checkAndShowBackupOption();
+
         // Sincronización silenciosa automática al abrir la aplicación si está conectado
         if (syncState.connected) {
             syncNow(true);
@@ -125,31 +128,44 @@ async function syncNow(auto = false) {
                         // Limpiar la bandera para evitar loops
                         chrome.storage.local.remove(['gdrive_force_download']);
 
-                        if (!dataModified) {
-                            // Los datos locales son solo de demostración. Descargamos de la nube de forma silenciosa.
+                        // SIEMPRE pedir confirmación al conectar Google Drive por primera vez
+                        // para evitar sobrescribir datos locales valiosos
+                        const hasLocalData = localData.agenda || localData.kanban || localData.shopping || localData.notes;
+
+                        if (hasLocalData) {
+                            // El usuario tiene datos locales, SIEMPRE preguntar
+                            window.showConfirm(
+                                '⚠️ IMPORTANTE: Se encontraron datos previos en Google Drive.\n\n' +
+                                '¿Qué deseas hacer?\n\n' +
+                                '✅ "SÍ": Descargar datos de Google Drive (CUIDADO: perderás datos locales)\n' +
+                                '❌ "NO": Mantener datos locales y subirlos a Google Drive',
+                                async (confirm) => {
+                                    if (confirm) {
+                                        // Crear backup local antes de sobrescribir
+                                        chrome.storage.local.set({ 'backup_before_sync': localData });
+                                        await applyDownloadedData(remoteData);
+                                        syncState.lastSync = new Date().toLocaleString();
+                                        chrome.storage.local.set({ gdrive_last_sync: Date.now() });
+                                        notify('Datos descargados de Google Drive. Backup local guardado.', 'success');
+                                        setTimeout(() => location.reload(), 1500);
+                                    } else {
+                                        // Conservar locales y sobrescribir la nube
+                                        await uploadToGDrive(fileId, localData);
+                                        chrome.storage.local.set({ local_data_modified: true, gdrive_last_sync: Date.now() });
+                                        notify('Datos locales sincronizados a Google Drive', 'success');
+                                        finishSync();
+                                    }
+                                }
+                            );
+                        } else {
+                            // Sin datos locales, descargar de Google Drive silenciosamente
                             await applyDownloadedData(remoteData);
                             syncState.lastSync = new Date().toLocaleString();
                             chrome.storage.local.set({ gdrive_last_sync: Date.now() });
                             notify('Datos recuperados de Google Drive exitosamente', 'success');
                             setTimeout(() => location.reload(), 1000);
-                            return;
-                        } else {
-                            // El usuario tiene cambios locales propios, pedir confirmación antes de sobrescribir
-                            window.showConfirm('Se encontraron datos previos en Google Drive. ¿Deseas descargar los datos de la nube y sobrescribir tus datos locales actuales?', async (confirm) => {
-                                if (confirm) {
-                                    await applyDownloadedData(remoteData);
-                                    syncState.lastSync = new Date().toLocaleString();
-                                    chrome.storage.local.set({ gdrive_last_sync: Date.now() });
-                                    notify('Datos descargados y aplicados correctamente', 'success');
-                                    setTimeout(() => location.reload(), 1000);
-                                } else {
-                                    // Conservar locales y sobrescribir la nube
-                                    await uploadToGDrive(fileId, localData);
-                                    finishSync();
-                                }
-                            });
-                            return;
                         }
+                        return;
                     }
 
                     // CASO B: Sincronización normal posterior. Comparamos contra la marca del último sync local
@@ -283,6 +299,62 @@ async function createInGDrive(filename, payload) {
             body: form
         }
     );
+}
+
+// Recuperar datos desde el backup local
+async function restoreFromLocalBackup() {
+    return new Promise((resolve) => {
+        chrome.storage.local.get(['backup_before_sync'], (result) => {
+            if (!result.backup_before_sync) {
+                notify('No hay backup disponible para restaurar', 'info');
+                resolve(false);
+                return;
+            }
+
+            window.showConfirm('¿Deseas restaurar los datos del backup local anterior?', async (confirm) => {
+                if (confirm) {
+                    const backup = result.backup_before_sync;
+                    const cleanData = {};
+                    const keys = ['agenda', 'shopping', 'income', 'kanban', 'notes', 'passwords', 'app_config', 'deudas_list', 'deudas_presupuesto', 'budget_limits'];
+
+                    keys.forEach(k => {
+                        if (backup[k] !== undefined) {
+                            cleanData[k] = backup[k];
+                        }
+                    });
+
+                    cleanData.local_data_modified = true;
+
+                    chrome.storage.local.set(cleanData, () => {
+                        notify('✅ Datos restaurados desde backup. Recargando...', 'success');
+                        setTimeout(() => location.reload(), 1000);
+                        resolve(true);
+                    });
+                } else {
+                    resolve(false);
+                }
+            });
+        });
+    });
+}
+
+// Verificar si hay backup disponible y mostrar opción
+function checkAndShowBackupOption() {
+    chrome.storage.local.get(['backup_before_sync'], (result) => {
+        if (result.backup_before_sync) {
+            const syncStatusDiv = document.getElementById('sync-status-text');
+            if (syncStatusDiv && !document.getElementById('restore-backup-btn')) {
+                const restoreBtn = document.createElement('button');
+                restoreBtn.id = 'restore-backup-btn';
+                restoreBtn.className = 'ag-btn ag-btn-primary';
+                restoreBtn.style.marginTop = '12px';
+                restoreBtn.textContent = '🔄 Restaurar Backup';
+                restoreBtn.onclick = restoreFromLocalBackup;
+
+                syncStatusDiv.parentElement.insertBefore(restoreBtn, syncStatusDiv.nextElementSibling);
+            }
+        }
+    });
 }
 
 // Actualizar elementos de la interfaz de sincronización

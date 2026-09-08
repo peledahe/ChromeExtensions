@@ -611,6 +611,56 @@ function bindKanbanEvents() {
         };
     });
 
+    document.querySelectorAll('.kb-col-toggle-collapse').forEach((btn) => {
+        btn.onclick = () => {
+            const status = btn.dataset.status || 'pending';
+            const col = document.getElementById(`col-${status}`);
+            if (col) {
+                const isCollapsed = col.classList.contains('collapsed');
+                col.classList.toggle('collapsed', !isCollapsed);
+                btn.dataset.collapsed = String(!isCollapsed);
+                localStorage.setItem(`kb-col-collapsed-${status}`, String(!isCollapsed));
+            }
+        };
+    });
+
+    // Restaurar estado de colapso de columnas
+    ['pending', 'inprogress', 'blocked', 'done'].forEach((status) => {
+        const isCollapsed = localStorage.getItem(`kb-col-collapsed-${status}`) === 'true';
+        const col = document.getElementById(`col-${status}`);
+        const btn = document.querySelector(`.kb-col-toggle-collapse[data-status="${status}"]`);
+        if (col && isCollapsed) {
+            col.classList.add('collapsed');
+            if (btn) btn.dataset.collapsed = 'true';
+        }
+    });
+
+    // Debug Button para ordenamiento de Kanban
+    const debugBtn = document.getElementById('kb-debug-btn');
+    if (debugBtn) {
+        const isDebugEnabled = localStorage.getItem('kb_debug_sort') === 'true';
+        debugBtn.textContent = isDebugEnabled ? '🐛 Debug ON' : '🐛 Debug OFF';
+        debugBtn.style.opacity = isDebugEnabled ? '1' : '0.5';
+
+        debugBtn.onclick = () => {
+            const currentState = localStorage.getItem('kb_debug_sort') === 'true';
+            const newState = !currentState;
+            localStorage.setItem('kb_debug_sort', String(newState));
+            debugBtn.textContent = newState ? '🐛 Debug ON' : '🐛 Debug OFF';
+            debugBtn.style.opacity = newState ? '1' : '0.5';
+            notify(newState ? '✅ Debug ACTIVADO - Abre DevTools (F12) para ver logs' : '❌ Debug desactivado', 'info');
+            fetchKanban(); // Recargar para ver logs inmediatamente
+        };
+    }
+
+    // Auto-fix Button para asignar prioridades automáticamente
+    const autoFixBtn = document.getElementById('kb-auto-fix-btn');
+    if (autoFixBtn) {
+        autoFixBtn.onclick = async () => {
+            await autoFixKanbanPriorities();
+        };
+    }
+
     const kbCancelBtn = document.getElementById('kb-modal-cancel');
     const kbSaveBtn = document.getElementById('kb-modal-save');
     const kbAddLabelBtn = document.getElementById('kb-add-label-btn');
@@ -2514,13 +2564,17 @@ function parseKanbanCardText(text) {
     const result = { title: '', description: '', due: '', priority: 'medium', labels: [] };
     const descParts = [];
     let titleSet = false;
-    
+    let priorityFound = false;
+
     for (const part of parts) {
         if (part.startsWith('Vence: ')) {
             result.due = part.replace('Vence: ', '');
         } else if (part.startsWith('Prioridad: ')) {
-            const p = part.replace('Prioridad: ', '').toLowerCase();
-            if (['high', 'medium', 'low'].includes(p)) result.priority = p;
+            const p = part.replace('Prioridad: ', '').toLowerCase().trim();
+            if (['high', 'medium', 'low'].includes(p)) {
+                result.priority = p;
+                priorityFound = true;
+            }
         } else if (part.startsWith('Etiquetas: ')) {
             const labels = part.replace('Etiquetas: ', '').split(',').map(l => l.trim()).filter(l => l);
             result.labels = labels;
@@ -2529,6 +2583,19 @@ function parseKanbanCardText(text) {
             titleSet = true;
         } else {
             descParts.push(part);
+        }
+    }
+
+    // Si no se encontró prioridad en el texto, intentar detectarla de otros modos
+    if (!priorityFound) {
+        const fullText = (text || '').toLowerCase();
+        // Detectar por emojis o palabras clave
+        if (fullText.includes('🔺') || fullText.includes('alta')) {
+            result.priority = 'high';
+        } else if (fullText.includes('🔸') || fullText.includes('media')) {
+            result.priority = 'medium';
+        } else if (fullText.includes('🔹') || fullText.includes('baja')) {
+            result.priority = 'low';
         }
     }
 
@@ -3023,6 +3090,66 @@ function kbInitDropZones() {
     kbDropZonesReady = true;
 }
 
+// Función para obtener la prioridad numérica (para ordenamiento)
+function getPriorityOrder(priority) {
+    const priorityMap = { high: 0, medium: 1, low: 2 };
+    const normalized = String(priority || '').toLowerCase().trim();
+    return priorityMap[normalized] || 2;
+}
+
+// Función para parsear fecha del formato YYYY-MM-DD
+function parseDueDate(dateStr) {
+    if (!dateStr) return null;
+    const cleaned = String(dateStr || '').trim();
+    if (cleaned.length === 0) return null;
+
+    // Intentar parsear como ISO date YYYY-MM-DD
+    if (/^\d{4}-\d{2}-\d{2}$/.test(cleaned)) {
+        const date = new Date(cleaned + 'T00:00:00Z');
+        return isNaN(date.getTime()) ? null : date.getTime();
+    }
+    return null;
+}
+
+// Función SIMPLE para ordenar tarjetas por prioridad y fecha
+function sortKanbanCards(cards) {
+    if (!cards || cards.length === 0) return [];
+
+    // Hacer una copia para no mutar el array original
+    const sorted = [...cards];
+
+    sorted.sort((a, b) => {
+        // Parsear ambas tarjetas
+        const parsedA = parseKanbanCardText(a.text);
+        const parsedB = parseKanbanCardText(b.text);
+
+        // Obtener prioridad numérica
+        const priorityA = getPriorityOrder(parsedA.priority);
+        const priorityB = getPriorityOrder(parsedB.priority);
+
+        // PASO 1: Ordenar por prioridad (HIGH=0 primero, LOW=2 último)
+        if (priorityA !== priorityB) {
+            return priorityA - priorityB;
+        }
+
+        // PASO 2: Dentro de la misma prioridad, por fecha
+        const dateA = parseDueDate(parsedA.due);
+        const dateB = parseDueDate(parsedB.due);
+
+        if (dateA !== null && dateB !== null) {
+            return dateA - dateB; // Fecha más pronta primero
+        }
+
+        if (dateA !== null && dateB === null) return -1; // Con fecha antes que sin fecha
+        if (dateA === null && dateB !== null) return 1;
+
+        // PASO 3: Si todo lo demás es igual, mantener orden por ID
+        return (a.id || 0) - (b.id || 0);
+    });
+
+    return sorted;
+}
+
 async function fetchKanban() {
     // Inicializar drop zones solo una vez
     if (!kbDropZonesReady) kbInitDropZones();
@@ -3035,6 +3162,9 @@ async function fetchKanban() {
         done: 'Completada'
     };
     const priorityLabels = { high: '🔺 Alta', medium: '🔸 Media', low: '🔹 Baja' };
+
+    // DEBUG: Log para verificar ordenamiento
+    const debugSort = localStorage.getItem('kb_debug_sort') === 'true';
 
     // Cargar etiquetas para filtro
     await loadKbLabels();
@@ -3055,12 +3185,35 @@ async function fetchKanban() {
             return true;
         });
 
+        // Ordenar tarjetas por prioridad y fecha de vencimiento
+        const sorted = sortKanbanCards(filtered);
+
+        if (debugSort && sorted && sorted.length > 0) {
+            console.group(`📊 KANBAN [${status}] - ${sorted.length} tarjetas`);
+            console.log('%c=== ORDEN ACTUAL ===', 'color: #6c5ce7; font-weight: bold;');
+            sorted.forEach((card, idx) => {
+                const parsed = parseKanbanCardText(card.text);
+                const priority = parsed.priority || 'medium';
+                const priorityEmoji = { high: '🔺', medium: '🔸', low: '🔹' }[priority];
+                const dueDate = parsed.due || '(sin fecha)';
+                const dueEmoji = parsed.due ? '📅' : '⏳';
+                console.log(
+                    `%c${idx + 1}.%c ${priorityEmoji} ${priority.toUpperCase()}%c | ${parsed.title.substring(0, 40)}... | ${dueEmoji} ${dueDate}`,
+                    'color: #666; font-weight: bold;',
+                    'color: ' + ({high: '#ff7675', medium: '#fdcb6e', low: '#74b9ff'}[priority]) + '; font-weight: bold;',
+                    'color: #999;'
+                );
+            });
+            console.log('%c\n⚠️ Si todas tienen la misma prioridad (medium), edita las tarjetas para asignarles prioridad correctamente', 'color: #e17055; font-style: italic;');
+            console.groupEnd();
+        }
+
         const container = document.getElementById(`cards-${status}`);
         const countEl = document.getElementById(`count-${status}`);
         if (!container || !countEl) continue;
 
-        countEl.textContent = String(filtered.length);
-        container.innerHTML = filtered.map((card) => {
+        countEl.textContent = String(sorted.length);
+        container.innerHTML = sorted.map((card) => {
             const parsed = parseKanbanCardText(card.text);
             const shortId = String(card.id || '').slice(-6);
             const dueInfo = getKbDueInfo(parsed.due, status);
@@ -3292,6 +3445,71 @@ async function deleteKanbanCard(id) {
         await py.delete_kanban_card(id);
         await fetchKanban();
     });
+}
+
+// Función para detectar prioridad automáticamente del texto de la tarjeta
+function detectCardPriority(text) {
+    const lower = (text || '').toLowerCase();
+
+    // Detectar ALTA (palabras clave comunes para tareas urgentes)
+    const highPatterns = ['urgente', 'crítico', 'importante', 'pronto', 'asap', 'muy importante', 'alta prioridad', '🔺', 'crucial', 'emergencia', 'inmediato'];
+    if (highPatterns.some(p => lower.includes(p))) {
+        return 'high';
+    }
+
+    // Detectar BAJA (palabras clave para tareas no urgentes)
+    const lowPatterns = ['baja', 'después', 'cuando pueda', 'opcional', 'puede esperar', 'no urgente', '🔹', 'luego', 'futuro', 'algún día'];
+    if (lowPatterns.some(p => lower.includes(p))) {
+        return 'low';
+    }
+
+    // Default: media
+    return 'medium';
+}
+
+// Función para auto-arreglar prioridades de tarjetas antiguas
+async function autoFixKanbanPriorities() {
+    window.showConfirm(
+        '🔧 Esto asignará automáticamente prioridades a las tarjetas antiguas basándose en su contenido.\n\n' +
+        '¿Estás seguro de que deseas continuar?',
+        async (confirm) => {
+            if (!confirm) return;
+
+            try {
+                notify('⏳ Analizando tarjetas...', 'info');
+                let updatedCount = 0;
+
+                // Procesar todas las columnas
+                for (let col = 1; col <= 4; col++) {
+                    const cards = await py.get_kanban_cards(col);
+                    if (!cards) continue;
+
+                    for (const card of cards) {
+                        const text = card.text || '';
+
+                        // Si ya tiene prioridad, saltar
+                        if (text.includes('Prioridad:')) continue;
+
+                        // Detectar prioridad
+                        const priority = detectCardPriority(text);
+
+                        // Agregar prioridad
+                        const newText = text + ` | Prioridad: ${priority}`;
+
+                        // Guardar
+                        await py.update_kanban_card(card.id, col, newText);
+                        updatedCount++;
+                    }
+                }
+
+                notify(`✅ ${updatedCount} tarjetas actualizadas con prioridades automáticas`, 'success');
+                await fetchKanban();
+            } catch (err) {
+                console.error('Error al auto-arreglar prioridades:', err);
+                notify('❌ Error al asignar prioridades', 'info');
+            }
+        }
+    );
 }
 
 async function clearDoneKanbanCards() {

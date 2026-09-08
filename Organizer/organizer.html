@@ -341,53 +341,74 @@
         <!-- ===== KANBAN VIEW ===== -->
         <div id="view-kanban" class="ag-view">
             <div class="section-header">
-                <h1>
-                    <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M4 3h4a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zm6 0h4a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zm6 0h4a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/></svg>
-                    Kanban
-                </h1>
-                <p>Seguimiento de tareas por estatus</p>
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; width: 100%;">
+                    <div>
+                        <h1>
+                            <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M4 3h4a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zm6 0h4a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zm6 0h4a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/></svg>
+                            Kanban
+                        </h1>
+                        <p>Seguimiento de tareas por estatus</p>
+                    </div>
+                    <button id="kb-debug-btn" class="ag-btn ag-btn-ghost" title="Activar/Desactivar debug de ordenamiento" style="padding: 6px 12px; font-size: 0.75rem; opacity: 0.5; margin-top: 8px;">🐛 Debug OFF</button>
+                </div>
                 <div class="kb-label-filter" id="kb-label-filter"></div>
+                <button id="kb-auto-fix-btn" class="ag-btn ag-btn-ghost" title="Asignar prioridades automáticamente a tarjetas antiguas" style="padding: 6px 12px; font-size: 0.75rem; margin-top: 8px;">🔧 Auto-fix Prioridades</button>
             </div>
 
             <div class="kb-board">
                 <!-- Pendientes -->
-                <div class="kb-col kb-col-border-pending" id="col-pending">
+                <div class="kb-col kb-col-border-pending" id="col-pending" data-status="pending">
                     <div class="kb-col-header">
                         <div class="kb-col-title">
                             <span class="kb-col-dot" style="background:#fdcb6e;"></span>
                             Pendientes
                             <span class="kb-col-count" id="count-pending">0</span>
                         </div>
-                        <button class="kb-col-add" data-status="pending" title="Agregar tarjeta">+</button>
+                        <div style="display: flex; align-items: center; gap: 4px;">
+                            <button class="kb-col-toggle-collapse" data-status="pending" title="Colapsar/Expandir columna" data-collapsed="false">
+                                <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" style="display:block;"><path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z"/></svg>
+                            </button>
+                            <button class="kb-col-add" data-status="pending" title="Agregar tarjeta">+</button>
+                        </div>
                     </div>
                     <div class="kb-cards" id="cards-pending" data-status="pending"></div>
                 </div>
                 <!-- En Proceso -->
-                <div class="kb-col kb-col-border-inprogress" id="col-inprogress">
+                <div class="kb-col kb-col-border-inprogress" id="col-inprogress" data-status="inprogress">
                     <div class="kb-col-header">
                         <div class="kb-col-title">
                             <span class="kb-col-dot" style="background:#6c5ce7;"></span>
                             En Proceso
                             <span class="kb-col-count" id="count-inprogress">0</span>
                         </div>
-                        <button class="kb-col-add" data-status="inprogress" title="Agregar tarjeta">+</button>
+                        <div style="display: flex; align-items: center; gap: 4px;">
+                            <button class="kb-col-toggle-collapse" data-status="inprogress" title="Colapsar/Expandir columna" data-collapsed="false">
+                                <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" style="display:block;"><path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z"/></svg>
+                            </button>
+                            <button class="kb-col-add" data-status="inprogress" title="Agregar tarjeta">+</button>
+                        </div>
                     </div>
                     <div class="kb-cards" id="cards-inprogress" data-status="inprogress"></div>
                 </div>
                 <!-- Detenidos -->
-                <div class="kb-col kb-col-border-blocked" id="col-blocked">
+                <div class="kb-col kb-col-border-blocked" id="col-blocked" data-status="blocked">
                     <div class="kb-col-header">
                         <div class="kb-col-title">
                             <span class="kb-col-dot" style="background:#e17055;"></span>
                             Detenidos
                             <span class="kb-col-count" id="count-blocked">0</span>
                         </div>
-                        <button class="kb-col-add" data-status="blocked" title="Agregar tarjeta">+</button>
+                        <div style="display: flex; align-items: center; gap: 4px;">
+                            <button class="kb-col-toggle-collapse" data-status="blocked" title="Colapsar/Expandir columna" data-collapsed="false">
+                                <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" style="display:block;"><path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z"/></svg>
+                            </button>
+                            <button class="kb-col-add" data-status="blocked" title="Agregar tarjeta">+</button>
+                        </div>
                     </div>
                     <div class="kb-cards" id="cards-blocked" data-status="blocked"></div>
                 </div>
                 <!-- Hechos -->
-                <div class="kb-col kb-col-border-done" id="col-done">
+                <div class="kb-col kb-col-border-done" id="col-done" data-status="done">
                     <div class="kb-col-header">
                         <div class="kb-col-title">
                             <span class="kb-col-dot" style="background:#00b894;"></span>
@@ -395,6 +416,9 @@
                             <span class="kb-col-count" id="count-done">0</span>
                         </div>
                         <div style="display: flex; align-items: center; gap: 4px;">
+                            <button class="kb-col-toggle-collapse" data-status="done" title="Colapsar/Expandir columna" data-collapsed="false">
+                                <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" style="display:block;"><path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z"/></svg>
+                            </button>
                             <button class="kb-col-clean" id="kb-clean-done-btn" title="Limpiar tareas hechas">
                                 <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" style="display:block;"><path d="M17 6h5v2h-2v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V8H2V6h5V3a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v3zm1 2H6v12h12V8zm-9 3h2v6H9v-6zm4 0h2v6h-2v-6zM9 4v2h6V4H9z"/></svg>
                             </button>

@@ -8,6 +8,309 @@
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="video-style.css">
     <script src="hls.js"></script>
+    <style>
+        /* El tema define --bg-dark/--sidebar-bg/--card-bg pero no estas, que usa
+           la galería. Sin definirlas los fondos quedaban transparentes y los
+           modales resultaban ilegibles. Se declaran para ambos temas. */
+        :root {
+            --bg-primary: #16161a;
+            --bg-secondary: #212128;
+            --gallery-modal-bg: #1e1e24;
+            --gallery-input-bg: #2a2a33;
+            --gallery-modal-border: rgba(255,255,255,0.14);
+        }
+
+        :root[data-theme='light'] {
+            --bg-primary: #ffffff;
+            --bg-secondary: #eef1f8;
+            --gallery-modal-bg: #ffffff;
+            --gallery-input-bg: #f1f3f9;
+            --gallery-modal-border: rgba(31,41,55,0.18);
+        }
+
+        /* En modo galería se oculta el cromo del reproductor: la flecha anterior/
+           siguiente y el título flotante quedan por encima del panel (z-index 100
+           y 999, este último position:fixed), y ahí no tienen sentido. */
+        body.gallery-active #prev-btn,
+        body.gallery-active #next-btn,
+        body.gallery-active .floating-title-container,
+        body.gallery-active #video-quick-actions,
+        body.gallery-active .video-info,
+        body.gallery-active #player-loader {
+            display: none !important;
+        }
+
+        /* ═══════════ Panel de Galería embebido en el reproductor ═══════════ */
+        #gallery-panel {
+            display: none;
+            position: absolute;
+            inset: 0;
+            background: var(--bg-primary, #111);
+            color: var(--text-primary, #fff);
+            overflow-y: auto;
+            z-index: 50;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        #gallery-panel * { box-sizing: border-box; }
+
+        .gallery-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-bottom: 20px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--glass-border);
+        }
+
+        .gallery-title h1 {
+            font-size: 1.4rem;
+            font-weight: 700;
+            margin: 0 0 4px;
+        }
+
+        .gallery-title p {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            margin: 0;
+        }
+
+        .gallery-controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .filter-btn {
+            padding: 8px 14px;
+            border: 1px solid var(--glass-border);
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.2s ease;
+        }
+
+        .filter-btn:hover,
+        .filter-btn.active {
+            background: var(--accent);
+            color: #fff;
+            border-color: var(--accent);
+        }
+
+        .gallery-close-btn {
+            padding: 8px 14px;
+            border: 1px solid var(--glass-border);
+            background: transparent;
+            color: var(--text-primary);
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85rem;
+        }
+
+        .gallery-close-btn:hover {
+            background: rgba(255,255,255,0.1);
+        }
+
+        .stats-box {
+            background: var(--bg-secondary);
+            padding: 12px 16px;
+            border-radius: 8px;
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            font-size: 0.85rem;
+            border: 1px solid var(--glass-border);
+            margin-bottom: 20px;
+        }
+
+        .stat-item { display: flex; align-items: center; gap: 6px; }
+        .stat-number { font-weight: 700; color: var(--accent); font-size: 1.05rem; }
+
+        .gallery-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 14px;
+            margin-bottom: 24px;
+        }
+
+        .video-card-gallery {
+            background: var(--bg-secondary);
+            border: 1px solid var(--glass-border);
+            border-radius: 10px;
+            overflow: hidden;
+            transition: all 0.2s ease;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .video-card-gallery:hover {
+            border-color: var(--accent);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.25);
+        }
+
+        .video-card-gallery.duplicate {
+            border: 2px solid #ff6b6b;
+            background: rgba(255,107,107,0.08);
+        }
+
+        .video-card-gallery[draggable="true"] { cursor: grab; }
+        .video-card-gallery.dragging { opacity: 0.45; cursor: grabbing; }
+
+        .video-thumb-container {
+            width: 100%;
+            height: 100px;
+            background: #1a1a1a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .video-thumb-container img { width: 100%; height: 100%; object-fit: cover; }
+        .video-thumb-container .placeholder { font-size: 1.8rem; }
+
+        /* Vista previa en reproducción (hover sostenido) */
+        .gallery-preview-video {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            background: #000;
+            z-index: 2;
+        }
+
+        .duplicate-badge {
+            position: absolute;
+            top: 6px;
+            right: 6px;
+            background: #ff6b6b;
+            color: #fff;
+            padding: 3px 6px;
+            border-radius: 4px;
+            font-size: 0.62rem;
+            font-weight: 700;
+            z-index: 3;
+        }
+
+        .video-info-gallery {
+            padding: 10px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .video-name-gallery {
+            font-weight: 600;
+            font-size: 0.8rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-bottom: 5px;
+        }
+
+        .video-meta { font-size: 0.7rem; color: var(--text-secondary); line-height: 1.35; }
+        .video-meta-item { display: flex; justify-content: space-between; margin-bottom: 2px; }
+        .video-meta-label { opacity: 0.7; }
+        .video-meta-value { font-weight: 600; }
+
+        .video-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid var(--glass-border);
+        }
+
+        .action-btn {
+            flex: 1 1 40%;
+            padding: 5px 6px;
+            background: transparent;
+            border: 1px solid var(--glass-border);
+            color: var(--text-primary);
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.65rem;
+            transition: all 0.2s ease;
+        }
+
+        .action-btn:hover { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+        .gallery-empty-state { text-align: center; padding: 50px 20px; color: var(--text-secondary); }
+        .gallery-empty-state .empty-state-icon { font-size: 2.5rem; margin-bottom: 12px; opacity: 0.5; }
+
+        .gallery-loading { text-align: center; padding: 40px 20px; color: var(--text-secondary); }
+        .gallery-spinner {
+            display: inline-block;
+            width: 28px;
+            height: 28px;
+            border: 3px solid var(--glass-border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: gallery-spin 0.8s linear infinite;
+            margin-bottom: 12px;
+        }
+
+        @keyframes gallery-spin { to { transform: rotate(360deg); } }
+
+        .duplicate-group {
+            margin-bottom: 28px;
+            padding: 16px;
+            background: var(--bg-secondary);
+            border: 2px solid #ff6b6b;
+            border-radius: 10px;
+        }
+
+        .duplicate-group-title { font-size: 0.95rem; font-weight: 700; color: #ff6b6b; margin-bottom: 10px; }
+        .duplicate-group-subtitle { color: var(--text-secondary); font-size: 0.78rem; margin-bottom: 12px; }
+
+        /* Modales de galería (prefijo gallery- para no chocar con los del reproductor) */
+        #gallery-tag-modal, #gallery-delete-modal, #gallery-move-modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.75);
+            backdrop-filter: blur(6px);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+        }
+
+        #gallery-tag-modal .gm-box, #gallery-delete-modal .gm-box, #gallery-move-modal .gm-box {
+            background: var(--gallery-modal-bg);   /* opaco: el contenido debe leerse bien */
+            border: 1px solid var(--gallery-modal-border);
+            border-radius: 12px;
+            padding: 26px;
+            max-width: 480px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 24px 60px rgba(0,0,0,0.75);
+        }
+
+        #gallery-delete-modal .gm-box { border: 2px solid #ff6b6b; max-width: 400px; }
+
+        /* Campos y listas dentro de los modales, con contraste suficiente */
+        #gallery-tag-modal input, #gallery-move-modal input {
+            background: var(--gallery-input-bg) !important;
+        }
+        #gallery-move-modal-folders { background: var(--bg-primary); }
+
+        @media (max-width: 768px) {
+            .gallery-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+            .gallery-header { flex-direction: column; align-items: flex-start; }
+        }
+    </style>
 </head>
 <body class="browser-active">
     <!-- ═══════════════ VIDEO PLAYER ═══════════════ -->
@@ -45,15 +348,6 @@
                     </ul>
                 </nav>
 
-                <!-- Sección Cloud -->
-                <nav class="cloud-nav" style="border-top: 1px solid var(--glass-border); padding-top: 1rem; margin-top: 1rem;">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 0.5rem;">
-                        <h2>☁️ Listas Cloud</h2>
-                        <button class="btn-subtle" id="new-cloud-playlist" title="Nueva Lista">+</button>
-                    </div>
-                    <ul id="cloud-playlist-list"></ul>
-                </nav>
-
                 <!-- Sección de Etiquetas -->
                 <nav class="tags-nav" style="border-top: 1px solid var(--glass-border); padding-top: 1rem; margin-top: 1rem;">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 0.5rem;">
@@ -89,7 +383,10 @@
                     <button class="btn-win-action" id="toggle-ui" title="Modo Cine">
                         <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>
                     </button>
-                                    <button class="btn-win-action" id="videoplayer-about-modal-open-btn" title="Acerca de">
+                    <button class="btn-win-action" id="open-gallery-btn" title="Galería de Videos y Detección de Duplicados">
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
+                    </button>
+                    <button class="btn-win-action" id="videoplayer-about-modal-open-btn" title="Acerca de">
                         <img src="data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiIHN0YW5kYWxvbmU9Im5vIj8+CjwhLS0gQ3JlYXRlZCB3aXRoIElua3NjYXBlIChodHRwOi8vd3d3Lmlua3NjYXBlLm9yZy8pIC0tPgoKPHN2ZwogICB3aWR0aD0iNDdtbSIKICAgaGVpZ2h0PSI0N21tIgogICB2aWV3Qm94PSIwIDAgNDcgNDciCiAgIHZlcnNpb249IjEuMSIKICAgaWQ9InN2ZzEiCiAgIGlua3NjYXBlOnZlcnNpb249IjEuNC4yIChmNDMyN2Y0LCAyMDI1LTA1LTEzKSIKICAgc29kaXBvZGk6ZG9jbmFtZT0iaWNvbm8uc3ZnIgogICB4bWxuczppbmtzY2FwZT0iaHR0cDovL3d3dy5pbmtzY2FwZS5vcmcvbmFtZXNwYWNlcy9pbmtzY2FwZSIKICAgeG1sbnM6c29kaXBvZGk9Imh0dHA6Ly9zb2RpcG9kaS5zb3VyY2Vmb3JnZS5uZXQvRFREL3NvZGlwb2RpLTAuZHRkIgogICB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciCiAgIHhtbG5zOnN2Zz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgogIDxzb2RpcG9kaTpuYW1lZHZpZXcKICAgICBpZD0ibmFtZWR2aWV3MSIKICAgICBwYWdlY29sb3I9IiNmZmZmZmYiCiAgICAgYm9yZGVyY29sb3I9IiMwMDAwMDAiCiAgICAgYm9yZGVyb3BhY2l0eT0iMC4yNSIKICAgICBpbmtzY2FwZTpzaG93cGFnZXNoYWRvdz0iMiIKICAgICBpbmtzY2FwZTpwYWdlb3BhY2l0eT0iMC4wIgogICAgIGlua3NjYXBlOnBhZ2VjaGVja2VyYm9hcmQ9IjAiCiAgICAgaW5rc2NhcGU6ZGVza2NvbG9yPSIjZDFkMWQxIgogICAgIGlua3NjYXBlOmRvY3VtZW50LXVuaXRzPSJtbSIKICAgICBpbmtzY2FwZTp6b29tPSIwLjQ0MDk3MjIyIgogICAgIGlua3NjYXBlOmN4PSIzOTUuNzE2NTQiCiAgICAgaW5rc2NhcGU6Y3k9IjQ3NS4wODY2MSIKICAgICBpbmtzY2FwZTp3aW5kb3ctd2lkdGg9IjEzNjYiCiAgICAgaW5rc2NhcGU6d2luZG93LWhlaWdodD0iNjk3IgogICAgIGlua3NjYXBlOndpbmRvdy14PSI1NzUyIgogICAgIGlua3NjYXBlOndpbmRvdy15PSIzMDQiCiAgICAgaW5rc2NhcGU6d2luZG93LW1heGltaXplZD0iMSIKICAgICBpbmtzY2FwZTpjdXJyZW50LWxheWVyPSJsYXllcjEiIC8+CiAgPGRlZnMKICAgICBpZD0iZGVmczEiPgogICAgPGZpbHRlcgogICAgICAgc3R5bGU9ImNvbG9yLWludGVycG9sYXRpb24tZmlsdGVyczpzUkdCIgogICAgICAgaWQ9ImZpbHRlcjQ1ODgiCiAgICAgICB4PSItMC4wMDAxMTIwMjc1NyIKICAgICAgIHdpZHRoPSIxLjAwMDIyNDEiCiAgICAgICB5PSItMC4wMDAxMTE5NjcwOSIKICAgICAgIGhlaWdodD0iMS4wMDAyMjM5Ij4KICAgICAgPGZlR2F1c3NpYW5CbHVyCiAgICAgICAgIHN0ZERldmlhdGlvbj0iMC4wMDAzMTQ1NjQxNiIKICAgICAgICAgaWQ9ImZlR2F1c3NpYW5CbHVyNDU5MCIgLz4KICAgIDwvZmlsdGVyPgogICAgPGZpbHRlcgogICAgICAgc3R5bGU9ImNvbG9yLWludGVycG9sYXRpb24tZmlsdGVyczpzUkdCIgogICAgICAgaWQ9ImZpbHRlcjEiCiAgICAgICB4PSItMC4wMDAxMTIwMjc1NyIKICAgICAgIHdpZHRoPSIxLjAwMDIyNDEiCiAgICAgICB5PSItMC4wMDAxMTE5NjcwOSIKICAgICAgIGhlaWdodD0iMS4wMDAyMjM5Ij4KICAgICAgPGZlR2F1c3NpYW5CbHVyCiAgICAgICAgIHN0ZERldmlhdGlvbj0iMC4wMDAzMTQ1NjQxNiIKICAgICAgICAgaWQ9ImZlR2F1c3NpYW5CbHVyMSIgLz4KICAgIDwvZmlsdGVyPgogICAgPGZpbHRlcgogICAgICAgc3R5bGU9ImNvbG9yLWludGVycG9sYXRpb24tZmlsdGVyczpzUkdCIgogICAgICAgaWQ9ImZpbHRlcjIiCiAgICAgICB4PSItMC4wMDAxMTIwMjc1NyIKICAgICAgIHdpZHRoPSIxLjAwMDIyNDEiCiAgICAgICB5PSItMC4wMDAxMTE5NjcwOSIKICAgICAgIGhlaWdodD0iMS4wMDAyMjM5Ij4KICAgICAgPGZlR2F1c3NpYW5CbHVyCiAgICAgICAgIHN0ZERldmlhdGlvbj0iMC4wMDAzMTQ1NjQxNiIKICAgICAgICAgaWQ9ImZlR2F1c3NpYW5CbHVyMiIgLz4KICAgIDwvZmlsdGVyPgogICAgPGZpbHRlcgogICAgICAgc3R5bGU9ImNvbG9yLWludGVycG9sYXRpb24tZmlsdGVyczpzUkdCIgogICAgICAgaWQ9ImZpbHRlcjMiCiAgICAgICB4PSItMC4wMDAxMTIwMjc1NyIKICAgICAgIHdpZHRoPSIxLjAwMDIyNDEiCiAgICAgICB5PSItMC4wMDAxMTE5NjcwOSIKICAgICAgIGhlaWdodD0iMS4wMDAyMjM5Ij4KICAgICAgPGZlR2F1c3NpYW5CbHVyCiAgICAgICAgIHN0ZERldmlhdGlvbj0iMC4wMDAzMTQ1NjQxNiIKICAgICAgICAgaWQ9ImZlR2F1c3NpYW5CbHVyMyIgLz4KICAgIDwvZmlsdGVyPgogIDwvZGVmcz4KICA8ZwogICAgIGlua3NjYXBlOmxhYmVsPSJDYXBhIDEiCiAgICAgaW5rc2NhcGU6Z3JvdXBtb2RlPSJsYXllciIKICAgICBpZD0ibGF5ZXIxIj4KICAgIDxnCiAgICAgICBpZD0iZzEiCiAgICAgICB0cmFuc2Zvcm09InRyYW5zbGF0ZSgtMC4zNzc2ODk1NywtMC41MDcxOTcxNykiPgogICAgICA8ZwogICAgICAgICBpZD0iZzIyMDctNCIKICAgICAgICAgdHJhbnNmb3JtPSJtYXRyaXgoLTAuMDgxMjc1ODcsMCwwLDAuMDgxMzE5NzYsNDguNDQzMDA1LDE1LjE0NDYyMikiCiAgICAgICAgIHN0eWxlPSJmaWx0ZXI6dXJsKCNmaWx0ZXI0NTg4KSI+CiAgICAgICAgPHBhdGgKICAgICAgICAgICBpZD0icGF0aDE2LTQtMy0zLTEtNy03LTciCiAgICAgICAgICAgc3R5bGU9ImZpbGw6IzEzYjNlZDtmaWxsLW9wYWNpdHk6MTtzdHJva2Utd2lkdGg6MSIKICAgICAgICAgICBkPSJNIDMwMS42NzM4MywtMTMyLjc1NTg2IEEgMjQxLjc0MDcxLDI0MS43NDA3MSAwIDAgMCA2MC41MDU4NTksMTA4Ljk4NDM4IDI0MS43NDA3MSwyNDEuNzQwNzEgMCAwIDAgMzAyLjI0NjA5LDM1MC43MjQ2MSAyNDEuNzQwNzEsMjQxLjc0MDcxIDAgMCAwIDUzNy44NjcxOSwxNjMuMDMxMjUgbCAtNDYuOTkwMjQsLTAuMjQyMTkgYyAwLDAgLTI1LjUxNzAzLC0yLjgxODY0IC0zNi43MDcwMywxLjAxMTcyIC0xMS4xOSwzLjgzMDM3IC0yNC44Nzk5NywxOS4yNzE1MyAtMzMuMTQ4NDQsMzMuMDI3MzQgLTguMjY4NDYsMTMuNzU1ODQgLTE0LjQ2OTk4LDIwLjkyNzQ0IC0zNS4xNjk5MiwyMC43NzU0IC0xNi42Mjc1OCwtMC4xMjIxMyAtNDEuMTUyNzMsMC4yNTAyMyAtNTIuMDE1NjIsMC40MjU3OCBhIDQ1Ljg0ODA4Myw0NS44NDgwODMgMCAwIDEgLTQ1LjE0ODQ0LDM3Ljg3MzA0IDQ1Ljg0ODA4Myw0NS44NDgwODMgMCAwIDEgLTQ1Ljg0NzY2LC00NS44NDc2NSA0NS44NDgwODMsNDUuODQ4MDgzIDAgMCAxIDQ1LjU3MjI3LC00NS44NDc2NiA0NS44NDgwODMsNDUuODQ4MDgzIDAgMCAxIDAuMjc1MzksMCA0NS44NDgwODMsNDUuODQ4MDgzIDAgMCAxIDQ0Ljc1MTk1LDM1Ljg4NjcyIGggNDguMzE4MzYgYyAwLDAgMTQuNjkzNDMsMi45ODk2OSAyOC41MTU2MywtMTUuMjUxOTUgMTIuNDIzNzQsLTE2LjM5NjA3IDE1LjA5MDczLC0yNS45MDMzMiAzMi4yNjE3MiwtMzQuNDM3NSAxMy45OTM5MiwtNi45NTUxMyA0MC4xMjMwNCwtNC4xNDQ1MyA0MC4xMjMwNCwtNC4xNDQ1MyBoIDU4LjQzNTU1IGEgMjQxLjc0MDcxLDI0MS43NDA3MSAwIDAgMCAxLjY5NTMxLC0xMy4yNzE0OSBjIC02MS4xNTQ5NywwLjY5MTU3IC0xOTQuMzQ2NzMsMS45MTM1IC0yMTIuMzkyNTgsLTAuMzg0NzYgLTEwLjM3NjMzLC0xLjMyMTUgLTE5LjM3MTQ0LC05LjM5ODQ0IC0yOS45MzM1OSwtMTQuNTgzOTkgLTEzLjI3NDM2LC02LjUxNzEgLTIzLjA5NjcsLTExLjE2MjggLTMyLjM3MzA1LC0xMi4yMjY1NiAtNy41MTI2OSwtMC44NjE1MSAtNDEuMzM1OTIsMS40MjE4NiAtNTQuODI2MTcsMi4zODY3MiBhIDQ1Ljg0ODA4Myw0NS44NDgwODMgMCAwIDEgLTQ0LjkzNzUsMzYuNzU5NzYgNDUuODQ4MDgzLDQ1Ljg0ODA4MyAwIDAgMSAtNDUuODQ5NjEsLTQ1Ljg0NzY1MyA0NS44NDgwODMsNDUuODQ4MDgzIDAgMCAxIDQ1LjU3MjI3LC00NS44NDc2NTYgNDUuODQ4MDgzLDQ1Ljg0ODA4MyAwIDAgMSAwLjI3NzM0LDAgNDUuODQ4MDgzLDQ1Ljg0ODA4MyAwIDAgMSA0NC45NTg5OSwzNi44NjcxODcgYyAxMS44Nzk3OCwtMC4zMDY4MTIgMzcuNzAyNDQsLTAuODkwNTA3IDU0LjIwMzEyLC0wLjY0ODQzNyAyMi4wMDA5MiwwLjMyMjc2IDI0LjM3OTI3LDUuNDM2MTI1IDQxLjQ5NjEsMTYuNzE4NzQ5IDE3LjExNjgzLDExLjI4MjY0IDI5LjE2NjAxLDkuOTM5NDUgMjkuMTY2MDEsOS45Mzk0NSBoIDIwNS43MzA0NyBhIDI0MS43NDA3MSwyNDEuNzQwNzEgMCAwIDAgMC4xMDU0NywtNy4xMzY3MSAyNDEuNzQwNzEsMjQxLjc0MDcxIDAgMCAwIC0wLjI3MTQ5LC0xMS40MzE2NDYgSCA0MjIuMTczODMgYyAwLDAgLTguODQxNDMsMC4yMzY3MTggLTE1LjY1NDMsLTcuNzQwMjM0IC02LjgxMjg2LC03Ljk3Njk1IC0zNC4yMDExNywtNTYuMDkxNzk3IC0zNC4yMDExNywtNTYuMDkxNzk3IC01LjIzODk5LC03LjY1NTM3IC03Ljc1OTYzLC0xMS4wNjc0MDkgLTE1LjE4MzU5LC0xMC45NjI4OTEgLTIwLjI4NTQxLDAuMjg1NTYyIC00Ny4zMjI3NywwLjQxMDU4NSAtNzAuNTg5ODUsMC42MTEzMjkgQSA0NS44NDgwODMsNDUuODQ4MDgzIDAgMCAxIDI0My4zODA4Niw1My43NjM2NzIgNDUuODQ4MDgzLDQ1Ljg0ODA4MyAwIDAgMSAxOTcuNTMzMiw3LjkxNDA2MjUgYSA0NS44NDgwODMsNDUuODQ4MDgzIDAgMCAxIDQ1LjU3MjI3LC00NS44NDc2NTY1IDQ1Ljg0ODA4Myw0NS44NDgwODMgMCAwIDEgMC4yNzUzOSwwIDQ1Ljg0ODA4Myw0NS44NDgwODMgMCAwIDEgNDUuNjAxNTYsNDEuMTE1MjM0NiBsIDY2LjY3NTc4LDAuMjgzMjAzMiBjIDAsMCAxOC4wNzE5LC0xLjEzMzk2MjQgMjQuNjQwNjMsOS4yNzM0MzcyIDQuNzg4MzIsNy41ODY1NSAzMi41NTI3Myw1NS4yMTQ4NDQgMzIuNTUyNzMsNTUuMjE0ODQ0IDAsMCA2LjU3MzgxLDEyLjY2NDA2MyAyMS45MzU1NSwxMi42NjQwNjMgaCAxMDcuNTI5MyBhIDI0MS43NDA3MSwyNDEuNzQwNzEgMCAwIDAgLTI0MC4wNzAzMiwtMjEzLjM3MzA0OCAyNDEuNzQwNzEsMjQxLjc0MDcxIDAgMCAwIC0wLjU3MjI2LDAgeiIgLz4KICAgICAgPC9nPgogICAgICA8ZWxsaXBzZQogICAgICAgICBzdHlsZT0iZmlsbDojNGQ0ZDRkO2ZpbGwtb3BhY2l0eToxO3N0cm9rZS13aWR0aDowLjExNTM3ODtmaWx0ZXI6dXJsKCNmaWx0ZXI0NTg4KSIKICAgICAgICAgaWQ9InBhdGgxNC0zLTItNC0zLTItOS01LTQ0IgogICAgICAgICBjeD0iLTI2MS41ODcwMSIKICAgICAgICAgY3k9IjQ4LjUwNDc4NyIKICAgICAgICAgdHJhbnNmb3JtPSJtYXRyaXgoLTAuNzA0NjIyODcsMCwwLDAuNzA0NjIyODcsLTE1NS42ODI4NSwtMTguNDA5NjIxKSIKICAgICAgICAgcng9IjMuMzY5NTAwOSIKICAgICAgICAgcnk9IjMuMzcxMzIxIiAvPgogICAgICA8ZWxsaXBzZQogICAgICAgICBzdHlsZT0iZmlsbDojNGQ0ZDRkO2ZpbGwtb3BhY2l0eToxO3N0cm9rZS13aWR0aDowLjExNTM3ODtmaWx0ZXI6dXJsKCNmaWx0ZXI0NTg4KSIKICAgICAgICAgaWQ9InBhdGgxNC0zLTctNy0yLTMtNy0yLTktMyIKICAgICAgICAgY3g9Ii0yNzAuMjQ0MzIiCiAgICAgICAgIGN5PSI1OS4wMjc0MDkiCiAgICAgICAgIHRyYW5zZm9ybT0ibWF0cml4KC0wLjcwNDYyMjg3LDAsMCwwLjcwNDYyMjg3LC0xNTUuNjgyODUsLTE4LjQwOTYyMSkiCiAgICAgICAgIHJ4PSIzLjM2OTUwMDkiCiAgICAgICAgIHJ5PSIzLjM3MTMyMSIgLz4KICAgICAgPGVsbGlwc2UKICAgICAgICAgc3R5bGU9ImZpbGw6IzRkNGQ0ZDtmaWxsLW9wYWNpdHk6MTtzdHJva2Utd2lkdGg6MC4xMTUzNzg7ZmlsdGVyOnVybCgjZmlsdGVyNDU4OCkiCiAgICAgICAgIGlkPSJwYXRoMTQtMy0zLTQtMi03LTAtMC0yLTAiCiAgICAgICAgIGN4PSItMjU2LjM2MDkzIgogICAgICAgICBjeT0iNzEuODMzNTE5IgogICAgICAgICB0cmFuc2Zvcm09Im1hdHJpeCgtMC43MDQ2MjI4NywwLDAsMC43MDQ2MjI4NywtMTU1LjY4Mjg1LC0xOC40MDk2MjEpIgogICAgICAgICByeD0iMy4zNjk1MDA5IgogICAgICAgICByeT0iMy4zNzEzMjEiIC8+CiAgICA8L2c+CiAgPC9nPgo8L3N2Zz4K" style="width:16px;height:16px;object-fit:contain;" alt="Acerca de">
                     </button>
                 </div>
@@ -100,9 +397,6 @@
                     <video id="main-player" class="player-content" controls autoplay>
                         Tu navegador no soporta el formato de video.
                     </video>
-                    <!-- Contenedor para embeds externos (YouTube/Web) -->
-                    <iframe id="external-player" class="player-content" style="display:none;" frameborder="0" allowfullscreen allow="autoplay; encrypted-media"></iframe>
-
                     <!-- Acciones rápidas sobre el video activo -->
                     <div id="video-quick-actions" class="video-quick-actions" style="display:none;">
                         <button id="vqa-tag"    class="vqa-btn" title="Etiquetas">🏷️</button>
@@ -122,6 +416,44 @@
                     </button>
 
                     <div class="video-info">
+                    </div>
+
+                    <!-- ═══════════ Panel de Galería (embebido, ocupa el área del reproductor) ═══════════ -->
+                    <div id="gallery-panel">
+                        <div class="gallery-header">
+                            <div class="gallery-title">
+                                <h1>📸 Galería de Videos</h1>
+                                <p id="gallery-scope-label">Visualiza tus videos y detecta duplicados</p>
+                            </div>
+                            <div class="gallery-controls">
+                                <button class="filter-btn" id="filter-all">📁 Todos</button>
+                                <button class="filter-btn" id="filter-duplicates">⚠️ Duplicados</button>
+                                <button class="filter-btn" id="filter-reload">🔄 Recargar</button>
+                                <button class="gallery-close-btn" id="close-gallery" title="Volver al reproductor">✕ Cerrar</button>
+                            </div>
+                        </div>
+
+                        <div class="stats-box" id="stats-box">
+                            <div class="stat-item">
+                                <span>📹 Total de videos:</span>
+                                <span class="stat-number" id="stat-total">0</span>
+                            </div>
+                            <div class="stat-item">
+                                <span>⚠️ Posibles duplicados:</span>
+                                <span class="stat-number" id="stat-duplicates">0</span>
+                            </div>
+                            <div class="stat-item">
+                                <span>💾 Tamaño total:</span>
+                                <span class="stat-number" id="stat-size">0 MB</span>
+                            </div>
+                        </div>
+
+                        <div id="gallery-content">
+                            <div class="gallery-loading">
+                                <div class="gallery-spinner"></div>
+                                <p>Cargando galería de videos...</p>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -188,34 +520,6 @@
         </div>
     </div>
 
-    <!-- Modal: Gestionar Lista Cloud -->
-    <div id="cloud-modal" class="modal-overlay">
-        <div class="modal" style="max-width: 700px; width: 90%; text-align: left; padding: 2rem;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem;">
-                <h3 id="cloud-modal-title" style="font-size:1.2rem;">Gestionar Lista</h3>
-                <button id="close-cloud-modal" style="background:transparent;border:none;color:var(--text-secondary);font-size:1.5rem;cursor:pointer;line-height:1;">&times;</button>
-            </div>
-            <div class="modal-body" style="text-align:left;">
-                <div style="margin-bottom: 20px;">
-                    <label style="display:block; margin-bottom:8px; font-size:0.8rem; color:var(--text-secondary);">Nombre de la Lista</label>
-                    <input type="text" id="cloud-playlist-name-input" placeholder="Ej: Mis Favoritos..." style="width:100%; font-size:1rem; background:rgba(255,255,255,0.05); border:1px solid var(--glass-border); border-radius:8px; padding:0.75rem 1rem; color:#fff; outline:none;">
-                </div>
-                <div style="display:flex; gap:10px; margin-bottom:20px; border-top:1px solid rgba(255,255,255,0.1); padding-top:20px;">
-                    <input type="text" id="cloud-url-input" placeholder="Pegar URL de YouTube o sitio web..." style="flex:1; background:rgba(255,255,255,0.05); border:1px solid var(--glass-border); border-radius:8px; padding:0.75rem 1rem; color:#fff; outline:none;">
-                    <button class="btn-secondary" id="paste-cloud-url" title="Pegar desde el portapapeles" style="padding:0.75rem 1rem; border-radius:8px;">📋</button>
-                    <button class="btn-primary" id="add-to-cloud-btn" style="padding:0.75rem 1.5rem; border:none; border-radius:8px; cursor:pointer; white-space:nowrap;">Añadir</button>
-                </div>
-                <div id="cloud-items-list" class="sortable-list" style="max-height: 350px; overflow-y: auto; padding-right: 8px; margin-top: 10px;">
-                    <!-- Items de la lista cloud -->
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn-secondary" id="cancel-cloud-modal">Cerrar</button>
-                <button class="btn-primary" id="save-cloud-modal">Guardar Cambios</button>
-            </div>
-        </div>
-    </div>
-
     <!-- Modal: Gestionar Etiquetas -->
     <div id="tags-modal" class="modal-overlay">
         <div class="modal" style="max-width: 660px; width: 94%; text-align: left; padding: 2.2rem;">
@@ -244,10 +548,71 @@
         </div>
     </div>
 
+    <!-- Modal Galería: Asignar Etiquetas -->
+    <div id="gallery-tag-modal">
+        <div class="gm-box">
+            <h2 style="margin-bottom:20px; display:flex; justify-content:space-between; align-items:center;">
+                🏷️ Asignar Etiquetas
+                <button id="gallery-tag-modal-close-x" style="background:none; border:none; font-size:1.5rem; cursor:pointer; color:var(--text-secondary);">×</button>
+            </h2>
+            <div id="gallery-tag-modal-filename" style="margin-bottom:15px; padding:10px; background:var(--bg-secondary); border-radius:6px; color:var(--text-secondary); font-size:0.9rem;"></div>
+            <div style="margin-bottom:20px;">
+                <label style="display:block; margin-bottom:8px; font-weight:600;">Etiquetas actuales:</label>
+                <div id="gallery-tag-modal-current" style="display:flex; flex-wrap:wrap; gap:8px; min-height:30px;"></div>
+            </div>
+            <div style="margin-bottom:20px;">
+                <label style="display:block; margin-bottom:8px; font-weight:600;">Agregar nueva etiqueta:</label>
+                <div style="display:flex; gap:8px;">
+                    <input type="text" id="gallery-tag-modal-input" placeholder="nombre de etiqueta" style="flex:1; padding:8px 12px; border:1px solid var(--glass-border); border-radius:6px; background:var(--bg-secondary); color:var(--text-primary);">
+                    <button id="gallery-tag-modal-add-btn" style="padding:8px 16px; background:var(--accent); color:white; border:none; border-radius:6px; cursor:pointer; font-weight:600;">+ Agregar</button>
+                </div>
+            </div>
+            <div style="margin-bottom:20px;">
+                <label style="display:block; margin-bottom:8px; font-weight:600;">Etiquetas disponibles:</label>
+                <div id="gallery-tag-modal-available" style="display:flex; flex-wrap:wrap; gap:8px; min-height:30px;"></div>
+            </div>
+            <div style="display:flex; gap:10px; justify-content:flex-end;">
+                <button id="gallery-tag-modal-close-btn" style="padding:10px 20px; background:transparent; border:1px solid var(--glass-border); color:var(--text-primary); border-radius:6px; cursor:pointer; font-weight:600;">Cerrar</button>
+                <button id="gallery-tag-modal-save-btn" style="padding:10px 20px; background:var(--accent); color:white; border:none; border-radius:6px; cursor:pointer; font-weight:600;">✅ Guardar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Galería: Eliminar Video -->
+    <div id="gallery-delete-modal">
+        <div class="gm-box">
+            <h2 style="margin-bottom:15px; color:#ff6b6b;">⚠️ Eliminar Video</h2>
+            <p id="gallery-delete-modal-filename" style="margin-bottom:20px; color:var(--text-secondary);"></p>
+            <p style="margin-bottom:20px; color:var(--text-secondary); font-size:0.9rem;">Esta acción no se puede deshacer.</p>
+            <div style="display:flex; gap:10px; justify-content:flex-end;">
+                <button id="gallery-delete-modal-cancel-btn" style="padding:10px 20px; background:transparent; border:1px solid var(--glass-border); color:var(--text-primary); border-radius:6px; cursor:pointer; font-weight:600;">Cancelar</button>
+                <button id="gallery-delete-modal-confirm-btn" style="padding:10px 20px; background:#ff6b6b; color:white; border:none; border-radius:6px; cursor:pointer; font-weight:600;">🗑️ Eliminar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Galería: Mover Video -->
+    <div id="gallery-move-modal">
+        <div class="gm-box">
+            <h2 style="margin-bottom:15px; display:flex; justify-content:space-between; align-items:center;">
+                📁 Mover Video
+                <button id="gallery-move-modal-close-x" style="background:none; border:none; font-size:1.5rem; cursor:pointer; color:var(--text-secondary);">×</button>
+            </h2>
+            <div id="gallery-move-modal-filename" style="margin-bottom:20px; padding:10px; background:var(--bg-secondary); border-radius:6px; color:var(--text-secondary); font-size:0.9rem;"></div>
+            <label style="display:block; margin-bottom:8px; font-weight:600;">Selecciona carpeta de destino:</label>
+            <div id="gallery-move-modal-folders" style="margin-bottom:20px; max-height:300px; overflow-y:auto; border:1px solid var(--glass-border); border-radius:6px; padding:10px;"></div>
+            <div style="display:flex; gap:10px; justify-content:flex-end;">
+                <button id="gallery-move-modal-cancel-btn" style="padding:10px 20px; background:transparent; border:1px solid var(--glass-border); color:var(--text-primary); border-radius:6px; cursor:pointer; font-weight:600;">Cancelar</button>
+                <button id="gallery-move-modal-confirm-btn" style="padding:10px 20px; background:var(--accent); color:white; border:none; border-radius:6px; cursor:pointer; font-weight:600;">✅ Mover</button>
+            </div>
+        </div>
+    </div>
+
     <div id="notification-container"></div>
 
     <script src="theme.js"></script>
     <script src="videoplayer.js"></script>
+    <script src="gallery.js"></script>
 
     <!-- MODAL ACERCA DE -->
     <div id="videoplayer-about-modal" style="display:none;position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.6);backdrop-filter:blur(5px);align-items:center;justify-content:center;flex-direction:column;">
