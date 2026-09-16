@@ -587,6 +587,17 @@
         setTimeout(() => playVideo(index), FADE_MS);
     }
     const playbackHistory = new Map();
+    // Videos dados por vistos por completo: al volver arrancan desde el principio.
+    const completedUrls = new Set();
+
+    // Marca el video como visto entero (progreso 0) para que no se reanude
+    // en el tramo final recortado al volver a abrirlo.
+    function markCompleted(video) {
+        if (!video || !video.url || video.type) return;
+        completedUrls.add(video.url);
+        playbackHistory.set(video.url, 0);
+        py.save_playback(video.url, '0');
+    }
 
     // ═══════════ Identidad de una etiqueta ═══════════
     // La clave es la RUTA RELATIVA del archivo (p.ej. "Alfa/mm/video.mp4").
@@ -1511,7 +1522,10 @@
                 return;
             }
 
-            if (previousVideo && !mainPlayer.paused && !previousVideo.type) {
+            if (previousVideo && completedUrls.has(previousVideo.url)) {
+                // Terminó (salto de outro o 'ended'): se queda en 0, no se guarda progreso.
+                completedUrls.delete(previousVideo.url);
+            } else if (previousVideo && !mainPlayer.paused && !previousVideo.type) {
                 const time = mainPlayer.currentTime;
                 playbackHistory.set(previousVideo.url, time);
                 py.save_playback(previousVideo.url, time.toString());
@@ -1644,11 +1658,13 @@
 
         if (mainPlayer.currentTime >= duration - SKIP_OUTRO_SECONDS) {
             endSkipArmed = false;   // un solo disparo por video
+            markCompleted(currentVideos[currentIndex]);
             fadeToVideo(currentIndex + 1);
         }
     });
 
     mainPlayer.onended = () => {
+        markCompleted(currentVideos[currentIndex]);
         if (currentIndex + 1 < currentVideos.length) {
             fadeToVideo(currentIndex + 1);
         }
