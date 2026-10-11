@@ -328,9 +328,9 @@ async function publishAllRemindersToGCal(remindersList) {
 // usaba un archivo aparte. Flujo para apps instaladas: PKCE + redirección a
 // 127.0.0.1, que la extensión captura en la pestaña con chrome.tabs.onUpdated.
 // (Google no trata como secreto el client_secret de un cliente de escritorio.)
-// Las credenciales viven en credentials.js (ignorado por git); ver credentials.example.js.
-const EXT_GOOGLE_CLIENT_ID = (window.GOOGLE_CREDENTIALS || {}).clientId || '';
-const EXT_GOOGLE_CLIENT_SECRET = (window.GOOGLE_CREDENTIALS || {}).clientSecret || '';
+// El client_secret no forma parte del código: se guarda solo en chrome.storage.local
+// de este navegador y se pide al usuario la primera vez que inicia sesión.
+const EXT_GOOGLE_CLIENT_ID = '136352780967-h1r5murn40hf23gdas5f2s4ft9keb9q7.apps.googleusercontent.com';
 const EXT_GOOGLE_SCOPES = 'openid email https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/calendar';
 
 function extStorageGet(keys) {
@@ -345,11 +345,21 @@ function b64url(bytes) {
     return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
+async function getExtGoogleClientSecret() {
+    const { google_client_secret: saved } = await extStorageGet(['google_client_secret']);
+    if (saved) return saved;
+    const entered = (window.prompt('Introduce el client_secret de Google OAuth (se guardará solo en este navegador):') || '').trim();
+    if (!entered) throw new Error('Falta el client_secret de Google.');
+    await extStorageSet({ google_client_secret: entered });
+    return entered;
+}
+
 async function googleTokenRequest(params) {
+    const clientSecret = await getExtGoogleClientSecret();
     const response = await fetch('https://oauth2.googleapis.com/token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({ client_id: EXT_GOOGLE_CLIENT_ID, client_secret: EXT_GOOGLE_CLIENT_SECRET, ...params })
+        body: new URLSearchParams({ client_id: EXT_GOOGLE_CLIENT_ID, client_secret: clientSecret, ...params })
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
