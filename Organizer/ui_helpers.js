@@ -178,7 +178,7 @@ document.addEventListener('click', async (e) => {
     }
 });
 
-// Vincular dinámicamente los botones de formato Kanban fijos en el HTML al cargar la página
+// Vincular dinámicamente los botones de formato Kanban, controles de ventana y modal Acerca de
 document.addEventListener('DOMContentLoaded', () => {
     const boldBtn = document.getElementById('kb-tool-bold');
     const italicBtn = document.getElementById('kb-tool-italic');
@@ -191,4 +191,140 @@ document.addEventListener('DOMContentLoaded', () => {
     if (codeBtn) codeBtn.addEventListener('click', () => { if (window.kbApplyFormat) window.kbApplyFormat('code'); });
     if (linkBtn) linkBtn.addEventListener('click', () => { if (window.kbApplyFormat) window.kbApplyFormat('link'); });
     if (listBtn) listBtn.addEventListener('click', () => { if (window.kbApplyFormat) window.kbApplyFormat('list'); });
+
+    // Controles de ventana
+    const minBtn = document.getElementById('btn-minimize');
+    const maxBtn = document.getElementById('btn-maximize');
+    const closeBtn = document.getElementById('btn-close');
+
+    if (minBtn) {
+        minBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (window.desktop && window.desktop.minimize) window.desktop.minimize();
+            else if (window.py && window.py.window_minimize) window.py.window_minimize();
+        });
+    }
+
+    if (maxBtn) {
+        maxBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (window.desktop && window.desktop.maximize) window.desktop.maximize();
+            else if (window.py && window.py.window_maximize) window.py.window_maximize();
+        });
+    }
+
+    if (closeBtn) {
+        closeBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (window.desktop && window.desktop.close) window.desktop.close();
+            else if (window.py && window.py.window_close) window.py.window_close();
+            else window.close();
+        });
+    }
+
+    // Modal Acerca de
+    const aboutBtn = document.getElementById('btn-about');
+    const aboutModal = document.getElementById('organizer-about-modal');
+    const aboutCloseBtn = document.getElementById('organizer-about-close-btn');
+
+    if (aboutBtn && aboutModal) {
+        aboutBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            aboutModal.style.display = 'flex';
+        });
+    }
+
+    if (aboutCloseBtn && aboutModal) {
+        aboutCloseBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            aboutModal.style.display = 'none';
+        });
+    }
+
+    // Botones de Google Drive y Calendar
+    const gdriveBtn = document.getElementById('sync-connect-btn');
+    if (gdriveBtn) {
+        gdriveBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            if (window.syncState && window.syncState.connected) {
+                if (window.signOutGDrive) window.signOutGDrive();
+            } else if (window.signInGDrive) {
+                window.signInGDrive();
+            }
+        });
+    }
+
+    const gcalBtn = document.getElementById('gcal-connect-btn');
+    if (gcalBtn) {
+        gcalBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            if (window.gcalState && window.gcalState.connected) {
+                if (window.signOutGCalendar) window.signOutGCalendar();
+            } else if (window.signInGCalendar) {
+                window.signInGCalendar();
+            }
+        });
+    }
+
+    if (aboutModal) {
+        aboutModal.addEventListener('click', (e) => {
+            if (e.target === aboutModal) aboutModal.style.display = 'none';
+        });
+    }
 });
+
+// Función para inicializar inmediatamente los controles
+function initHeaderAndWindowControls() {
+    const minBtn = document.getElementById('btn-minimize');
+    const maxBtn = document.getElementById('btn-maximize');
+    const closeBtn = document.getElementById('btn-close');
+    const aboutBtn = document.getElementById('btn-about');
+    const aboutModal = document.getElementById('organizer-about-modal');
+    const aboutCloseBtn = document.getElementById('organizer-about-close-btn');
+
+    if (minBtn) {
+        minBtn.onclick = (e) => {
+            e.preventDefault();
+            if (window.desktop && window.desktop.minimize) window.desktop.minimize();
+            else if (window.py && window.py.window_minimize) window.py.window_minimize();
+        };
+    }
+    if (maxBtn) {
+        maxBtn.onclick = (e) => {
+            e.preventDefault();
+            if (window.desktop && window.desktop.maximize) window.desktop.maximize();
+            else if (window.py && window.py.window_maximize) window.py.window_maximize();
+        };
+    }
+    if (closeBtn) {
+        closeBtn.onclick = (e) => {
+            e.preventDefault();
+            if (window.desktop && window.desktop.close) window.desktop.close();
+            else if (window.py && window.py.window_close) window.py.window_close();
+            else window.close();
+        };
+    }
+    if (aboutBtn && aboutModal) {
+        aboutBtn.onclick = (e) => {
+            e.preventDefault();
+            aboutModal.style.display = 'flex';
+        };
+    }
+    if (aboutCloseBtn && aboutModal) {
+        aboutCloseBtn.onclick = (e) => {
+            e.preventDefault();
+            aboutModal.style.display = 'none';
+        };
+    }
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initHeaderAndWindowControls);
+} else {
+    initHeaderAndWindowControls();
+}

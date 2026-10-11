@@ -51,7 +51,7 @@
         .ag-header {
             position: relative;
             z-index: 10;
-            -webkit-app-region: drag;
+            -webkit-app-region: no-drag;
             background: #1a1a1e;
             border-bottom: 1px solid rgba(255,255,255,0.08);
             padding: 0 16px;
@@ -59,6 +59,12 @@
             display: flex;
             align-items: center;
             gap: 16px;
+        }
+
+        .ag-drag-region {
+            -webkit-app-region: drag !important;
+            flex: 1;
+            height: 100%;
         }
 
         .ag-header > * { -webkit-app-region: no-drag; }
@@ -224,6 +230,8 @@
             margin-left: auto;
             display: flex;
             gap: 8px;
+            -webkit-app-region: no-drag !important;
+            pointer-events: auto !important;
         }
         .ag-win-btn {
             background: rgba(255, 255, 255, 0.05);
@@ -232,12 +240,25 @@
             border-radius: 50%;
             width: 28px;
             height: 28px;
-            cursor: pointer;
+            cursor: pointer !important;
             display: flex;
             align-items: center;
             justify-content: center;
             transition: all 0.2s ease;
             backdrop-filter: blur(10px);
+            -webkit-app-region: no-drag !important;
+            pointer-events: auto !important;
+        }
+        .ag-win-btn svg,
+        .ag-win-btn path,
+        #btn-about img,
+        #btn-config span {
+            pointer-events: none !important;
+        }
+        #btn-about, #btn-config {
+            -webkit-app-region: no-drag !important;
+            pointer-events: auto !important;
+            cursor: pointer !important;
         }
         .ag-win-btn:hover {
             background: rgba(255, 255, 255, 0.15);

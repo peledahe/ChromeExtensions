@@ -5,11 +5,261 @@
 
 (function() {
   let isInjectingDemo = false;
+  const genericChangeListeners = [];
 
-  // Inicialización de la estructura mock de QWebChannel
-  window.qt = {
-    webChannelTransport: {}
-  };
+  function createLocalStorageArea() {
+    return {
+      get: function(keys, callback) {
+        const result = {};
+        const keyList = Array.isArray(keys) ? keys : (typeof keys === 'string' ? [keys] : (keys && typeof keys === 'object' ? Object.keys(keys) : null));
+        if (keyList === null) {
+          for (let i = 0; i < localStorage.length; i++) {
+            const k = localStorage.key(i);
+            try { result[k] = JSON.parse(localStorage.getItem(k)); } catch (e) { result[k] = localStorage.getItem(k); }
+          }
+        } else {
+          keyList.forEach((k) => {
+            const val = localStorage.getItem(k);
+            if (val !== null) {
+              try { result[k] = JSON.parse(val); } catch (e) { result[k] = val; }
+            } else if (keys && typeof keys === 'object' && !Array.isArray(keys) && keys[k] !== undefined) {
+              result[k] = keys[k];
+            }
+          });
+        }
+        if (typeof callback === 'function') callback(result);
+      },
+      set: function(items, callback) {
+        const changes = {};
+        if (items && typeof items === 'object') {
+          Object.keys(items).forEach((k) => {
+            const oldVal = localStorage.getItem(k);
+            let parsedOld = undefined;
+            if (oldVal !== null) {
+              try { parsedOld = JSON.parse(oldVal); } catch (e) { parsedOld = oldVal; }
+            }
+            localStorage.setItem(k, JSON.stringify(items[k]));
+            changes[k] = { oldValue: parsedOld, newValue: items[k] };
+          });
+        }
+        genericChangeListeners.forEach((fn) => {
+          try { fn(changes, 'local'); } catch (e) { console.error(e); }
+        });
+        if (typeof callback === 'function') callback();
+      },
+      remove: function(keys, callback) {
+        const keyList = Array.isArray(keys) ? keys : [keys];
+        const changes = {};
+        keyList.forEach((k) => {
+          const oldVal = localStorage.getItem(k);
+          let parsedOld = undefined;
+          if (oldVal !== null) {
+            try { parsedOld = JSON.parse(oldVal); } catch (e) { parsedOld = oldVal; }
+          }
+          localStorage.removeItem(k);
+          changes[k] = { oldValue: parsedOld, newValue: undefined };
+        });
+        genericChangeListeners.forEach((fn) => {
+          try { fn(changes, 'local'); } catch (e) { console.error(e); }
+        });
+        if (typeof callback === 'function') callback();
+      }
+    };
+  }
+
+  // Polyfill de chrome.storage y chrome.identity para entorno Electron Desktop y Minichrome
+  if (typeof window.chrome === 'undefined') {
+    window.chrome = {};
+  }
+  window.chrome.runtime = window.chrome.runtime || { lastError: undefined };
+
+  if (window.desktop) {
+    const desktopChangeListeners = [];
+    if (window.desktop.onStorageChanged && window.desktop.onStorageChanged.addListener) {
+      window.desktop.onStorageChanged.addListener((changes, area) => {
+        desktopChangeListeners.forEach((fn) => {
+          try { fn(changes, area || 'local'); } catch (e) { console.error(e); }
+        });
+      });
+    }
+
+    function createDesktopStorageArea() {
+      return {
+        get: function(keys, callback) {
+          window.desktop.storage.get(keys).then((res) => {
+            if (typeof callback === 'function') callback(res || {});
+          });
+        },
+        set: function(items, callback) {
+          window.desktop.storage.set(items).then(() => {
+            if (typeof callback === 'function') callback();
+          });
+        },
+        remove: function(keys, callback) {
+          window.desktop.storage.remove(keys).then(() => {
+            if (typeof callback === 'function') callback();
+          });
+        }
+      };
+    }
+
+    window.chrome.storage = {
+      local: createDesktopStorageArea(),
+      sync: createDesktopStorageArea(),
+      onChanged: {
+        addListener: function(fn) {
+          if (typeof fn === 'function') desktopChangeListeners.push(fn);
+        }
+      }
+    };
+    window.chrome.identity = {
+      getAuthToken: function(options, callback) {
+        window.desktop.getAuthToken(options || {}).then((res) => {
+          window.chrome.runtime.lastError = res && res.error ? { message: res.error } : undefined;
+          if (typeof callback === 'function') callback(res && res.token);
+        });
+      },
+      removeCachedAuthToken: function(_options, callback) {
+        window.chrome.runtime.lastError = undefined;
+        if (typeof callback === 'function') callback();
+      }
+    };
+  } else if (!window.chrome.storage || !window.chrome.storage.local) {
+    // Minichrome y navegadores web
+    window.chrome.storage = {
+      local: createLocalStorageArea(),
+      sync: createLocalStorageArea(),
+      onChanged: {
+        addListener: function(fn) {
+          if (typeof fn === 'function') genericChangeListeners.push(fn);
+        }
+      }
+    };
+    function loadGisLibrary() {
+      return new Promise((resolve) => {
+        if (window.google?.accounts?.oauth2) return resolve(true);
+        const s = document.createElement('script');
+        s.src = 'https://accounts.google.com/gsi/client';
+        s.async = true;
+        s.defer = true;
+        s.onload = () => resolve(true);
+        s.onerror = () => resolve(false);
+        document.head.appendChild(s);
+      });
+    }
+
+    function showWebAuthModal(scopes, callback) {
+      const existing = document.getElementById('ag-auth-modal');
+      if (existing) existing.remove();
+
+      const overlay = document.createElement('div');
+      overlay.id = 'ag-auth-modal';
+      overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;z-index:99999;font-family:sans-serif;padding:16px;';
+
+      const modal = document.createElement('div');
+      modal.style.cssText = 'background:#111827;border:1px solid rgba(255,255,255,0.15);border-radius:14px;padding:24px;max-width:460px;width:100%;color:#f3f4f6;box-shadow:0 20px 40px rgba(0,0,0,0.6);';
+
+      modal.innerHTML = `
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+          <span style="font-size:24px;">🔑</span>
+          <h3 style="margin:0;font-size:18px;font-weight:700;color:#fff;">Conectar Google Apps (Minichrome)</h3>
+        </div>
+        <p style="font-size:13px;color:#9ca3af;line-height:1.5;margin:0 0 16px;">
+          Inicia sesión con tu cuenta de Google para sincronizar tus datos con Google Drive y Calendar.
+        </p>
+        <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:20px;">
+          <button id="ag-auth-login-btn" style="background:#2563eb;color:#fff;border:none;border-radius:8px;padding:11px 16px;font-weight:600;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;gap:8px;">
+            <span>🌐</span> Iniciar sesión con Google
+          </button>
+          <div style="display:flex;align-items:center;gap:8px;margin:4px 0;">
+            <div style="flex:1;height:1px;background:rgba(255,255,255,0.1);"></div>
+            <span style="font-size:11px;color:#6b7280;text-transform:uppercase;">o ingresar token</span>
+            <div style="flex:1;height:1px;background:rgba(255,255,255,0.1);"></div>
+          </div>
+          <input id="ag-auth-token-input" type="password" placeholder="Pegar Access Token (ya29...)" style="background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.15);border-radius:8px;padding:10px 14px;color:#fff;font-size:13px;width:100%;box-sizing:border-box;" />
+        </div>
+        <div style="display:flex;justify-content:flex-end;gap:10px;">
+          <button id="ag-auth-cancel-btn" style="background:transparent;border:1px solid rgba(255,255,255,0.2);color:#9ca3af;border-radius:8px;padding:8px 16px;cursor:pointer;font-size:13px;">Cancelar</button>
+          <button id="ag-auth-save-btn" style="background:#10b981;border:none;color:#fff;border-radius:8px;padding:8px 16px;cursor:pointer;font-weight:600;font-size:13px;">Guardar Token</button>
+        </div>
+      `;
+
+      overlay.appendChild(modal);
+      document.body.appendChild(overlay);
+
+      const close = (token) => {
+        overlay.remove();
+        if (typeof callback === 'function') callback(token);
+      };
+
+      modal.querySelector('#ag-auth-cancel-btn').onclick = () => close(null);
+      modal.querySelector('#ag-auth-save-btn').onclick = () => {
+        const tok = modal.querySelector('#ag-auth-token-input').value.trim();
+        if (tok) {
+          localStorage.setItem('gdrive_token', tok);
+          close(tok);
+        } else {
+          close(null);
+        }
+      };
+
+      modal.querySelector('#ag-auth-login-btn').onclick = async () => {
+        const isGisReady = await loadGisLibrary();
+        const clientId = localStorage.getItem('google_client_id') || '136352780967-h1r5murn40hf23gdas5f2s4ft9keb9q7.apps.googleusercontent.com';
+        const scopeStr = Array.isArray(scopes) ? scopes.join(' ') : 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/calendar';
+        
+        if (isGisReady && window.google?.accounts?.oauth2) {
+          try {
+            const client = window.google.accounts.oauth2.initTokenClient({
+              client_id: clientId,
+              scope: scopeStr,
+              callback: (res) => {
+                if (res && res.access_token) {
+                  localStorage.setItem('gdrive_token', res.access_token);
+                  close(res.access_token);
+                } else {
+                  console.warn('GIS respuesta sin token:', res);
+                }
+              }
+            });
+            client.requestAccessToken({ prompt: 'consent' });
+          } catch (err) {
+            console.error('Error GIS client:', err);
+          }
+        } else {
+          window.open(`https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(clientId)}&response_type=token&redirect_uri=${encodeURIComponent(window.location.origin || 'http://localhost')}&scope=${encodeURIComponent(scopeStr)}`, '_blank');
+        }
+      };
+    }
+
+    window.chrome.identity = window.chrome.identity || {
+      getAuthToken: function(options, callback) {
+        const cached = localStorage.getItem('gdrive_token');
+        if (cached) {
+          if (typeof callback === 'function') callback(cached);
+          return;
+        }
+
+        if (options && options.interactive) {
+          const scopes = (options.scopes && options.scopes.length > 0) ? options.scopes : ['https://www.googleapis.com/auth/drive.file', 'https://www.googleapis.com/auth/calendar'];
+          showWebAuthModal(scopes, callback);
+        } else {
+          if (typeof callback === 'function') callback(null);
+        }
+      },
+      removeCachedAuthToken: function(_options, callback) {
+        localStorage.removeItem('gdrive_token');
+        if (typeof callback === 'function') callback();
+      }
+    };
+  }
+
+  // Inicialización segura de QWebChannel sin pisar el transporte nativo de Qt si existe
+  if (typeof window.qt === 'undefined') {
+    window.qt = {
+      webChannelTransport: {}
+    };
+  }
 
   // Helper para interactuar con chrome.storage.local/sync de forma asíncrona
   const storage = {
@@ -329,7 +579,7 @@
   }
 
   window.injectDemoData = injectDemoData;
-  injectDemoData(false).catch(err => console.error("Error inyectando demo:", err));
+  // Escritorio: primera instalación usa datos locales vacíos, sin demo y sin exigir Google Drive.
 
   // Helper para obtener el siguiente ID de una lista
   function getNextId(items) {
@@ -342,12 +592,18 @@
   // --- MOCK DE PY (AgendaBridge) ---
   const mockPy = {
     // Control de ventanas (no operativo en extensión de Chrome)
-    window_minimize: async function() {},
-    window_maximize: async function() {},
+    window_minimize: async function() {
+      if (window.desktop && window.desktop.minimize) return window.desktop.minimize();
+    },
+    window_maximize: async function() {
+      if (window.desktop && window.desktop.maximize) return window.desktop.maximize();
+    },
     window_close: async function() {
+      if (window.desktop && window.desktop.close) return window.desktop.close();
       window.close();
     },
     close_app: async function() {
+      if (window.desktop && window.desktop.close) return window.desktop.close();
       window.close();
     },
 

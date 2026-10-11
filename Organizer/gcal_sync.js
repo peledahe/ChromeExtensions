@@ -14,8 +14,9 @@ let cachedAccessToken = null;
 async function initGCalendarSync() {
     if (typeof chrome === 'undefined' || !chrome.storage) return;
 
-    chrome.storage.local.get(['gcal_connected', 'gcal_selected_calendars', 'gcal_destination_calendar'], (result) => {
-        if (result.gcal_connected) {
+    chrome.storage.local.get(['gcal_connected', 'gcal_selected_calendars', 'gcal_destination_calendar', 'google_refresh_token'], (result) => {
+        // En la extensión hace falta la cuenta conectada con el cliente nuevo.
+        if (result.gcal_connected && (window.desktop || result.google_refresh_token)) {
             gcalState.connected = true;
         }
         if (result.gcal_selected_calendars) {
@@ -34,49 +35,59 @@ async function initGCalendarSync() {
 }
 
 // Conectar con Google Calendar
-function signInGCalendar() {
-    if (navigator.userAgent.includes('Edg/')) {
-        window.showToast('La API de Google Calendar no está soportada en Microsoft Edge.', 'error');
-        return;
-    }
-
-    if (typeof chrome === 'undefined' || !chrome.identity) {
-        window.showToast('La API de identidad de Chrome no está disponible.', 'error');
-        return;
-    }
-
+async function signInGCalendar() {
     gcalState.syncing = true;
     updateGCalUI();
 
-    chrome.identity.getAuthToken({ interactive: true }, (token) => {
-        gcalState.syncing = false;
-        
-        if (chrome.runtime.lastError || !token) {
-            const errObj = chrome.runtime.lastError;
-            const errMsg = errObj ? (errObj.message || JSON.stringify(errObj)) : 'Token no recibido';
-            console.error('Google Calendar Auth error:', errObj);
-            window.showToast(`Error al conectar con Google Calendar: ${errMsg}`, 'error');
+    let token = null;
+    if (window.desktop && typeof window.desktop.signInGoogle === 'function') {
+        const res = await window.desktop.signInGoogle();
+        if (res && res.token) {
+            token = res.token;
+        } else {
+            const err = res && res.error ? res.error : 'No se pudo conectar con Google Calendar';
+            window.showToast(err, 'info');
+            gcalState.syncing = false;
             gcalState.connected = false;
             updateGCalUI();
             return;
         }
+    } else if (typeof chrome !== 'undefined' && chrome.tabs) {
+        try {
+            token = await googleSignInExtension();
+        } catch (err) {
+            window.showToast(`No se pudo conectar con Google: ${err.message}`, 'error');
+        }
+    }
 
+    gcalState.syncing = false;
+    if (token) {
         cachedAccessToken = token;
         gcalState.connected = true;
-        chrome.storage.local.set({ gcal_connected: true }, () => {
+        chrome.storage.local.set({ gcal_connected: true, gdrive_token: token }, () => {
             window.showToast('Conectado a Google Calendar exitosamente', 'success');
+            updateGCalUI();
             fetchGCalendars();
         });
-    });
+    } else {
+        gcalState.connected = false;
+        updateGCalUI();
+    }
 }
 
 // Desconectar Google Calendar
-function signOutGCalendar() {
+async function signOutGCalendar() {
     gcalState.connected = false;
     gcalState.calendars = [];
     gcalState.events = [];
     window.gcalEvents = [];
     cachedAccessToken = null;
+
+    if (window.desktop && typeof window.desktop.signOutGoogle === 'function') {
+        await window.desktop.signOutGoogle();
+    } else if (typeof chrome !== 'undefined' && chrome.tabs) {
+        await signOutExtensionGoogle();
+    }
     
     chrome.storage.local.remove(['gcal_connected', 'gcal_selected_calendars', 'gcal_destination_calendar'], () => {
         window.showToast('Desconectado de Google Calendar.', 'success');
@@ -308,50 +319,157 @@ async function publishAllRemindersToGCal(remindersList) {
     }
 }
 
-// Obtener token de identidad de Chrome con promesa
-function getAuthTokenPromise() {
-    if (cachedAccessToken) {
-        return Promise.resolve(cachedAccessToken);
-    }
-    return new Promise((resolve) => {
-        if (typeof chrome === 'undefined' || !chrome.identity) {
-            resolve(null);
-            return;
-        }
-        chrome.identity.getAuthToken({ interactive: false }, (token) => {
-            if (chrome.runtime.lastError || !token) {
-                resolve(null);
-            } else {
-                cachedAccessToken = token;
-                resolve(token);
-            }
-        });
-    });
+// Obtener token de identidad de Chrome / Escritorio con promesa
+// ── Cuenta de Google de la extensión ────────────────────────────────────────
+// La extensión usa el mismo cliente OAuth de escritorio que Mk Organizer y
+// Minichrome (proyecto 136352780967): ahí está activa la Drive API y, con el
+// permiso drive.file, las tres apps ven el mismo mkorganizer_data.json. Su antiguo
+// cliente (chrome.identity, proyecto 488512596557) no tenía la Drive API activa y
+// usaba un archivo aparte. Flujo para apps instaladas: PKCE + redirección a
+// 127.0.0.1, que la extensión captura en la pestaña con chrome.tabs.onUpdated.
+// (Google no trata como secreto el client_secret de un cliente de escritorio.)
+// Las credenciales viven en credentials.js (ignorado por git); ver credentials.example.js.
+const EXT_GOOGLE_CLIENT_ID = (window.GOOGLE_CREDENTIALS || {}).clientId || '';
+const EXT_GOOGLE_CLIENT_SECRET = (window.GOOGLE_CREDENTIALS || {}).clientSecret || '';
+const EXT_GOOGLE_SCOPES = 'openid email https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/calendar';
+
+function extStorageGet(keys) {
+    return new Promise((resolve) => chrome.storage.local.get(keys, (r) => resolve(r || {})));
+}
+function extStorageSet(items) {
+    return new Promise((resolve) => chrome.storage.local.set(items, resolve));
+}
+function b64url(bytes) {
+    let bin = '';
+    bytes.forEach((b) => { bin += String.fromCharCode(b); });
+    return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
-// Wrapper de fetch que maneja expiración de tokens
+async function googleTokenRequest(params) {
+    const response = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ client_id: EXT_GOOGLE_CLIENT_ID, client_secret: EXT_GOOGLE_CLIENT_SECRET, ...params })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+        const err = new Error(data.error_description || data.error || `Google respondió ${response.status}`);
+        err.code = data.error;
+        throw err;
+    }
+    return data;
+}
+
+async function saveExtensionTokens(tok) {
+    const items = {
+        gdrive_token: tok.access_token,
+        gdrive_token_expiry: Date.now() + (Number(tok.expires_in) || 3600) * 1000 - 60000
+    };
+    if (tok.refresh_token) items.google_refresh_token = tok.refresh_token;
+    await extStorageSet(items);
+    cachedAccessToken = tok.access_token;
+    if (window.syncState) window.syncState.accessToken = tok.access_token;
+}
+
+// Abre el inicio de sesión de Google en una pestaña y devuelve el token de acceso.
+async function googleSignInExtension() {
+    if (typeof chrome === 'undefined' || !chrome.tabs || !chrome.tabs.create || !chrome.tabs.onUpdated) {
+        throw new Error('El inicio de sesión de Google no está disponible aquí.');
+    }
+    const verifier = b64url(crypto.getRandomValues(new Uint8Array(32)));
+    const challenge = b64url(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier))));
+    const state = b64url(crypto.getRandomValues(new Uint8Array(16)));
+    const redirect = `http://127.0.0.1:${40000 + Math.floor(Math.random() * 20000)}/`;
+    const authUrl = 'https://accounts.google.com/o/oauth2/v2/auth?' + new URLSearchParams({
+        client_id: EXT_GOOGLE_CLIENT_ID, redirect_uri: redirect, response_type: 'code', scope: EXT_GOOGLE_SCOPES,
+        code_challenge: challenge, code_challenge_method: 'S256', state, access_type: 'offline', prompt: 'consent'
+    });
+    const tab = await chrome.tabs.create({ url: authUrl });
+
+    const code = await new Promise((resolve, reject) => {
+        let done = false;
+        const finish = (fn, value) => {
+            if (done) return;
+            done = true;
+            clearTimeout(timer);
+            chrome.tabs.onUpdated.removeListener(onUpdated);
+            chrome.tabs.onRemoved.removeListener(onRemoved);
+            fn(value);
+        };
+        const onUpdated = (tabId, info, t) => {
+            const url = (info && info.url) || (t && t.url) || '';
+            if (tabId !== tab.id || !url.startsWith(redirect)) return;
+            chrome.tabs.remove(tabId, () => void chrome.runtime.lastError);
+            const q = new URL(url).searchParams;
+            if (q.get('error')) return finish(reject, new Error(q.get('error') === 'access_denied' ? 'Inicio de sesión cancelado.' : `Google: ${q.get('error')}`));
+            if (q.get('state') !== state || !q.get('code')) return finish(reject, new Error('La respuesta de Google no corresponde a este inicio de sesión.'));
+            finish(resolve, q.get('code'));
+        };
+        const onRemoved = (tabId) => {
+            if (tabId === tab.id) finish(reject, new Error('Se cerró la pestaña de inicio de sesión.'));
+        };
+        const timer = setTimeout(() => finish(reject, new Error('Tiempo de espera agotado al conectar con Google.')), 5 * 60 * 1000);
+        chrome.tabs.onUpdated.addListener(onUpdated);
+        chrome.tabs.onRemoved.addListener(onRemoved);
+    });
+
+    const tok = await googleTokenRequest({ grant_type: 'authorization_code', code, code_verifier: verifier, redirect_uri: redirect });
+    if (!tok.refresh_token) throw new Error('Google no entregó un permiso permanente. Inténtalo de nuevo.');
+    await saveExtensionTokens(tok);
+    await extStorageSet({ gcal_connected: true });
+    return tok.access_token;
+}
+
+async function signOutExtensionGoogle() {
+    const { google_refresh_token: rt } = await extStorageGet(['google_refresh_token']);
+    cachedAccessToken = null;
+    await new Promise((resolve) => chrome.storage.local.remove(['google_refresh_token', 'gdrive_token', 'gdrive_token_expiry'], resolve));
+    if (rt) fetch('https://oauth2.googleapis.com/revoke?token=' + encodeURIComponent(rt), { method: 'POST' }).catch(() => {});
+}
+
+// ── Token de Google (Calendar y Drive) ──────────────────────────────────────
+// Los tokens de acceso duran ~1 h: se renuevan con el token de actualización
+// (escritorio: lo hace el proceso principal). Ante un 401 se pide otro una vez.
+async function getAuthTokenPromise(forceRefresh = false) {
+    if (cachedAccessToken && !forceRefresh) return cachedAccessToken;
+    cachedAccessToken = null;
+
+    // Escritorio (Mk Organizer / Minichrome): el proceso principal renueva el token.
+    if (window.desktop && typeof window.desktop.getAuthToken === 'function') {
+        try {
+            const auth = await window.desktop.getAuthToken();
+            if (auth && auth.token) return (cachedAccessToken = auth.token);
+        } catch (e) {}
+        return null;
+    }
+
+    if (typeof chrome === 'undefined' || !chrome.storage || !chrome.storage.local) return null;
+    const st = await extStorageGet(['google_refresh_token', 'gdrive_token', 'gdrive_token_expiry']);
+    if (!st.google_refresh_token) return null;   // hay que conectar la cuenta de Google
+    if (!forceRefresh && st.gdrive_token && Number(st.gdrive_token_expiry) > Date.now()) {
+        return (cachedAccessToken = st.gdrive_token);
+    }
+    try {
+        const tok = await googleTokenRequest({ grant_type: 'refresh_token', refresh_token: st.google_refresh_token });
+        await saveExtensionTokens(tok);
+        return tok.access_token;
+    } catch (e) {
+        if (e.code === 'invalid_grant') {   // revocado o caducado: hay que volver a conectar
+            await new Promise((resolve) => chrome.storage.local.remove(['google_refresh_token', 'gdrive_token', 'gdrive_token_expiry'], resolve));
+        }
+        return null;
+    }
+}
+
 async function fetchWithAuth(url, options = {}) {
     let token = await getAuthTokenPromise();
     if (!token) throw new Error('No autorizado');
 
-    options.headers = options.headers || {};
-    options.headers['Authorization'] = `Bearer ${token}`;
-
-    let response = await fetch(url, options);
-
+    const call = (t) => fetch(url, { ...options, headers: { ...(options.headers || {}), Authorization: `Bearer ${t}` } });
+    let response = await call(token);
     if (response.status === 401) {
-        cachedAccessToken = null;
-        // Remover token caducado de la caché de Chrome
-        await new Promise((resolve) => {
-            chrome.identity.removeCachedAuthToken({ token: token }, resolve);
-        });
-
-        // Intentar obtener un token nuevo
-        token = await getAuthTokenPromise();
-        if (token) {
-            options.headers['Authorization'] = `Bearer ${token}`;
-            response = await fetch(url, options);
-        }
+        token = await getAuthTokenPromise(true);
+        if (token) response = await call(token);
     }
     return response;
 }
@@ -487,10 +605,16 @@ function updateGCalUI() {
 // Exponer funciones y variables al ámbito global
 window.initGCalendarSync = initGCalendarSync;
 window.gcalState = gcalState;
+window.signInGCalendar = signInGCalendar;
+window.signOutGCalendar = signOutGCalendar;
 window.publishReminderToGCal = publishReminderToGCal;
 window.publishAllRemindersToGCal = publishAllRemindersToGCal;
 window.fetchGCalEvents = fetchGCalEvents;
 window.fetchGCalendars = fetchGCalendars;
+window.getAuthTokenPromise = getAuthTokenPromise;
+window.googleSignInExtension = googleSignInExtension;
+window.signOutExtensionGoogle = signOutExtensionGoogle;
+window.fetchWithAuth = fetchWithAuth;
 
 document.addEventListener('DOMContentLoaded', () => {
     initGCalendarSync();

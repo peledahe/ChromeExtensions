@@ -1,2 +1,10 @@
 .agents/
 .clinerules
+
+# Credenciales y secretos
+credentials.js
+.env
+.env.*
+*.pem
+*.key
+client_secret*.json

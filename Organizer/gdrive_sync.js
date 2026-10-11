@@ -1,6 +1,4 @@
-// gdrive_sync.js - Sincronización local-first opcional con Google Drive
-
-const GDRIVE_SCOPES = 'https://www.googleapis.com/auth/drive.file';
+// gdrive_sync.js - Escritorio: local-first hasta conectar; Drive es fuente principal si existe archivo.
 
 const syncState = {
     connected: false,
@@ -9,11 +7,22 @@ const syncState = {
     accessToken: null
 };
 
-// Inicializar estado de sincronización
+function notifySync(msg, type) {
+    if (typeof window.showToast === 'function') window.showToast(msg, type);
+    else if (typeof notify === 'function') notify(msg, type);
+}
+
 async function initGDriveSync() {
     if (typeof chrome === 'undefined' || !chrome.storage) return;
 
-    chrome.storage.local.get(['gdrive_token', 'gdrive_last_sync'], (result) => {
+    chrome.storage.local.get(['gdrive_token', 'gdrive_last_sync', 'google_refresh_token'], (result) => {
+        if (result.gdrive_token && !window.desktop && !result.google_refresh_token) {
+            // Conexión anterior con el cliente viejo (proyecto sin Drive API y con
+            // un archivo aparte): hay que conectar otra vez para compartir datos.
+            chrome.storage.local.remove(['gdrive_token', 'gcal_connected']);
+            notifySync('Vuelve a conectar Google Drive: la extensión ahora usa la misma cuenta que Minichrome y Mk Organizer.', 'info');
+            result.gdrive_token = null;
+        }
         if (result.gdrive_token) {
             syncState.accessToken = result.gdrive_token;
             syncState.connected = true;
@@ -22,187 +31,307 @@ async function initGDriveSync() {
             syncState.lastSync = new Date(result.gdrive_last_sync).toLocaleString();
         }
         updateSyncUI();
-
-        // Verificar si hay backup disponible
         checkAndShowBackupOption();
 
-        // Sincronización silenciosa automática al abrir la aplicación si está conectado
         if (syncState.connected) {
             syncNow(true);
         }
     });
 }
 
-// Iniciar sesión con Google Drive usando la API nativa getAuthToken
-function signInGDrive() {
-    if (typeof chrome === 'undefined' || !chrome.identity) {
-        window.showToast('La API de identidad de Chrome no está disponible.', 'error');
-        return;
-    }
-
+async function signInGDrive() {
     syncState.syncing = true;
     updateSyncUI();
 
-    chrome.identity.getAuthToken({ interactive: true }, (token) => {
-        syncState.syncing = false;
-        
-        if (chrome.runtime.lastError || !token) {
-            const errObj = chrome.runtime.lastError;
-            const errMsg = errObj ? (errObj.message || JSON.stringify(errObj)) : 'Token no recibido';
-            console.error('Google Auth error object:', errObj);
-            
-            if (errMsg.includes('Microsoft Edge') || errMsg.includes('Edge')) {
-                window.showToast('La conexión nativa con Google Drive no está soportada en Microsoft Edge. Operando localmente de forma persistente.', 'info');
-            } else {
-                window.showToast(`Error al conectar con Google Drive: ${errMsg}. Operando localmente.`, 'info');
-            }
-            
+    let token = null;
+    if (window.desktop && typeof window.desktop.signInGoogle === 'function') {
+        const res = await window.desktop.signInGoogle();
+        if (res && res.token) {
+            token = res.token;
+        } else {
+            const err = res && res.error ? res.error : 'No se pudo conectar con Google. La app sigue funcionando en local.';
+            notifySync(err, 'info');
+            syncState.syncing = false;
             syncState.connected = false;
             updateSyncUI();
             return;
         }
+    } else if (typeof chrome !== 'undefined' && chrome.tabs) {
+        try {
+            token = await googleSignInExtension();
+        } catch (err) {
+            notifySync(`No se pudo conectar con Google: ${err.message}`, 'error');
+        }
+    } else {
+        notifySync('La capa de escritorio o identidad no está disponible.', 'error');
+        syncState.syncing = false;
+        updateSyncUI();
+        return;
+    }
 
+    syncState.syncing = false;
+    if (token) {
         syncState.accessToken = token;
         syncState.connected = true;
-        
-        chrome.storage.local.set({ gdrive_token: token, gdrive_force_download: true }, () => {
-            window.showToast('Conectado a Google Drive exitosamente', 'success');
+        chrome.storage.local.set({ gdrive_token: token }, () => {
+            notifySync('Conectado a Google Drive exitosamente', 'success');
             updateSyncUI();
-            syncNow(true); // Intentar sincronización automática inicial
+            // Sin «preferir Drive»: al conectar se combina lo de la extensión con lo
+            // que ya hay en Drive (ver la regla del primer uso de un archivo).
+            syncNow(true);
         });
-    });
+    } else {
+        syncState.connected = false;
+        updateSyncUI();
+    }
 }
 
-// Cerrar sesión
-function signOutGDrive() {
+async function signOutGDrive() {
+    if (window.desktop && window.desktop.signOutGoogle) {
+        await window.desktop.signOutGoogle();
+    } else if (typeof chrome !== 'undefined' && chrome.tabs) {
+        await signOutExtensionGoogle();
+    }
     syncState.accessToken = null;
     syncState.connected = false;
     chrome.storage.local.remove(['gdrive_token'], () => {
-        notify('Desconectado de Google Drive. Los datos permanecen locales.', 'success');
+        notifySync('Desconectado de Google Drive. Los datos permanecen locales.', 'success');
         updateSyncUI();
     });
 }
 
-// Sincronizar datos (subir o descargar)
-async function syncNow(auto = false) {
-    if (!syncState.connected || !syncState.accessToken) {
-        if (!auto) notify('Conéctate a Google Drive primero', 'info');
+// Llamadas a Drive con el token renovable de gcal_sync.js (fetchWithAuth). Cualquier
+// error de la API detiene la sincronización: antes un 401 se tomaba como «no hay
+// archivo» y se intentaba crear otro.
+async function driveRequest(url, options = {}) {
+    const response = await fetchWithAuth(url, options);
+    if (!response.ok) {
+        let detail = '';
+        try { const d = await response.json(); detail = (d.error && d.error.message) || ''; } catch (e) {}
+        throw new Error(`Google Drive respondió ${response.status}${detail ? ': ' + detail : ''}`);
+    }
+    return response.status === 204 ? null : response.json().catch(() => null);
+}
+
+async function findFileInGDrive(_token) {
+    const q = encodeURIComponent("name='mkorganizer_data.json' and trashed=false");
+    const data = await driveRequest(
+        `https://www.googleapis.com/drive/v3/files?q=${q}&spaces=drive&orderBy=modifiedTime desc&pageSize=10&fields=files(id,name,modifiedTime)`
+    );
+    return data && data.files && data.files.length > 0 ? data.files[0].id : null;
+}
+
+async function downloadFromGDrive(_token, fileId) {
+    return driveRequest(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`);
+}
+
+async function uploadToGDrive(_token, fileId, payload) {
+    await driveRequest(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    });
+}
+
+async function createInGDrive(token, payload) {
+    const boundary = '-------314159265358979323846';
+    const delimiter = `\r\n--${boundary}\r\n`;
+    const closeDelim = `\r\n--${boundary}--`;
+    const metadata = JSON.stringify({ name: 'mkorganizer_data.json', mimeType: 'application/json' });
+    const data = JSON.stringify(payload);
+    const body = delimiter +
+        'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
+        metadata +
+        delimiter +
+        'Content-Type: application/json\r\n\r\n' +
+        data +
+        closeDelim;
+
+    return driveRequest('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+        method: 'POST',
+        headers: { 'Content-Type': `multipart/related; boundary=${boundary}` },
+        body: body
+    });
+}
+
+// Para combinar sin duplicar: qué hace "igual" a un registro en cada lista.
+const DRIVE_MERGE_SIGNATURES = {
+    agenda: (x) => [x.text, x.dueDate || ''],
+    shopping: (x) => [x.text, Number(x.value) || 0, x.dueDate || ''],
+    income: (x) => [x.text, Number(x.value) || 0, x.dueDate || ''],
+    kanban_cards: (x) => [x.text],
+    notes: (x) => [x.content],
+    passwords: (x) => [x.site, x.username],
+    deudas_list: (x) => [x.name],
+    savings_goals: (x) => [x.name]
+};
+
+function hasDriveAppData(p) {
+    if (!p || typeof p !== 'object') return false;
+    const lists = ['agenda', 'shopping', 'income', 'kanban', 'kanban_cards', 'notes', 'passwords', 'deudas_list', 'savings_goals'];
+    if (lists.some((k) => Array.isArray(p[k]) && p[k].length > 0)) return true;
+    if (['budget_limits', 'budget_income_targets'].some((k) => p[k] && typeof p[k] === 'object' && Object.keys(p[k]).length > 0)) return true;
+    return Number(p.deudas_presupuesto) > 0;
+}
+
+// Une Drive y lo local la primera vez que se sincroniza con un archivo: nada se
+// pierde. Las listas se combinan (lo local que falte en Drive entra con un ID
+// nuevo); en lo demás manda Drive si lo tiene. Mismo criterio que Minichrome y
+// Mk Organizer de escritorio.
+function mergeDrivePayloads(remote, local) {
+    const merged = JSON.parse(JSON.stringify(remote || {}));
+    Object.entries(DRIVE_MERGE_SIGNATURES).forEach(([key, sig]) => {
+        const items = Array.isArray(merged[key]) ? merged[key] : [];
+        const seen = new Set(items.filter((x) => x && typeof x === 'object').map((x) => JSON.stringify(sig(x))));
+        let nextId = Math.max(0, ...items.map((x) => Number(x && x.id) || 0)) + 1;
+        (Array.isArray(local[key]) ? local[key] : []).forEach((item) => {
+            if (!item || typeof item !== 'object') return;
+            const s = JSON.stringify(sig(item));
+            if (seen.has(s)) return;
+            seen.add(s);
+            items.push({ ...item, id: nextId++ });
+        });
+        merged[key] = items;
+    });
+    merged.app_config = { ...(local.app_config || {}), ...(merged.app_config || {}) };
+    Object.keys(local).forEach((k) => {
+        const v = merged[k];
+        const empty = v === undefined || v === null || v === '' || v === 0
+            || (Array.isArray(v) && !v.length) || (v && typeof v === 'object' && !Object.keys(v).length);
+        if (empty) merged[k] = local[k];
+    });
+    return merged;
+}
+
+function canonicalDriveValue(value) {
+    if (Array.isArray(value)) return `[${value.map(canonicalDriveValue).join(',')}]`;
+    if (value && typeof value === 'object') {
+        return `{${Object.keys(value).sort().map((k) => `${JSON.stringify(k)}:${canonicalDriveValue(value[k])}`).join(',')}}`;
+    }
+    return JSON.stringify(value === undefined ? null : value);
+}
+
+// ¿El archivo ya tiene exactamente lo que se subiría? (sin contar la fecha ni marcas internas)
+function sameDriveContent(local, remote) {
+    if (!remote || typeof remote !== 'object') return false;
+    const ignore = new Set(['timestamp', 'local_data_modified']);
+    return Object.keys(local).every((k) => ignore.has(k) || canonicalDriveValue(local[k]) === canonicalDriveValue(remote[k]));
+}
+
+async function syncNow(auto = false, preferDrive = false) {
+    if (!syncState.connected && !auto) {
+        notifySync('Conéctate a Google Drive primero', 'info');
         return;
     }
+    // Al abrir se pide sincronizar más de una vez; dos a la vez sin archivo en
+    // Drive creaban mkorganizer_data.json duplicado.
+    if (auto && syncState.syncing) return;
 
     syncState.syncing = true;
     updateSyncUI();
 
     try {
-        // 1. Obtener todos los datos locales, incluyendo banderas de control
-        const keys = [
-            'agenda', 'shopping', 'income', 'kanban', 'notes', 'passwords', 'app_config', 
-            'deudas_list', 'deudas_presupuesto', 'budget_limits',
-            'gdrive_force_download', 'local_data_modified', 'gdrive_last_sync'
-        ];
-        
-        chrome.storage.local.get(keys, async (localData) => {
-            const forceDownload = localData.gdrive_force_download === true;
-            const dataModified = localData.local_data_modified === true;
-            const lastSyncTime = localData.gdrive_last_sync || 0;
-
-            // Limpiamos las banderas de control del objeto que subiremos a Google Drive
-            delete localData.gdrive_force_download;
-            delete localData.local_data_modified;
-            delete localData.gdrive_last_sync;
-
-            localData.timestamp = Date.now();
-
-            // 2. Buscar si ya existe el archivo en Drive
-            const fileId = await findFileInGDrive('mkorganizer_data.json');
-            
-            if (fileId) {
-                // Descargar archivo de Drive para comparar marcas de tiempo
-                const remoteData = await downloadFromGDrive(fileId);
-                
-                if (remoteData && remoteData.timestamp) {
-                    const remoteTs = remoteData.timestamp || 0;
-
-                    // CASO A: Primera sincronización tras pulsar conectar Google Drive
-                    if (forceDownload) {
-                        // Limpiar la bandera para evitar loops
-                        chrome.storage.local.remove(['gdrive_force_download']);
-
-                        // SIEMPRE pedir confirmación al conectar Google Drive por primera vez
-                        // para evitar sobrescribir datos locales valiosos
-                        const hasLocalData = localData.agenda || localData.kanban || localData.shopping || localData.notes;
-
-                        if (hasLocalData) {
-                            // El usuario tiene datos locales, SIEMPRE preguntar
-                            window.showConfirm(
-                                '⚠️ IMPORTANTE: Se encontraron datos previos en Google Drive.\n\n' +
-                                '¿Qué deseas hacer?\n\n' +
-                                '✅ "SÍ": Descargar datos de Google Drive (CUIDADO: perderás datos locales)\n' +
-                                '❌ "NO": Mantener datos locales y subirlos a Google Drive',
-                                async (confirm) => {
-                                    if (confirm) {
-                                        // Crear backup local antes de sobrescribir
-                                        chrome.storage.local.set({ 'backup_before_sync': localData });
-                                        await applyDownloadedData(remoteData);
-                                        syncState.lastSync = new Date().toLocaleString();
-                                        chrome.storage.local.set({ gdrive_last_sync: Date.now() });
-                                        notify('Datos descargados de Google Drive. Backup local guardado.', 'success');
-                                        setTimeout(() => location.reload(), 1500);
-                                    } else {
-                                        // Conservar locales y sobrescribir la nube
-                                        await uploadToGDrive(fileId, localData);
-                                        chrome.storage.local.set({ local_data_modified: true, gdrive_last_sync: Date.now() });
-                                        notify('Datos locales sincronizados a Google Drive', 'success');
-                                        finishSync();
-                                    }
-                                }
-                            );
-                        } else {
-                            // Sin datos locales, descargar de Google Drive silenciosamente
-                            await applyDownloadedData(remoteData);
-                            syncState.lastSync = new Date().toLocaleString();
-                            chrome.storage.local.set({ gdrive_last_sync: Date.now() });
-                            notify('Datos recuperados de Google Drive exitosamente', 'success');
-                            setTimeout(() => location.reload(), 1000);
-                        }
-                        return;
-                    }
-
-                    // CASO B: Sincronización normal posterior. Comparamos contra la marca del último sync local
-                    if (remoteTs > lastSyncTime && !auto) {
-                        // Los datos remotos son más nuevos, preguntar antes de sobrescribir
-                        window.showConfirm('Los datos en Google Drive son más recientes. ¿Deseas descargar los datos de la nube y sobrescribir los locales?', async (confirm) => {
-                            if (confirm) {
-                                await applyDownloadedData(remoteData);
-                                syncState.lastSync = new Date().toLocaleString();
-                                chrome.storage.local.set({ gdrive_last_sync: Date.now() });
-                                notify('Datos descargados y aplicados correctamente', 'success');
-                                setTimeout(() => location.reload(), 1000);
-                            } else {
-                                // Forzar subida de datos locales
-                                await uploadToGDrive(fileId, localData);
-                                finishSync();
-                            }
-                        });
-                        return;
-                    }
-                }
-                
-                // Si no hay conflicto o los datos locales son más recientes, subir
-                await uploadToGDrive(fileId, localData);
-            } else {
-                // Crear archivo nuevo en Drive
-                await createInGDrive('mkorganizer_data.json', localData);
-                if (forceDownload) {
-                    chrome.storage.local.remove(['gdrive_force_download']);
-                }
+        if (window.desktop && typeof window.desktop.syncDrive === 'function') {
+            const result = await window.desktop.syncDrive({ auto: !!auto, preferDrive: !!preferDrive });
+            if (!result || !result.ok) {
+                throw new Error((result && result.error) || 'Fallo en la sincronización');
             }
+            if (result.action === 'download') {
+                notifySync('Datos de Google Drive aplicados. Recargando…', 'success');
+                setTimeout(() => location.reload(), 800);
+                return;
+            }
+            if (!auto) {
+                notifySync(result.action === 'create' ? 'Se creó mkorganizer_data.json en Google Drive con tus datos.' : 'Sincronización con Google Drive completada', 'success');
+            }
+        } else {
+            const token = await getAuthTokenPromise();
+            if (!token) throw new Error('No hay sesión de Google activa');
 
-            finishSync();
-        });
+            const keys = [
+                'agenda', 'shopping', 'income', 'kanban', 'kanban_cards', 'notes', 'passwords', 'app_config', 
+                'deudas_list', 'deudas_presupuesto', 'savings_goals', 'budget_limits', 'budget_income_targets',
+                'budget_currency_symbol', 'budget_currency_code', 'budget_second_currency_enabled',
+                'budget_second_currency_symbol', 'budget_second_currency_code', 'budget_exchange_rate',
+                'budget_categories'
+            ];
+
+            const localData = await new Promise((res) => chrome.storage.local.get(keys, res));
+            const lastSync = await new Promise((res) => chrome.storage.local.get(['gdrive_last_sync'], (r) => res(r && r.gdrive_last_sync ? r.gdrive_last_sync : 0)));
+
+            const fileId = await findFileInGDrive(token);
+            const lastFileId = await new Promise((res) => chrome.storage.local.get(['gdrive_file_id'], (r) => res((r && r.gdrive_file_id) || '')));
+            const rememberFile = (id) => new Promise((res) => chrome.storage.local.set({ gdrive_file_id: id || '' }, res));
+            if (fileId) {
+                const remoteData = await downloadFromGDrive(token, fileId);
+                const hasRemote = hasDriveAppData(remoteData);
+                const remoteTs = Number(remoteData && remoteData.timestamp) || 0;
+                const hasLocal = hasDriveAppData(localData);
+
+                // Primera vez con este archivo (nunca se sincronizó, o antes se usaba otro,
+                // p. ej. de otro proyecto de Google): combinar en lugar de reemplazar.
+                if ((!lastSync || lastFileId !== fileId) && hasLocal && hasRemote && !preferDrive) {
+                    await new Promise((res) => chrome.storage.local.set({ backup_before_sync: { ...localData }, backup_drive_before_merge: remoteData }, res));
+                    const merged = mergeDrivePayloads(remoteData, localData);
+                    merged.timestamp = Date.now();
+                    await uploadToGDrive(token, fileId, merged);
+                    const { timestamp, ...toStore } = merged;
+                    await new Promise((res) => chrome.storage.local.set(toStore, res));
+                    await new Promise((res) => chrome.storage.local.set({ gdrive_last_sync: merged.timestamp }, res));
+                    await rememberFile(fileId);
+                    notifySync('Se combinaron tus datos con los de Google Drive. Actualizando…', 'success');
+                    setTimeout(() => location.reload(), 800);
+                    return;
+                }
+
+                const driveIsSource = hasRemote && (preferDrive || (!lastSync && !hasLocal) || (remoteTs > (lastSync + 2000)));
+
+                if (driveIsSource) {
+                    if (hasLocal) {
+                        await new Promise((res) => chrome.storage.local.set({ backup_before_sync: { ...localData } }, res));
+                    }
+                    await new Promise((res) => chrome.storage.local.set(remoteData, res));
+                    await new Promise((res) => chrome.storage.local.set({ gdrive_last_sync: Math.max(Date.now(), remoteTs) }, res));
+                    await rememberFile(fileId);
+                    notifySync('Datos descargados de Google Drive. Actualizando…', 'success');
+                    setTimeout(() => location.reload(), 800);
+                    return;
+                } else if (sameDriveContent(localData, remoteData)) {
+                    // Nada que subir: no se cambia la fecha del archivo, así Minichrome y
+                    // Mk Organizer de escritorio no creen que hay datos nuevos.
+                    await new Promise((res) => chrome.storage.local.set({ gdrive_last_sync: Math.max(lastSync || 0, remoteTs) }, res));
+                    await rememberFile(fileId);
+                    if (!auto) notifySync('Todo está sincronizado con Google Drive', 'success');
+                } else {
+                    localData.timestamp = Date.now();
+                    await uploadToGDrive(token, fileId, localData);
+                    await new Promise((res) => chrome.storage.local.set({ gdrive_last_sync: Date.now() }, res));
+                    await rememberFile(fileId);
+                    if (!auto) notifySync('Sincronización con Google Drive completada', 'success');
+                }
+            } else {
+                localData.timestamp = Date.now();
+                const created = await createInGDrive(token, localData);
+                await new Promise((res) => chrome.storage.local.set({ gdrive_last_sync: Date.now() }, res));
+                await rememberFile(created && created.id);
+                if (!auto) notifySync('Se creó mkorganizer_data.json en Google Drive con tus datos locales.', 'success');
+            }
+        }
+        finishSync();
     } catch (err) {
         console.error('Error durante la sincronización:', err);
-        notify('Fallo en la sincronización de Google Drive. Datos guardados localmente.', 'info');
+        if (!auto) {
+            const msg = String(err.message || err);
+            if (msg.includes('Google Drive API has not been used') || msg.includes('disabled')) {
+                // Google indica el proyecto del cliente OAuth: se muestra para saber dónde activarla.
+                const project = (msg.match(/project[ =](\d+)/) || [])[1];
+                notifySync(project
+                    ? `La Google Drive API está desactivada en el proyecto ${project} de Google Cloud. Actívala en console.cloud.google.com/apis/library/drive.googleapis.com?project=${project}`
+                    : 'Falta habilitar la Google Drive API en tu proyecto de Google Cloud.', 'error');
+            } else {
+                notifySync(`Fallo en la sincronización: ${err.message || 'Error'}`, 'info');
+            }
+        }
         syncState.syncing = false;
         updateSyncUI();
     }
@@ -211,134 +340,32 @@ async function syncNow(auto = false) {
 function finishSync() {
     syncState.syncing = false;
     syncState.lastSync = new Date().toLocaleString();
-    chrome.storage.local.set({ gdrive_last_sync: Date.now() });
-    notify('Sincronización con Google Drive completada', 'success');
     updateSyncUI();
 }
 
-// Aplicar los datos remotos al almacenamiento local de la extensión
-async function applyDownloadedData(remoteData) {
-    return new Promise((resolve) => {
-        const cleanData = {};
-        const keys = ['agenda', 'shopping', 'income', 'kanban', 'notes', 'passwords', 'app_config', 'deudas_list', 'deudas_presupuesto', 'budget_limits'];
-        keys.forEach(k => {
-            if (remoteData[k] !== undefined) {
-                cleanData[k] = remoteData[k];
-            }
-        });
-        
-        // Marcamos que ya no son datos de demostración limpios
-        cleanData.local_data_modified = true;
-        
-        chrome.storage.local.set(cleanData, () => {
-            if (cleanData.app_config && typeof chrome !== 'undefined' && chrome.storage && chrome.storage.sync) {
-                chrome.storage.sync.set({ app_config: cleanData.app_config }, resolve);
-            } else {
-                resolve();
-            }
-        });
-    });
-}
-
-// --- HELPERS API GOOGLE DRIVE REST ---
-
-async function findFileInGDrive(filename) {
-    const response = await fetch(
-        `https://www.googleapis.com/drive/v3/files?q=name='${filename}'+and+trashed=false&spaces=drive`, 
-        {
-            headers: { 'Authorization': `Bearer ${syncState.accessToken}` }
-        }
-    );
-    const data = await response.json();
-    if (data.files && data.files.length > 0) {
-        return data.files[0].id;
-    }
-    return null;
-}
-
-async function downloadFromGDrive(fileId) {
-    const response = await fetch(
-        `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, 
-        {
-            headers: { 'Authorization': `Bearer ${syncState.accessToken}` }
-        }
-    );
-    return await response.json();
-}
-
-async function uploadToGDrive(fileId, payload) {
-    await fetch(
-        `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, 
-        {
-            method: 'PATCH',
-            headers: { 
-                'Authorization': `Bearer ${syncState.accessToken}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(payload)
-        }
-    );
-}
-
-async function createInGDrive(filename, payload) {
-    // Metadata del archivo
-    const metadata = {
-        name: filename,
-        mimeType: 'application/json'
-    };
-
-    const form = new FormData();
-    form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-    form.append('media', new Blob([JSON.stringify(payload)], { type: 'application/json' }));
-
-    await fetch(
-        'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', 
-        {
-            method: 'POST',
-            headers: { 'Authorization': `Bearer ${syncState.accessToken}` },
-            body: form
-        }
-    );
-}
-
-// Recuperar datos desde el backup local
 async function restoreFromLocalBackup() {
-    return new Promise((resolve) => {
-        chrome.storage.local.get(['backup_before_sync'], (result) => {
-            if (!result.backup_before_sync) {
-                notify('No hay backup disponible para restaurar', 'info');
-                resolve(false);
-                return;
-            }
+    chrome.storage.local.get(['backup_before_sync'], (result) => {
+        if (!result.backup_before_sync) {
+            notifySync('No hay backup disponible para restaurar', 'info');
+            return;
+        }
 
-            window.showConfirm('¿Deseas restaurar los datos del backup local anterior?', async (confirm) => {
-                if (confirm) {
-                    const backup = result.backup_before_sync;
-                    const cleanData = {};
-                    const keys = ['agenda', 'shopping', 'income', 'kanban', 'notes', 'passwords', 'app_config', 'deudas_list', 'deudas_presupuesto', 'budget_limits'];
-
-                    keys.forEach(k => {
-                        if (backup[k] !== undefined) {
-                            cleanData[k] = backup[k];
-                        }
-                    });
-
-                    cleanData.local_data_modified = true;
-
-                    chrome.storage.local.set(cleanData, () => {
-                        notify('✅ Datos restaurados desde backup. Recargando...', 'success');
-                        setTimeout(() => location.reload(), 1000);
-                        resolve(true);
-                    });
-                } else {
-                    resolve(false);
-                }
+        window.showConfirm('¿Deseas restaurar los datos del backup local anterior?', (confirm) => {
+            if (!confirm) return;
+            const backup = result.backup_before_sync;
+            const skip = new Set(['gdrive_token', 'gdrive_refresh_token', 'gdrive_token_expiry', 'gdrive_last_sync', 'backup_before_sync']);
+            const cleanData = { local_data_modified: true };
+            Object.keys(backup).forEach((k) => {
+                if (!skip.has(k) && backup[k] !== undefined) cleanData[k] = backup[k];
+            });
+            chrome.storage.local.set(cleanData, () => {
+                notifySync('Datos restaurados desde backup. Recargando…', 'success');
+                setTimeout(() => location.reload(), 800);
             });
         });
     });
 }
 
-// Verificar si hay backup disponible y mostrar opción
 function checkAndShowBackupOption() {
     chrome.storage.local.get(['backup_before_sync'], (result) => {
         if (result.backup_before_sync) {
@@ -348,16 +375,14 @@ function checkAndShowBackupOption() {
                 restoreBtn.id = 'restore-backup-btn';
                 restoreBtn.className = 'ag-btn ag-btn-primary';
                 restoreBtn.style.marginTop = '12px';
-                restoreBtn.textContent = '🔄 Restaurar Backup';
+                restoreBtn.textContent = 'Restaurar Backup';
                 restoreBtn.onclick = restoreFromLocalBackup;
-
                 syncStatusDiv.parentElement.insertBefore(restoreBtn, syncStatusDiv.nextElementSibling);
             }
         }
     });
 }
 
-// Actualizar elementos de la interfaz de sincronización
 function updateSyncUI() {
     const statusText = document.getElementById('sync-status-text');
     const connectBtn = document.getElementById('sync-connect-btn');
@@ -379,7 +404,7 @@ function updateSyncUI() {
         syncBtn.style.display = syncState.connected ? 'inline-block' : 'none';
         syncBtn.disabled = syncState.syncing;
         syncBtn.onclick = () => syncNow(false);
-        
+
         const svgIcon = `
             <svg class="${syncState.syncing ? 'ag-spin' : ''}" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; margin-left: 6px; display: inline-block;">
                 <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l.73-.73"/>
@@ -398,25 +423,32 @@ function updateSyncUI() {
     }
 }
 
-// Exponer funciones globales
 window.initGDriveSync = initGDriveSync;
 window.syncNow = syncNow;
+window.signInGDrive = signInGDrive;
+window.signOutGDrive = signOutGDrive;
 
-// Escuchar cambios locales para disparar sincronizaciones automáticas diferidas
+document.addEventListener('DOMContentLoaded', () => {
+    initGDriveSync();
+});
+
 let syncDebounceTimeout = null;
 if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.onChanged) {
     chrome.storage.onChanged.addListener((changes, areaName) => {
         if (areaName === 'local' && syncState.connected && !syncState.syncing) {
-            // Ignorar cambios en variables de control interno de sincronización para evitar loops infinitos
             const keys = Object.keys(changes);
-            const isInternal = keys.every(k => k.startsWith('gdrive_'));
+            const isInternal = keys.every((k) => 
+                k.startsWith('gdrive_') || 
+                k.startsWith('gcal_') || 
+                k === 'backup_before_sync' || 
+                k === 'local_data_modified'
+            );
             if (isInternal) return;
 
-            // Debounce de 3 segundos tras cambios locales para evitar saturar la API
             if (syncDebounceTimeout) clearTimeout(syncDebounceTimeout);
             syncDebounceTimeout = setTimeout(() => {
-                syncNow(true); // Sincronización silenciosa automática
-            }, 3000);
+                syncNow(true);
+            }, 5000);
         }
     });
 }

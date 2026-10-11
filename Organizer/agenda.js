@@ -1517,7 +1517,9 @@ function renderReminders() {
 
     list.innerHTML = '';
     chunk.forEach((r) => {
-        const due = r.dueDate ? new Date(r.dueDate) : null;
+        // 'AAAA-MM-DD' se interpreta en UTC con new Date(): en América sale el día anterior.
+        const ymd = /^(\d{4})-(\d{2})-(\d{2})$/.exec(r.dueDate || '');
+        const due = ymd ? new Date(+ymd[1], +ymd[2] - 1, +ymd[3]) : (r.dueDate ? new Date(r.dueDate) : null);
         const dateStr = due ? due.toLocaleDateString('es', { day: '2-digit', month: 'short' }) : '';
         const tags = getReminderTagsFromRow(r);
         const visibleTags = tags.slice(0, 2);
